@@ -97,6 +97,9 @@ const MedicalAssessmentSchema = new mongoose.Schema(
   }
 );
 
-MedicalAssessmentSchema.index({ personnelId: 1, expeditionId: 1 });
+MedicalAssessmentSchema.index(
+    { personnelId: 1, expeditionId: 1 },
+    { unique: true }
+);
 
 export default mongoose.model("MedicalAssessment", MedicalAssessmentSchema);
