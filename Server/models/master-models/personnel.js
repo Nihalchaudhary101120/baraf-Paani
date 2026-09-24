@@ -96,11 +96,10 @@ const PersonnelSchema = new mongoose.Schema(
       expectedReturnDate: Date
     },
 
-    previousExpeditions: [
-      {
-        expeditionName: String,
-        year: Number,
-        role: String
+    previousExpeditions: [{
+       type:mongoose.Schema.Types.ObjectId,
+       ref:"Expedition",
+       default:null
       }
     ],
 

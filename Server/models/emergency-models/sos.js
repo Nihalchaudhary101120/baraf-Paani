@@ -77,6 +77,21 @@ const SOSSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User"
     },
+    
+     offlineCreated: {
+      type: Boolean,
+      default: false
+    },
+
+    syncStatus: {
+      type: String,
+      enum: [
+        "LOCAL",
+        "PENDING",
+        "SYNCED"
+      ],
+      default: "LOCAL"
+    },
 
     status: {
       type: String,
