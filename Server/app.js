@@ -12,6 +12,7 @@ import trainingRoutes from "./routes/trainingRoutes.js";
 import cargoCheckpointRoutes from "./routes/cargoRoutes/cargoCheckpointRoutes.js";
 import cargoManifestRoutes from "./routes/cargoRoutes/cargoMenifestRoutes.js";
 import shipmentRoutes from "./routes/cargoRoutes/shipmentRoutes.js";
+import syncRoutes from "./routes/syncRoutes.js";
 
 dotenv.config();
 const app = express();
@@ -61,6 +62,7 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/cargo/manifests", cargoManifestRoutes);
 app.use("/api/cargo/shipments", shipmentRoutes);
 app.use("/api/cargo/checkpoints", cargoCheckpointRoutes);
+app.use("/api/sync",syncRoutes);
 
 const PORT = process.env.PORT || 5000;
 

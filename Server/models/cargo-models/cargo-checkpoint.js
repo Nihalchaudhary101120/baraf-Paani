@@ -6,6 +6,12 @@ import mongoose from "mongoose";
 
 const CargoCheckpointSchema = new mongoose.Schema(
   {
+    eventId: {
+      type: String,
+      unique: true,
+      sparse: true
+    },
+    
     manifestId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "CargoManifest",
@@ -69,7 +75,7 @@ const CargoCheckpointSchema = new mongoose.Schema(
     //PENDING
     // ↓
     //SYNCED
-    
+
     offlineCreated: {
       type: Boolean,
       default: false

@@ -3,6 +3,8 @@ import mongoose from "mongoose";
 
 const InventoryItemSchema = new mongoose.Schema(
   {
+    
+
     itemCode: {
       type: String,
       required: true,

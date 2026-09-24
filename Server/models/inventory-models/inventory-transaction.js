@@ -76,6 +76,12 @@ const InventoryTransactionSchema = new mongoose.Schema(
 
     deviceId: String,
 
+    eventId: {
+      type: String,
+      unique: true,
+      sparse: true
+    },
+
     offlineCreated: {
       type: Boolean,
       default: false
