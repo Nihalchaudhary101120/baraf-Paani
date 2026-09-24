@@ -67,8 +67,7 @@ const CargoItemSchema = new mongoose.Schema(
     },
 
     qrCode: String
-  },
-  { _id: false }
+  }
 );
 
 const CargoManifestSchema = new mongoose.Schema(

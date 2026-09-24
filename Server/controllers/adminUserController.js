@@ -12,7 +12,7 @@ const allowedRoles = [
     "SHIP_OFFICER",
     "FLIGHT_OFFICER",
     "SCIENTIST"
-];
+];  
 
 export const createUserByAdmin = async (req, res) => {
     try {

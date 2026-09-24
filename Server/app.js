@@ -6,11 +6,14 @@ import connectDB from "./config/db.js";
 
 import authRoutes from "./routes/authRoutes.js";
 import personnelRoutes from "./routes/personnelRoutes.js";
+import adminRoutes from "./routes/adminRoutes.js";
 import medicalRoutes from "./routes/medicalRoutes.js";
 import trainingRoutes from "./routes/trainingRoutes.js";
+import cargoCheckpointRoutes from "./routes/cargoRoutes/cargoCheckpointRoutes.js";
+import cargoManifestRoutes from "./routes/cargoRoutes/cargoMenifestRoutes.js";
+import shipmentRoutes from "./routes/cargoRoutes/shipmentRoutes.js";
 
 dotenv.config();
-
 const app = express();
 
 app.use(
@@ -25,7 +28,7 @@ app.use(
         "http://127.0.0.1:5173",
         "http://127.0.0.1:5174",
       ].filter(Boolean);
-      
+
       if (allowedOrigins.includes(origin) || origin.startsWith("http://localhost:")) {
         return callback(null, true);
       }
@@ -54,6 +57,10 @@ app.use("/api/auth", authRoutes);
 app.use("/api/personnel", personnelRoutes);
 app.use("/api/medical", medicalRoutes);
 app.use("/api/training", trainingRoutes);
+app.use("/api/admin", adminRoutes);
+app.use("/api/cargo/manifests", cargoManifestRoutes);
+app.use("/api/cargo/shipments", shipmentRoutes);
+app.use("/api/cargo/checkpoints", cargoCheckpointRoutes);
 
 const PORT = process.env.PORT || 5000;
 
