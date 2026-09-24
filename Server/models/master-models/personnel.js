@@ -10,18 +10,6 @@ const PersonnelSchema = new mongoose.Schema(
       unique: true
     },
 
-    firstName: {
-      type: String,
-      required: true
-    },
-
-    middleName: String,
-
-    lastName: {
-      type: String,
-      required: true
-    },
-
     dateOfBirth: Date,
 
     gender: {
