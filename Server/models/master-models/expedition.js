@@ -2,41 +2,41 @@
 
 const ExpeditionSchema = new mongoose.Schema({
 
- expeditionCode:{
-   type:String,
-   unique:true
- },
+  expeditionCode: {
+    type: String,
+    unique: true
+  },
 
- name:String,
+  name: String,
+  year: Number,
 
- year:Number,
+  season: {
+    type: String,
+    enum: ["SUMMER", "WINTER"]
+  },
 
- season:{
-   type:String,
-   enum:["SUMMER","WINTER"]
- },
+  startDate: Date,
+  endDate: Date,
 
- startDate:Date,
+  stations: [{
+    stationId: {
+      type: ObjectId,
+      ref: "Station"
+    },
 
- endDate:Date,
+    deploymentType: String
+  }],
 
- stations:[{
-   stationId:{
-     type:ObjectId,
-     ref:"Station"
-   },
+  status: {
+    type: String,
+    enum: [
+      "PLANNING",
+      "APPROVED",
+      "ACTIVE",
+      "COMPLETED"
+    ]
+  }
 
-   deploymentType:String
- }],
+}, { timestamps: true });
 
- status:{
-   type:String,
-   enum:[
-     "PLANNING",
-     "APPROVED",
-     "ACTIVE",
-     "COMPLETED"
-   ]
- }
 
-},{timestamps:true});

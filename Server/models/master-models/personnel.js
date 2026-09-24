@@ -23,7 +23,6 @@ const PersonnelSchema = new mongoose.Schema(
     },
 
     maritalStatus: String,
-
     profilePhoto: String,
 
     contact: {
@@ -39,16 +38,11 @@ const PersonnelSchema = new mongoose.Schema(
       }
     },
 
-    organization: {
-      department: String,
-      designation: String,
-      employmentStatus: String
-    },
-
     passport: {
       passportNumber: {
         type: String,
-        uppercase: true
+        uppercase: true,
+        trim: true
       },
       passportType: String,
       issueDate: Date,
@@ -80,16 +74,25 @@ const PersonnelSchema = new mongoose.Schema(
       },
 
       joiningDate: Date,
-
       expectedReturnDate: Date
     },
 
     previousExpeditions: [{
-       type:mongoose.Schema.Types.ObjectId,
-       ref:"Expedition",
-       default:null
-      }
-    ],
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Expedition"
+    }],
+
+    profileStatus: {
+      type: String,
+      enum: [
+        "INCOMPLETE",
+        "COMPLETED",
+        "UNDER_REVIEW",
+        "APPROVED",
+        "REQUIRES_CHANGES"
+      ],
+      default: "INCOMPLETE"
+    },
 
     status: {
       type: String,
@@ -103,12 +106,17 @@ const PersonnelSchema = new mongoose.Schema(
       ],
       default: "REGISTERED"
     }
+
+
   },
   {
     timestamps: true
   }
 );
 
-PersonnelSchema.index({ "passport.passportNumber": 1 });
+PersonnelSchema.index(
+  { "passport.passportNumber": 1 },
+  { unique: true, sparse: true }
+);
 
 export default mongoose.model("Personnel", PersonnelSchema);

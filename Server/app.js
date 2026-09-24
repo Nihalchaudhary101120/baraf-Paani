@@ -5,6 +5,7 @@ import cookieParser from "cookie-parser";
 import connectDB from "./config/db.js";
 
 import authRoutes from "./routes/authRoutes.js";
+import personnelRoutes from "./routes/personnelRoutes.js";
 
 dotenv.config();
 
@@ -48,6 +49,7 @@ app.get("/health", (req, res) => {
 });
 
 app.use("/api/auth", authRoutes);
+app.use("/api/personnel", personnelRoutes);
 
 const PORT = process.env.PORT || 5000;
 
