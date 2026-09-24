@@ -30,7 +30,6 @@ const TrainingRecordSchema = new mongoose.Schema(
     },
 
     certificateNumber: String,
-
     validUntil: Date,
 
     passed: {
@@ -78,7 +77,9 @@ const TrainingClearanceSchema = new mongoose.Schema(
     timestamps: true
   }
 );
-
-TrainingClearanceSchema.index({ personnelId: 1 });
+TrainingClearanceSchema.index(
+  { personnelId: 1, expeditionId: 1 },
+  { unique: true }
+);
 
 export default mongoose.model("TrainingClearance", TrainingClearanceSchema);
