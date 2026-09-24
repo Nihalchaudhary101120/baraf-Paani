@@ -3,44 +3,52 @@ import mongoose from "mongoose";
 
 const UserSchema = new mongoose.Schema({
   employeeId: {
-      type: String,
-      required: true,
-      unique: true,
-      trim: true,
-      uppercase: true
+    type: String,
+    required: true,
+    unique: true,
+    trim: true,
+    uppercase: true
   },
 
   name: {
     type: String,
     required: true,
     trim: true
-    
+
   },
 
   email: {
-      type: String,
-      required: true,
-      unique: true,
-      lowercase: true,
-      trim: true
+    type: String,
+    required: true,
+    unique: true,
+    lowercase: true,
+    trim: true
   },
 
-   phone: {
-      type: String,
-      trim: true
-    },
+  phone: {
+    type: String,
+    trim: true
+  },
 
   password: {
     type: String,
-    required: true
+    required: true,
+    select: false,
   },
 
-  designation: String,
+  designation: {
+    type: String,
+    trim: true,
+  },
 
-  organization: String,
+  organization: {
+    type: String,
+    trim: true,
+  },
 
   role: {
     type: String,
+    required: true,
     enum: [
       "HQ_ADMIN",
       "HQ_COMMAND",
@@ -52,25 +60,28 @@ const UserSchema = new mongoose.Schema({
       "SHIP_OFFICER",
       "FLIGHT_OFFICER",
       "SCIENTIST"
-    ]
+    ],
   },
 
-    permissions: {
-      type: [String],
-      default: []
-    },
+  permissions: {
+    type: [String],
+    default: []
+  },
 
   stationId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Station",
-    default:null
+    default: null
   },
 
   isActive: {
     type: Boolean,
     default: true
   },
-   lastLogin: Date
+  
+  lastLogin: {
+    type: Date,
+  },
 
 
 }, { timestamps: true });
