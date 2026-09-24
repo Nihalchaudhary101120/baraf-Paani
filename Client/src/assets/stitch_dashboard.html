@@ -1,0 +1,1450 @@
+<!DOCTYPE html>
+
+<html class="" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>NIRANTRA • NCPOR Polar Expedition Digital Operations Platform</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&amp;family=JetBrains+Mono:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+    @layer base {
+      html, body { margin: 0; padding: 0; }
+      body { overscroll-behavior: none; }
+    }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #f1f5f9; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    .nav-active {
+      background-color: #f0fdfa !important;
+      color: #005B7F !important;
+      border-left: 4px solid #005B7F !important;
+      font-weight: 600 !important;
+    }
+  </style>
+</head>
+<body class="bg-[#F4F7F9] font-['Inter',sans-serif] text-sm text-[#0F172A] antialiased select-none min-h-screen flex flex-col">
+<!-- ========================================================================= -->
+<!-- 1. GLOBAL SOLID TEAL APPLICATION HEADER (#005B7F) -->
+<!-- ========================================================================= -->
+<header class="fixed top-0 left-0 right-0 h-16 bg-[#005B7F] text-white z-50 px-5 flex items-center justify-between shadow-sm">
+<!-- Brand & Nodal Identity -->
+<div class="flex items-center gap-6">
+<div class="flex items-center gap-3 cursor-pointer" onclick="switchView('dashboard')">
+<div class="w-8 h-8 rounded bg-white/10 border border-white/20 flex items-center justify-center text-white">
+<span class="material-symbols-outlined text-[20px]">explore</span>
+</div>
+<div class="flex flex-col">
+<div class="flex items-center gap-2">
+<span class="font-bold text-base tracking-wider text-white">NIRANTRA</span>
+<span class="text-[10px] font-['JetBrains_Mono'] bg-white/20 text-white px-1.5 py-0.2 rounded font-semibold tracking-wider">v1.0</span>
+</div>
+<span class="text-[10px] text-teal-100/80 tracking-tight leading-3">PS 26062 • NCPOR Polar Operations</span>
+</div>
+</div>
+<!-- Center / HQ Badge -->
+<div class="hidden md:flex items-center gap-2 px-3 py-1 bg-black/15 rounded border border-white/10 text-xs text-white">
+<span class="material-symbols-outlined text-[15px] text-teal-200">location_city</span>
+<span class="font-medium tracking-wide">HQ / NCPOR</span>
+</div>
+</div>
+<!-- Header Actions, Status Toggle & User Profile -->
+<div class="flex items-center gap-4">
+<!-- Interactive Online / Offline State Toggle Indicator -->
+<button class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/20 hover:bg-black/30 border border-white/15 transition text-xs font-medium cursor-pointer" id="networkStatusToggle" onclick="toggleOffline()" title="Click to test Offline / Online State">
+<span class="w-2.5 h-2.5 rounded-full bg-[#15803D]" id="statusDot"></span>
+<span class="font-semibold text-emerald-300 tracking-wide text-xs" id="statusText">● Online</span>
+</button>
+<!-- Notification Bell -->
+<button class="relative p-2 text-teal-100 hover:text-white hover:bg-white/10 rounded transition" onclick="switchView('emergency')" title="Notifications">
+<span class="material-symbols-outlined text-[20px]">notifications</span>
+<span class="absolute top-1.5 right-1.5 w-4 h-4 bg-[#E65A28] text-white text-[10px] font-bold flex items-center justify-center rounded-full">2</span>
+</button>
+<!-- SOS Trigger Button -->
+<button class="flex items-center gap-1.5 px-3 py-1.5 bg-[#B91C1C] hover:bg-[#991b1b] text-white rounded font-medium text-xs shadow-sm transition border border-red-400/30" onclick="switchView('emergency')">
+<span class="material-symbols-outlined text-[16px]">warning</span>
+<span class="font-bold tracking-wider">⚠ SOS</span>
+</button>
+<div class="h-6 w-[1px] bg-white/20"></div>
+<!-- User Profile -->
+<div class="flex items-center gap-2 cursor-pointer py-1 px-2 rounded hover:bg-white/10 transition">
+<div class="w-7 h-7 rounded-full bg-teal-800 border border-white/30 flex items-center justify-center text-white font-semibold text-xs">
+          DV
+        </div>
+<div class="flex items-center gap-1">
+<span class="font-semibold text-xs text-white">Dr. Vasu</span>
+<span class="material-symbols-outlined text-[16px] text-teal-200">arrow_drop_down</span>
+</div>
+</div>
+</div>
+</header>
+<!-- ========================================================================= -->
+<!-- 2. OFFLINE BANNER (Toggled via button / Online state) -->
+<!-- ========================================================================= -->
+<div class="hidden fixed top-16 left-0 right-0 z-40 bg-[#FFC000] text-[#0F172A] font-medium text-sm py-2 px-6 flex items-center justify-between shadow-sm border-b border-amber-400" id="offlineBanner">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[20px]">cloud_off</span>
+<span class="font-bold text-xs md:text-sm">⚠ OFFLINE</span>
+<span class="text-xs md:text-sm">— Changes are being stored locally and will synchronize when connected.</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="text-[11px] font-['JetBrains_Mono'] bg-black/10 px-2 py-0.5 rounded">6 Changes Queued</span>
+<button class="px-2.5 py-0.5 bg-[#0F172A] text-white text-xs rounded hover:bg-slate-800 transition" onclick="toggleOffline()">Restore Connection</button>
+</div>
+</div>
+<!-- ========================================================================= -->
+<!-- MAIN APP CONTAINER (Sidebar + Dynamic Main Views) -->
+<!-- ========================================================================= -->
+<div class="flex flex-1 pt-16">
+<!-- ======================================================================= -->
+<!-- LEFT SIDEBAR NAVIGATION (Fixed w-64, #F4F7F9, border-r #E2E8F0) -->
+<!-- ======================================================================= -->
+<aside class="w-64 fixed top-16 bottom-0 left-0 bg-[#F4F7F9] border-r border-[#E2E8F0] z-30 flex flex-col justify-between overflow-y-auto">
+<div class="py-3 flex flex-col">
+<div class="px-4 py-2 text-[11px] font-bold text-[#64748B] uppercase tracking-wider">
+          HQ Operations
+        </div>
+<nav class="flex flex-col text-sm" id="sidebarMenu">
+<button class="nav-btn nav-active flex items-center gap-3 px-4 py-2.5 text-left border-l-4 border-transparent text-[#334155] hover:bg-slate-200/50 transition" id="nav-dashboard" onclick="switchView('dashboard')">
+<span class="material-symbols-outlined text-[20px]">space_dashboard</span>
+<span>Dashboard</span>
+</button>
+<button class="nav-btn flex items-center gap-3 px-4 py-2.5 text-left border-l-4 border-transparent text-[#334155] hover:bg-slate-200/50 transition" id="nav-expeditions" onclick="switchView('expeditions')">
+<span class="material-symbols-outlined text-[20px]">calendar_month</span>
+<span>Expeditions</span>
+</button>
+<button class="nav-btn flex items-center justify-between px-4 py-2.5 text-left border-l-4 border-transparent text-[#334155] hover:bg-slate-200/50 transition" id="nav-cargo" onclick="switchView('cargo')">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-[20px]">inventory_2</span>
+<span>Cargo</span>
+</div>
+<span class="bg-orange-50 text-[#E65A28] border border-orange-200 text-[10px] font-bold px-1.5 py-0.5 rounded-full">1 Alert</span>
+</button>
+<button class="nav-btn flex items-center justify-between px-4 py-2.5 text-left border-l-4 border-transparent text-[#334155] hover:bg-slate-200/50 transition" id="nav-inventory" onclick="switchView('inventory')">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-[20px]">category</span>
+<span>Inventory</span>
+</div>
+<span class="bg-amber-50 text-amber-800 border border-amber-300 text-[10px] font-bold px-1.5 py-0.5 rounded-full">🟠 Low</span>
+</button>
+<button class="nav-btn flex items-center gap-3 px-4 py-2.5 text-left border-l-4 border-transparent text-[#334155] hover:bg-slate-200/50 transition" id="nav-personnel" onclick="switchView('personnel')">
+<span class="material-symbols-outlined text-[20px]">groups</span>
+<span>Personnel</span>
+</button>
+<button class="nav-btn flex items-center gap-3 px-4 py-2.5 text-left border-l-4 border-transparent text-[#334155] hover:bg-slate-200/50 transition" id="nav-movement" onclick="switchView('movement')">
+<span class="material-symbols-outlined text-[20px]">near_me</span>
+<span>Movement</span>
+</button>
+<button class="nav-btn flex items-center justify-between px-4 py-2.5 text-left border-l-4 border-transparent text-[#334155] hover:bg-slate-200/50 transition" id="nav-emergency" onclick="switchView('emergency')">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-[20px] text-[#B91C1C]">emergency</span>
+<span class="text-[#B91C1C] font-semibold">Emergency</span>
+</div>
+<span class="bg-red-50 text-[#B91C1C] border border-red-200 text-[10px] font-bold px-1.5 py-0.5 rounded-full">1 SOS</span>
+</button>
+<button class="nav-btn flex items-center gap-3 px-4 py-2.5 text-left border-l-4 border-transparent text-[#334155] hover:bg-slate-200/50 transition" id="nav-reports" onclick="switchView('reports')">
+<span class="material-symbols-outlined text-[20px]">description</span>
+<span>Reports</span>
+</button>
+<button class="nav-btn flex items-center justify-between px-4 py-2.5 text-left border-l-4 border-transparent text-[#334155] hover:bg-slate-200/50 transition" id="nav-approvals" onclick="switchView('approvals')">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-[20px]">verified</span>
+<span>Approvals</span>
+</div>
+<span class="bg-blue-50 text-[#005B7F] border border-blue-200 text-[10px] font-bold px-1.5 py-0.5 rounded-full">2</span>
+</button>
+<button class="nav-btn flex items-center gap-3 px-4 py-2.5 text-left border-l-4 border-transparent text-[#334155] hover:bg-slate-200/50 transition" id="nav-fleet" onclick="switchView('fleet')">
+<span class="material-symbols-outlined text-[20px]">directions_boat</span>
+<span>Fleet / Transport</span>
+</button>
+<button class="nav-btn flex items-center justify-between px-4 py-2.5 text-left border-l-4 border-transparent text-[#334155] hover:bg-slate-200/50 transition" id="nav-synchronization" onclick="switchView('synchronization')">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-[20px]">sync</span>
+<span>Synchronization</span>
+</div>
+<span class="w-2 h-2 rounded-full bg-amber-500"></span>
+</button>
+<button class="nav-btn flex items-center gap-3 px-4 py-2.5 text-left border-l-4 border-transparent text-[#334155] hover:bg-slate-200/50 transition" id="nav-copilot" onclick="switchView('copilot')">
+<span class="material-symbols-outlined text-[20px] text-teal-600">psychology</span>
+<span class="font-medium text-teal-900">Command Copilot</span>
+</button>
+<button class="nav-btn flex items-center gap-3 px-4 py-2.5 text-left border-l-4 border-transparent text-[#334155] hover:bg-slate-200/50 transition" id="nav-settings" onclick="switchView('settings')">
+<span class="material-symbols-outlined text-[20px]">settings</span>
+<span>Settings</span>
+</button>
+</nav>
+</div>
+<!-- Footer Metadata -->
+<div class="p-3 border-t border-[#E2E8F0] bg-white text-[11px] text-[#64748B]">
+<div class="font-semibold text-[#0F172A]">Nirantra v1.0 • PS 26062</div>
+<div>MoES • Govt. of India</div>
+</div>
+</aside>
+<!-- ======================================================================= -->
+<!-- MAIN CONTENT VIEW AREA (Pushed by 64px sidebar) -->
+<!-- ======================================================================= -->
+<main class="ml-64 flex-1 p-6 md:p-8 bg-[#F4F7F9] min-h-[calc(100vh-4rem)]">
+<!-- =================================================================== -->
+<!-- WIREFRAME 2: HQ OVERVIEW DASHBOARD -->
+<!-- =================================================================== -->
+<section class="view-section flex flex-col gap-6 max-w-[1500px] mx-auto" id="view-dashboard">
+<!-- Section Header -->
+<div class="flex items-center justify-between pb-2 border-b border-[#E2E8F0]">
+<div>
+<h1 class="text-xl font-bold text-[#005B7F]">HQ COMMAND</h1>
+<p class="text-xs text-[#64748B]">Overview of active polar missions, station complements, and priority alerts.</p>
+</div>
+<div class="flex items-center gap-2">
+<button class="bg-[#005B7F] hover:bg-[#004a68] text-white px-3.5 py-1.5 rounded text-xs font-medium shadow-sm transition" onclick="switchView('expeditions-create')">
+              + Create Expedition
+            </button>
+<button class="bg-[#B91C1C] hover:bg-[#991b1b] text-white px-3 py-1.5 rounded text-xs font-medium transition" onclick="switchView('emergency')">
+              ⚠ SOS Center
+            </button>
+</div>
+</div>
+<!-- 1. Current Expedition Card -->
+<div class="bg-white border border-[#E2E8F0] rounded-md p-6 shadow-sm flex flex-col gap-3">
+<div class="flex items-center justify-between pb-2 border-b border-[#E2E8F0]">
+<span class="text-xs font-bold text-[#64748B] uppercase tracking-wider">Current Expedition</span>
+<button class="bg-white border border-[#005B7F] text-[#005B7F] hover:bg-teal-50 px-3 py-1 rounded text-xs font-semibold transition" onclick="switchView('expedition-detail')">
+              [VIEW EXPEDITION]
+            </button>
+</div>
+<div class="flex flex-wrap items-center justify-between gap-4">
+<div class="flex items-center gap-3">
+<span class="font-['JetBrains_Mono'] font-bold text-[#005B7F] text-lg">EXP-46</span>
+<span class="text-base font-bold text-[#0F172A]">Expedition 46</span>
+<span class="bg-slate-100 text-[#0F172A] border border-[#CBD5E1] px-2 py-0.5 rounded text-xs font-semibold">WINTER</span>
+<span class="bg-emerald-50 text-[#15803D] border border-emerald-200 px-2.5 py-0.5 rounded-full text-xs font-semibold">ACTIVE</span>
+</div>
+<div class="text-xs text-[#64748B]">
+              Expedition period: <strong class="text-slate-800">2026 – 2027</strong>
+</div>
+</div>
+</div>
+<!-- 2. Station Status Cards (Maitri & Bharati) -->
+<div>
+<div class="text-xs font-bold text-[#64748B] uppercase tracking-wider mb-2.5">Station Status</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+<!-- Maitri -->
+<div class="bg-white border border-[#E2E8F0] rounded-md p-5 shadow-sm flex flex-col justify-between">
+<div class="flex items-center justify-between">
+<span class="font-bold text-sm text-[#005B7F]">MAITRI</span>
+<span class="bg-emerald-50 text-[#15803D] border border-emerald-200 px-2 py-0.5 rounded-full text-xs font-semibold">● ACTIVE</span>
+</div>
+<div class="mt-3 text-xs text-[#64748B]">
+                Personnel: <strong class="text-slate-900 text-sm">42</strong>
+</div>
+</div>
+<!-- Bharati -->
+<div class="bg-white border border-[#E2E8F0] rounded-md p-5 shadow-sm flex flex-col justify-between">
+<div class="flex items-center justify-between">
+<span class="font-bold text-sm text-[#005B7F]">BHARATI</span>
+<span class="bg-emerald-50 text-[#15803D] border border-emerald-200 px-2 py-0.5 rounded-full text-xs font-semibold">● ACTIVE</span>
+</div>
+<div class="mt-3 text-xs text-[#64748B]">
+                Personnel: <strong class="text-slate-900 text-sm">31</strong>
+</div>
+</div>
+</div>
+</div>
+<!-- 3. Operational Status Grid (4 Rectangular Counters) -->
+<div>
+<div class="text-xs font-bold text-[#64748B] uppercase tracking-wider mb-2.5">Operational Status</div>
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+<div class="bg-white border border-[#E2E8F0] rounded-md p-5 shadow-sm hover:border-[#005B7F] cursor-pointer transition" onclick="switchView('personnel')">
+<div class="text-xs font-semibold text-[#64748B] uppercase">Personnel</div>
+<div class="text-2xl font-bold text-[#005B7F] mt-1.5">73 Active</div>
+</div>
+<div class="bg-white border border-[#E2E8F0] rounded-md p-5 shadow-sm hover:border-[#005B7F] cursor-pointer transition" onclick="switchView('cargo')">
+<div class="text-xs font-semibold text-[#64748B] uppercase">Cargo</div>
+<div class="text-2xl font-bold text-[#0F172A] mt-1.5">18 Transit</div>
+</div>
+<div class="bg-white border border-[#E2E8F0] rounded-md p-5 shadow-sm hover:border-[#005B7F] cursor-pointer transition" onclick="switchView('inventory')">
+<div class="text-xs font-semibold text-[#64748B] uppercase">Inventory</div>
+<div class="text-2xl font-bold text-[#E65A28] mt-1.5">3 Risks</div>
+</div>
+<div class="bg-white border border-[#E2E8F0] rounded-md p-5 shadow-sm hover:border-[#005B7F] cursor-pointer transition" onclick="switchView('emergency')">
+<div class="text-xs font-semibold text-[#64748B] uppercase">Emergency</div>
+<div class="text-2xl font-bold text-[#B91C1C] mt-1.5">1 Active</div>
+</div>
+</div>
+</div>
+<!-- 4. Critical Alerts -->
+<div>
+<div class="text-xs font-bold text-[#64748B] uppercase tracking-wider mb-2.5">Critical Alerts</div>
+<div class="bg-white border border-[#E2E8F0] rounded-md shadow-sm divide-y divide-[#E2E8F0]">
+<!-- Red Medical SOS -->
+<div class="p-4 flex items-center justify-between hover:bg-[#F4F7F9] transition">
+<div class="flex items-center gap-3">
+<span class="w-3 h-3 rounded-full bg-[#B91C1C] flex-shrink-0"></span>
+<div>
+<div class="font-bold text-sm text-[#0F172A]">🔴 Medical SOS — Personnel P1023</div>
+<div class="text-xs text-[#64748B]">Maitri • Medical • Active</div>
+</div>
+</div>
+<button class="bg-[#B91C1C] hover:bg-[#991b1b] text-white px-3 py-1.5 rounded text-xs font-semibold transition" onclick="switchView('emergency')">
+                [RESPOND]
+              </button>
+</div>
+<!-- Orange Cargo Discrepancy -->
+<div class="p-4 flex items-center justify-between hover:bg-[#F4F7F9] transition">
+<div class="flex items-center gap-3">
+<span class="w-3 h-3 rounded-full bg-[#E65A28] flex-shrink-0"></span>
+<div>
+<div class="font-bold text-sm text-[#0F172A]">🟠 Cargo discrepancy — Manifest AL-1403-021</div>
+<div class="text-xs text-[#64748B]">Bharati • 2 packages missing</div>
+</div>
+</div>
+<button class="bg-white border border-[#005B7F] text-[#005B7F] hover:bg-teal-50 px-3 py-1.5 rounded text-xs font-semibold transition" onclick="switchView('cargo')">
+                [VIEW]
+              </button>
+</div>
+</div>
+</div>
+<!-- 5. Upcoming Schedule -->
+<div>
+<div class="text-xs font-bold text-[#64748B] uppercase tracking-wider mb-2.5">Upcoming</div>
+<div class="bg-white border border-[#E2E8F0] rounded-md p-5 shadow-sm">
+<div class="space-y-3 text-xs">
+<div class="flex items-center justify-between border-b border-[#E2E8F0] pb-2">
+<div class="flex items-center gap-3 font-semibold text-slate-800">
+<span class="font-['JetBrains_Mono'] text-[#005B7F] w-16">18 Oct</span>
+<span>Ship departure — ORV Sagar Nidhi</span>
+</div>
+<span class="bg-blue-50 text-[#005B7F] px-2 py-0.5 rounded-full font-semibold">Planned</span>
+</div>
+<div class="flex items-center justify-between border-b border-[#E2E8F0] pb-2">
+<div class="flex items-center gap-3 font-semibold text-slate-800">
+<span class="font-['JetBrains_Mono'] text-[#005B7F] w-16">21 Oct</span>
+<span>Bharati resupply — Helicopter Staging</span>
+</div>
+<span class="bg-orange-50 text-[#E65A28] border border-orange-200 px-2 py-0.5 rounded-full font-semibold">Weather Alert</span>
+</div>
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-3 font-semibold text-slate-800">
+<span class="font-['JetBrains_Mono'] text-[#005B7F] w-16">02 Nov</span>
+<span>Personnel deployment — Maitri Inter-Station</span>
+</div>
+<span class="bg-blue-50 text-[#005B7F] px-2 py-0.5 rounded-full font-semibold">Scheduled</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- =================================================================== -->
+<!-- WIREFRAME 3: EXPEDITION CALENDAR -->
+<!-- =================================================================== -->
+<section class="view-section hidden flex flex-col gap-6 max-w-[1500px] mx-auto" id="view-expeditions">
+<div class="flex items-center justify-between pb-2 border-b border-[#E2E8F0]">
+<div>
+<h1 class="text-xl font-bold text-[#005B7F]">EXPEDITIONS</h1>
+<p class="text-xs text-[#64748B]">Mission phases schedule, timeline bars, and multi-year expedition registry.</p>
+</div>
+<button class="bg-[#005B7F] hover:bg-[#004a68] text-white px-3.5 py-1.5 rounded text-xs font-medium shadow-sm transition" onclick="switchView('expeditions-create')">
+            [+ CREATE]
+          </button>
+</div>
+<div class="flex items-center justify-between text-xs">
+<div class="flex items-center gap-2">
+<select class="border border-[#CBD5E1] rounded px-3 py-1 bg-white font-semibold text-[#0F172A]">
+<option selected="">2026 ▼</option>
+<option>2027</option>
+<option>2028</option>
+</select>
+</div>
+<div class="flex items-center gap-2">
+<select class="border border-[#CBD5E1] rounded px-3 py-1 bg-white text-[#0F172A]">
+<option selected="">Month ▼</option>
+<option>Quarter</option>
+<option>Year</option>
+</select>
+<div class="flex items-center border border-[#CBD5E1] rounded bg-white">
+<button class="px-2 py-1 text-slate-600 hover:bg-slate-100">&lt;</button>
+<button class="px-2 py-1 text-slate-600 hover:bg-slate-100 border-l border-[#CBD5E1]">&gt;</button>
+</div>
+</div>
+</div>
+<!-- Wireframe 3 ASCII Timeline Gantt Representation -->
+<div class="bg-white border border-[#E2E8F0] rounded-md p-6 shadow-sm flex flex-col gap-4">
+<div class="text-xs font-bold text-center text-[#005B7F] tracking-wider uppercase border-b border-[#E2E8F0] pb-2">
+            OCTOBER 2026
+          </div>
+<div class="flex flex-col gap-4 text-xs font-['JetBrains_Mono']">
+<!-- Training -->
+<div class="flex items-center gap-4">
+<span class="w-24 text-slate-700 font-semibold font-['Inter']">Training</span>
+<div class="flex-1 bg-slate-100 h-6 rounded relative flex items-center">
+<div class="absolute left-0 w-1/4 h-5 bg-[#005B7F] rounded text-white flex items-center justify-center font-bold text-[10px]">
+                  ███████████
+                </div>
+</div>
+</div>
+<!-- Travel -->
+<div class="flex items-center gap-4">
+<span class="w-24 text-slate-700 font-semibold font-['Inter']">Travel</span>
+<div class="flex-1 bg-slate-100 h-6 rounded relative flex items-center">
+<div class="absolute left-1/4 w-1/4 h-5 bg-[#337AB7] rounded text-white flex items-center justify-center font-bold text-[10px]">
+                  █████████████
+                </div>
+</div>
+</div>
+<!-- Deployment -->
+<div class="flex items-center gap-4">
+<span class="w-24 text-slate-700 font-semibold font-['Inter']">Deployment</span>
+<div class="flex-1 bg-slate-100 h-6 rounded relative flex items-center">
+<div class="absolute left-[45%] w-1/3 h-5 bg-[#005B7F] rounded text-white flex items-center justify-center font-bold text-[10px]">
+                  ███████████████
+                </div>
+</div>
+</div>
+<!-- Resupply -->
+<div class="flex items-center gap-4">
+<span class="w-24 text-slate-700 font-semibold font-['Inter']">Resupply</span>
+<div class="flex-1 bg-slate-100 h-6 rounded relative flex items-center">
+<div class="absolute left-[65%] w-1/5 h-5 bg-[#FFC000] text-slate-900 rounded flex items-center justify-center font-bold text-[10px]">
+                  █████████
+                </div>
+</div>
+</div>
+<!-- Return -->
+<div class="flex items-center gap-4">
+<span class="w-24 text-slate-700 font-semibold font-['Inter']">Return</span>
+<div class="flex-1 bg-slate-100 h-6 rounded relative flex items-center">
+<div class="absolute left-[80%] w-1/6 h-5 bg-slate-600 text-white rounded flex items-center justify-center font-bold text-[10px]">
+                  ████████
+                </div>
+</div>
+</div>
+</div>
+</div>
+<!-- Wireframe 3 Expeditions Table -->
+<div class="bg-white border border-[#E2E8F0] rounded-md p-6 shadow-sm flex flex-col gap-3">
+<div class="text-xs font-bold text-[#64748B] uppercase tracking-wider pb-2 border-b border-[#E2E8F0]">
+            Expeditions
+          </div>
+<div class="overflow-x-auto">
+<table class="w-full text-left text-xs">
+<thead>
+<tr class="border-b border-[#E2E8F0]">
+<th class="pb-2 font-semibold text-[#64748B] uppercase">Code</th>
+<th class="pb-2 font-semibold text-[#64748B] uppercase">Name</th>
+<th class="pb-2 font-semibold text-[#64748B] uppercase">Season</th>
+<th class="pb-2 font-semibold text-[#64748B] uppercase">Status</th>
+<th class="pb-2 font-semibold text-[#64748B] uppercase">Dates</th>
+<th class="pb-2 font-semibold text-[#64748B] uppercase text-right">Action</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-[#E2E8F0]">
+<tr class="hover:bg-[#F4F7F9] transition cursor-pointer" onclick="switchView('expedition-detail')">
+<td class="py-3 font-bold font-['JetBrains_Mono'] text-[#005B7F]">EXP-46</td>
+<td class="py-3 font-medium text-slate-800">Expedition 46</td>
+<td class="py-3 font-medium">WINTER</td>
+<td class="py-3"><span class="bg-blue-50 text-[#005B7F] border border-blue-200 px-2 py-0.5 rounded-full font-bold text-[11px]">ACTIVE</span></td>
+<td class="py-3 text-[#64748B]">2026–27</td>
+<td class="py-3 text-right">
+<button class="bg-white border border-[#005B7F] text-[#005B7F] hover:bg-teal-50 px-2.5 py-1 rounded text-xs font-semibold">[VIEW]</button>
+</td>
+</tr>
+<tr class="hover:bg-[#F4F7F9] transition">
+<td class="py-3 font-bold font-['JetBrains_Mono'] text-[#005B7F]">EXP-47</td>
+<td class="py-3 font-medium text-slate-800">Expedition 47</td>
+<td class="py-3 font-medium">SUMMER</td>
+<td class="py-3"><span class="bg-amber-50 text-amber-800 border border-amber-300 px-2 py-0.5 rounded-full font-bold text-[11px]">PLANNING</span></td>
+<td class="py-3 text-[#64748B]">2027</td>
+<td class="py-3 text-right">
+<button class="bg-white border border-[#CBD5E1] text-slate-700 hover:bg-slate-50 px-2.5 py-1 rounded text-xs font-semibold" onclick="switchView('expeditions-create')">[EDIT]</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</section>
+<!-- =================================================================== -->
+<!-- WIREFRAME 4: EXPEDITION DETAIL -->
+<!-- =================================================================== -->
+<section class="view-section hidden flex flex-col gap-6 max-w-[1500px] mx-auto" id="view-expedition-detail">
+<div class="flex items-center justify-between pb-2 border-b border-[#E2E8F0]">
+<div class="flex items-center gap-2">
+<button class="text-[#005B7F] hover:underline text-xs font-semibold flex items-center gap-1" onclick="switchView('expeditions')">
+              ← Expeditions
+            </button>
+</div>
+<div class="flex items-center gap-2">
+<button class="bg-white border border-[#005B7F] text-[#005B7F] hover:bg-teal-50 px-3 py-1.5 rounded text-xs font-semibold transition" onclick="switchView('expeditions-create')">
+              [EDIT]
+            </button>
+<button class="bg-white border border-[#CBD5E1] text-slate-700 px-3 py-1.5 rounded text-xs font-medium">
+              [MORE ▼]
+            </button>
+</div>
+</div>
+<div class="bg-white border border-[#E2E8F0] rounded-md p-6 shadow-sm flex flex-col gap-6">
+<div>
+<div class="flex items-center gap-3">
+<h2 class="text-xl font-bold text-[#0F172A]">Expedition 46</h2>
+<span class="font-['JetBrains_Mono'] font-bold text-xs bg-slate-100 text-[#005B7F] px-2 py-0.5 rounded">EXP-46</span>
+</div>
+<div class="flex items-center gap-2 mt-2">
+<span class="bg-slate-100 text-slate-800 border border-[#CBD5E1] px-2.5 py-0.5 rounded text-xs font-semibold">[ WINTER ]</span>
+<span class="bg-blue-50 text-[#005B7F] border border-blue-200 px-2.5 py-0.5 rounded font-bold text-xs">[ ACTIVE ]</span>
+<span class="text-xs text-[#64748B] font-semibold">2026 – 2027</span>
+</div>
+</div>
+<!-- Expedition Information Card -->
+<div class="bg-white border border-[#E2E8F0] rounded-md p-5 shadow-sm">
+<div class="text-xs font-bold text-[#64748B] uppercase tracking-wider mb-3">Expedition Information</div>
+<div class="grid grid-cols-2 md:grid-cols-3 gap-3 text-xs">
+<div><span class="text-[#64748B]">Name:</span> <strong class="text-slate-900 ml-1">Expedition 46</strong></div>
+<div><span class="text-[#64748B]">Code:</span> <strong class="text-slate-900 ml-1 font-['JetBrains_Mono']">EXP-46</strong></div>
+<div><span class="text-[#64748B]">Season:</span> <strong class="text-slate-900 ml-1">WINTER</strong></div>
+<div><span class="text-[#64748B]">Start:</span> <strong class="text-slate-900 ml-1">10 Oct 2026</strong></div>
+<div><span class="text-[#64748B]">End:</span> <strong class="text-slate-900 ml-1">20 Mar 2027</strong></div>
+<div><span class="text-[#64748B]">Status:</span> <span class="bg-emerald-50 text-[#15803D] px-2 py-0.5 rounded font-bold ml-1">ACTIVE</span></div>
+</div>
+</div>
+<!-- Timeline Stepper (ASCII Wireframe 4) -->
+<div>
+<div class="text-xs font-bold text-[#64748B] uppercase tracking-wider mb-2">Timeline</div>
+<div class="bg-slate-50 border border-[#E2E8F0] rounded p-4 text-xs font-semibold flex items-center justify-between overflow-x-auto">
+<span class="text-emerald-700">✓ Training</span>
+<span class="text-slate-300">───</span>
+<span class="text-emerald-700">✓ Travel</span>
+<span class="text-slate-300">───</span>
+<span class="text-[#005B7F] font-bold">● Deployment (Active)</span>
+<span class="text-slate-300">───</span>
+<span class="text-slate-500">○ Resupply</span>
+<span class="text-slate-300">───</span>
+<span class="text-slate-500">○ Return</span>
+</div>
+</div>
+<!-- Assigned Stations -->
+<div>
+<div class="text-xs font-bold text-[#64748B] uppercase tracking-wider mb-2">Assigned Stations</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+<div class="border border-[#E2E8F0] rounded-md p-4 bg-slate-50/50">
+<div class="font-bold text-[#005B7F] text-sm">MAITRI</div>
+<div class="text-xs text-slate-600 mt-1">SUMMER &amp; WINTER STAGING</div>
+</div>
+<div class="border border-[#E2E8F0] rounded-md p-4 bg-slate-50/50">
+<div class="font-bold text-[#005B7F] text-sm">BHARATI</div>
+<div class="text-xs text-slate-600 mt-1">WINTERING GEOPHYSICAL BASE</div>
+</div>
+</div>
+</div>
+<!-- Key Metrics -->
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-center border-t border-[#E2E8F0] pt-4">
+<div class="p-3 bg-white border border-[#E2E8F0] rounded">
+<div class="text-xs text-[#64748B] uppercase">Personnel</div>
+<div class="text-xl font-bold text-[#005B7F] mt-1">42</div>
+</div>
+<div class="p-3 bg-white border border-[#E2E8F0] rounded">
+<div class="text-xs text-[#64748B] uppercase">Cargo</div>
+<div class="text-xl font-bold text-slate-800 mt-1">18</div>
+</div>
+<div class="p-3 bg-white border border-[#E2E8F0] rounded">
+<div class="text-xs text-[#64748B] uppercase">Transport</div>
+<div class="text-xl font-bold text-slate-800 mt-1">3</div>
+</div>
+<div class="p-3 bg-white border border-[#E2E8F0] rounded">
+<div class="text-xs text-[#64748B] uppercase">Incidents</div>
+<div class="text-xl font-bold text-[#B91C1C] mt-1">1</div>
+</div>
+</div>
+</div>
+</section>
+<!-- =================================================================== -->
+<!-- WIREFRAME 5: CREATE / EDIT EXPEDITION -->
+<!-- =================================================================== -->
+<section class="view-section hidden flex flex-col gap-6 max-w-[1200px] mx-auto" id="view-expeditions-create">
+<div class="flex items-center justify-between pb-2 border-b border-[#E2E8F0]">
+<div>
+<h1 class="text-xl font-bold text-[#005B7F]">CREATE EXPEDITION</h1>
+<p class="text-xs text-[#64748B]">Register mission code, season, operational periods, and phase milestones.</p>
+</div>
+<button class="text-xs text-[#64748B] hover:text-[#005B7F] font-semibold" onclick="switchView('expeditions')">
+            Cancel
+          </button>
+</div>
+<form class="bg-white border border-[#E2E8F0] rounded-md p-6 shadow-sm flex flex-col gap-6" onsubmit="event.preventDefault(); alert('Expedition registered!'); switchView('expedition-detail');">
+<!-- Basic Information -->
+<div>
+<div class="text-xs font-bold text-[#64748B] uppercase tracking-wider mb-3">Basic Information</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+<div class="flex flex-col gap-1">
+<label class="text-sm font-medium text-[#0F172A]">Expedition Code *</label>
+<input class="border border-[#CBD5E1] rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#005B7F]" required="" type="text" value="EXP-47"/>
+</div>
+<div class="flex flex-col gap-1">
+<label class="text-sm font-medium text-[#0F172A]">Name *</label>
+<input class="border border-[#CBD5E1] rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#005B7F]" placeholder="Expedition 47" required="" type="text"/>
+</div>
+<div class="flex flex-col gap-1 md:col-span-2">
+<label class="text-sm font-medium text-[#0F172A]">Season *</label>
+<select class="border border-[#CBD5E1] rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#005B7F]">
+<option selected="">SUMMER ▼</option>
+<option>WINTER</option>
+</select>
+</div>
+</div>
+</div>
+<!-- Expedition Period -->
+<div>
+<div class="text-xs font-bold text-[#64748B] uppercase tracking-wider mb-3">Expedition Period</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+<div class="flex flex-col gap-1">
+<label class="text-sm font-medium text-[#0F172A]">Start Date *</label>
+<input class="border border-[#CBD5E1] rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#005B7F]" placeholder="DD/MM/YYYY" required="" type="text" value="10/10/2026"/>
+</div>
+<div class="flex flex-col gap-1">
+<label class="text-sm font-medium text-[#0F172A]">End Date *</label>
+<input class="border border-[#CBD5E1] rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#005B7F]" placeholder="DD/MM/YYYY" required="" type="text" value="20/03/2027"/>
+</div>
+</div>
+</div>
+<!-- Stations -->
+<div>
+<div class="text-xs font-bold text-[#64748B] uppercase tracking-wider mb-3">Stations</div>
+<div class="space-y-3 text-xs bg-slate-50 p-4 rounded border border-[#E2E8F0]">
+<div class="flex items-center justify-between">
+<label class="flex items-center gap-2 font-medium text-slate-800">
+<input checked="" class="rounded text-[#005B7F]" type="checkbox"/> ☑ Maitri
+                </label>
+<div class="flex items-center gap-2">
+<span class="text-[#64748B]">Deployment:</span>
+<select class="border border-[#CBD5E1] rounded px-2 py-1 bg-white">
+<option selected="">SUMMER ▼</option>
+<option>WINTER</option>
+</select>
+</div>
+</div>
+<div class="flex items-center justify-between border-t border-[#E2E8F0] pt-2">
+<label class="flex items-center gap-2 font-medium text-slate-800">
+<input checked="" class="rounded text-[#005B7F]" type="checkbox"/> ☑ Bharati
+                </label>
+<div class="flex items-center gap-2">
+<span class="text-[#64748B]">Deployment:</span>
+<select class="border border-[#CBD5E1] rounded px-2 py-1 bg-white">
+<option selected="">WINTER ▼</option>
+<option>SUMMER</option>
+</select>
+</div>
+</div>
+</div>
+</div>
+<!-- Phases -->
+<div>
+<div class="text-xs font-bold text-[#64748B] uppercase tracking-wider mb-2">Phases</div>
+<button class="bg-white border border-[#005B7F] text-[#005B7F] hover:bg-teal-50 px-3 py-1.5 rounded text-xs font-semibold" type="button">
+              [+ Add Phase]
+            </button>
+</div>
+<div class="flex items-center justify-end gap-3 pt-4 border-t border-[#E2E8F0]">
+<button class="bg-white border border-[#CBD5E1] text-slate-700 px-4 py-2 rounded text-xs font-semibold hover:bg-slate-50" onclick="switchView('expeditions')" type="button">
+              [ CANCEL ]
+            </button>
+<button class="bg-[#005B7F] hover:bg-[#004a68] text-white px-5 py-2 rounded text-xs font-bold shadow-sm transition" type="submit">
+              [ CREATE EXPEDITION ]
+            </button>
+</div>
+</form>
+</section>
+<!-- =================================================================== -->
+<!-- WIREFRAME 6: FLEET & TRANSPORT -->
+<!-- =================================================================== -->
+<section class="view-section hidden flex flex-col gap-6 max-w-[1500px] mx-auto" id="view-fleet">
+<div class="flex items-center justify-between pb-2 border-b border-[#E2E8F0]">
+<div>
+<h1 class="text-xl font-bold text-[#005B7F]">FLEET / TRANSPORT</h1>
+<p class="text-xs text-[#64748B]">Polar research ships, aircraft, and heavy transport inventory.</p>
+</div>
+<div class="flex items-center gap-2">
+<button class="bg-[#005B7F] hover:bg-[#004a68] text-white px-3.5 py-1.5 rounded text-xs font-medium shadow-sm transition" onclick="switchView('fleet-booking')">
+              + Book Transport Slot
+            </button>
+<button class="bg-white border border-[#005B7F] text-[#005B7F] px-3.5 py-1.5 rounded text-xs font-medium">
+              [+ ADD TRANSPORT]
+            </button>
+</div>
+</div>
+<div class="flex items-center gap-2 text-xs">
+<select class="border border-[#CBD5E1] rounded px-3 py-1 bg-white"><option>[ All ▼ ]</option></select>
+<select class="border border-[#CBD5E1] rounded px-3 py-1 bg-white"><option>[ Available ▼ ]</option></select>
+<select class="border border-[#CBD5E1] rounded px-3 py-1 bg-white"><option>[ Assigned ▼ ]</option></select>
+<select class="border border-[#CBD5E1] rounded px-3 py-1 bg-white"><option>[ In Transit ▼ ]</option></select>
+</div>
+<!-- Fleet Table -->
+<div class="bg-white border border-[#E2E8F0] rounded-md p-6 shadow-sm">
+<table class="w-full text-left text-xs">
+<thead>
+<tr class="border-b border-[#E2E8F0]">
+<th class="pb-2 font-semibold text-[#64748B] uppercase">Asset</th>
+<th class="pb-2 font-semibold text-[#64748B] uppercase">Type</th>
+<th class="pb-2 font-semibold text-[#64748B] uppercase">Registration</th>
+<th class="pb-2 font-semibold text-[#64748B] uppercase">Status</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-[#E2E8F0]">
+<tr class="hover:bg-[#F4F7F9] transition bg-blue-50/20">
+<td class="py-3 font-bold text-[#005B7F]">Sagar Nidhi</td>
+<td class="py-3">SHIP</td>
+<td class="py-3 font-['JetBrains_Mono']">IN-023</td>
+<td class="py-3"><span class="bg-blue-50 text-[#005B7F] border border-blue-200 px-2 py-0.5 rounded-full font-bold text-[10px]">ASSIGNED</span></td>
+</tr>
+<tr class="hover:bg-[#F4F7F9] transition">
+<td class="py-3 font-bold text-[#005B7F]">Aircraft 01</td>
+<td class="py-3">AIRCRAFT</td>
+<td class="py-3 font-['JetBrains_Mono']">VT-XXX</td>
+<td class="py-3"><span class="bg-emerald-50 text-[#15803D] border border-emerald-200 px-2 py-0.5 rounded-full font-bold text-[10px]">AVAILABLE</span></td>
+</tr>
+<tr class="hover:bg-[#F4F7F9] transition">
+<td class="py-3 font-bold text-[#005B7F]">Helicopter 01</td>
+<td class="py-3">HELICOPTER</td>
+<td class="py-3 font-['JetBrains_Mono']">VT-XXX</td>
+<td class="py-3"><span class="bg-amber-50 text-amber-800 border border-amber-300 px-2 py-0.5 rounded-full font-bold text-[10px]">MAINTENANCE</span></td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Selected Transport (Wireframe 6) -->
+<div class="bg-white border border-[#E2E8F0] rounded-md p-6 shadow-sm flex flex-col gap-3">
+<div class="text-xs font-bold text-[#64748B] uppercase tracking-wider pb-2 border-b border-[#E2E8F0]">
+            Selected Transport
+          </div>
+<div class="space-y-1.5 text-xs">
+<div class="font-bold text-base text-[#005B7F]">Sagar Nidhi</div>
+<div><span class="text-[#64748B]">Type:</span> <strong class="text-slate-800">SHIP</strong></div>
+<div><span class="text-[#64748B]">Registration:</span> <strong class="text-slate-800 font-['JetBrains_Mono']">IN-023</strong></div>
+<div><span class="text-[#64748B]">Passenger Capacity:</span> <strong class="text-slate-800">120</strong></div>
+<div><span class="text-[#64748B]">Cargo Capacity:</span> <strong class="text-slate-800">20,000 kg</strong></div>
+<div><span class="text-[#64748B]">Status:</span> <span class="bg-blue-50 text-[#005B7F] font-bold px-2 py-0.5 rounded">ASSIGNED</span></div>
+</div>
+<div class="pt-2">
+<button class="bg-[#005B7F] hover:bg-[#004a68] text-white px-4 py-2 rounded text-xs font-bold transition" onclick="switchView('fleet-booking')">
+              Book Slot on Sagar Nidhi
+            </button>
+</div>
+</div>
+</section>
+<!-- =================================================================== -->
+<!-- WIREFRAME 7: FLEET / SLOT BOOKING -->
+<!-- =================================================================== -->
+<section class="view-section hidden flex flex-col gap-6 max-w-[1200px] mx-auto" id="view-fleet-booking">
+<div class="flex items-center justify-between pb-2 border-b border-[#E2E8F0]">
+<div>
+<h1 class="text-xl font-bold text-[#005B7F]">BOOK TRANSPORT</h1>
+<p class="text-xs text-[#64748B]">Assign cargo allowances and passenger allocations to polar transit units.</p>
+</div>
+<button class="text-xs text-[#64748B] hover:text-[#005B7F] font-semibold" onclick="switchView('fleet')">
+            Cancel
+          </button>
+</div>
+<form class="bg-white border border-[#E2E8F0] rounded-md p-6 shadow-sm flex flex-col gap-5" onsubmit="event.preventDefault(); alert('Transport booking submitted for Approval!'); switchView('approvals');">
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+<div class="flex flex-col gap-1">
+<label class="text-sm font-medium text-[#0F172A]">Transport *</label>
+<select class="border border-[#CBD5E1] rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#005B7F]">
+<option selected="">Sagar Nidhi (SHIP - IN-023) ▼</option>
+<option>Aircraft 01 (AIRCRAFT)</option>
+<option>Helicopter 01 (HELICOPTER)</option>
+</select>
+</div>
+<div class="flex flex-col gap-1">
+<label class="text-sm font-medium text-[#0F172A]">Expedition *</label>
+<select class="border border-[#CBD5E1] rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#005B7F]">
+<option selected="">EXP-46 ▼</option>
+<option>EXP-47</option>
+</select>
+</div>
+<div class="flex flex-col gap-1 md:col-span-2">
+<label class="text-sm font-medium text-[#0F172A]">Route *</label>
+<select class="border border-[#CBD5E1] rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#005B7F]">
+<option selected="">Cape Town to Larsemann Hills (Bharati Base) ▼</option>
+<option>Cape Town to Schirmacher Oasis (Maitri Base)</option>
+</select>
+</div>
+<div class="flex flex-col gap-1">
+<label class="text-sm font-medium text-[#0F172A]">Departure Date</label>
+<input class="border border-[#CBD5E1] rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#005B7F]" placeholder="DD/MM/YYYY" type="text" value="18/10/2026"/>
+</div>
+<div class="flex flex-col gap-1">
+<label class="text-sm font-medium text-[#0F172A]">Departure Time</label>
+<input class="border border-[#CBD5E1] rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#005B7F]" placeholder="HH:MM" type="text" value="08:00 UTC"/>
+</div>
+</div>
+<!-- Capacity Info Box (Wireframe 7) -->
+<div class="bg-slate-50 border border-[#E2E8F0] rounded p-4 text-xs space-y-1">
+<div class="text-[#64748B] font-bold uppercase mb-1">Capacity Specifications</div>
+<div>Passenger capacity: <strong class="text-slate-800">120</strong></div>
+<div>Cargo capacity: <strong class="text-slate-800">20,000 kg</strong></div>
+</div>
+<!-- Wireframe 7 Orange Booking Conflict Warning -->
+<div class="bg-orange-50 border-l-4 border-l-[#E65A28] border-y border-r border-orange-200 rounded p-4 text-xs flex items-start gap-3">
+<span class="material-symbols-outlined text-[#E65A28] text-[20px]">warning</span>
+<div>
+<div class="font-bold text-[#E65A28]">🟠 Booking conflict</div>
+<div class="text-slate-700 mt-0.5">Existing assignment overlaps this booking.</div>
+</div>
+</div>
+<div class="flex items-center justify-end gap-3 pt-3 border-t border-[#E2E8F0]">
+<button class="bg-white border border-[#CBD5E1] text-slate-700 px-4 py-2 rounded text-xs font-semibold hover:bg-slate-50" onclick="switchView('fleet')" type="button">
+              [ CANCEL ]
+            </button>
+<button class="bg-[#005B7F] hover:bg-[#004a68] text-white px-5 py-2 rounded text-xs font-bold shadow-sm transition" type="submit">
+              [ CONFIRM BOOKING ]
+            </button>
+</div>
+</form>
+</section>
+<!-- =================================================================== -->
+<!-- WIREFRAME 8: CROSS-STATION INVENTORY -->
+<!-- =================================================================== -->
+<section class="view-section hidden flex flex-col gap-6 max-w-[1500px] mx-auto" id="view-inventory">
+<div class="flex items-center justify-between pb-2 border-b border-[#E2E8F0]">
+<div>
+<h1 class="text-xl font-bold text-[#005B7F]">INVENTORY</h1>
+<p class="text-xs text-[#64748B]">Critical station consumables, fuel stocks, rations, and trauma medical supplies.</p>
+</div>
+<button class="bg-white border border-[#005B7F] text-[#005B7F] hover:bg-teal-50 px-3 py-1.5 rounded text-xs font-medium" onclick="alert('Exporting inventory audit...');">
+            Export Report
+          </button>
+</div>
+<div class="flex flex-wrap items-center justify-between gap-3 text-xs">
+<div class="flex items-center gap-2">
+<select class="border border-[#CBD5E1] rounded px-3 py-1 bg-white"><option>[ Station: All ▼ ]</option></select>
+<select class="border border-[#CBD5E1] rounded px-3 py-1 bg-white"><option>[ Category: All ▼ ]</option></select>
+</div>
+<div class="flex items-center">
+<input class="border border-[#CBD5E1] rounded px-3 py-1 bg-white text-xs" placeholder="Search _________" type="text"/>
+</div>
+</div>
+<!-- Wireframe 8 Inventory Table -->
+<div class="bg-white border border-[#E2E8F0] rounded-md p-6 shadow-sm">
+<table class="w-full text-left text-xs">
+<thead>
+<tr class="border-b border-[#E2E8F0]">
+<th class="pb-2 font-semibold text-[#64748B] uppercase">Item</th>
+<th class="pb-2 font-semibold text-[#64748B] uppercase">Category</th>
+<th class="pb-2 font-semibold text-[#64748B] uppercase">Maitri</th>
+<th class="pb-2 font-semibold text-[#64748B] uppercase">Bharati</th>
+<th class="pb-2 font-semibold text-[#64748B] uppercase">Status</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-[#E2E8F0]">
+<tr class="hover:bg-[#F4F7F9] transition">
+<td class="py-3 font-bold font-['JetBrains_Mono'] text-[#005B7F]">Fuel-01</td>
+<td class="py-3">FUEL</td>
+<td class="py-3">8,400 L</td>
+<td class="py-3">5,200 L</td>
+<td class="py-3"><span class="bg-blue-50 text-[#005B7F] border border-blue-200 px-2 py-0.5 rounded-full font-bold text-[10px]">NORMAL</span></td>
+</tr>
+<tr class="hover:bg-[#F4F7F9] transition bg-amber-50/20">
+<td class="py-3 font-bold font-['JetBrains_Mono'] text-[#E65A28]">Food-23</td>
+<td class="py-3">FOOD</td>
+<td class="py-3">320 units</td>
+<td class="py-3 font-bold text-[#E65A28]">84 units</td>
+<td class="py-3"><span class="bg-orange-50 text-[#E65A28] border border-orange-200 px-2 py-0.5 rounded-full font-bold text-[10px]">🟠 LOW</span></td>
+</tr>
+<tr class="hover:bg-[#F4F7F9] transition">
+<td class="py-3 font-bold font-['JetBrains_Mono'] text-[#005B7F]">Med-08</td>
+<td class="py-3">MEDICAL</td>
+<td class="py-3">120 units</td>
+<td class="py-3">42 units</td>
+<td class="py-3"><span class="bg-blue-50 text-[#005B7F] border border-blue-200 px-2 py-0.5 rounded-full font-bold text-[10px]">NORMAL</span></td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Wireframe 8 Inventory Risk Card -->
+<div class="bg-white border border-[#E2E8F0] rounded-md p-6 shadow-sm flex flex-col gap-3">
+<div class="text-xs font-bold text-[#64748B] uppercase tracking-wider pb-2 border-b border-[#E2E8F0]">
+            Inventory Risk
+          </div>
+<div class="bg-orange-50 border-l-4 border-l-[#E65A28] border-y border-r border-orange-200 rounded p-4 flex items-center justify-between">
+<div>
+<div class="font-bold text-sm text-[#E65A28]">🟠 Food-23 — Bharati</div>
+<div class="text-xs text-slate-700 mt-0.5">Stock has fallen below the critical threshold.</div>
+</div>
+<button class="bg-[#005B7F] hover:bg-[#004a68] text-white px-3 py-1.5 rounded text-xs font-bold transition" onclick="switchView('fleet-booking')">
+              [ VIEW ]
+            </button>
+</div>
+</div>
+</section>
+<!-- =================================================================== -->
+<!-- WIREFRAME 9: HQ PERSONNEL ROSTER -->
+<!-- =================================================================== -->
+<section class="view-section hidden flex flex-col gap-6 max-w-[1500px] mx-auto" id="view-personnel">
+<div class="flex items-center justify-between pb-2 border-b border-[#E2E8F0]">
+<div>
+<h1 class="text-xl font-bold text-[#005B7F]">PERSONNEL</h1>
+<p class="text-xs text-[#64748B]">Deployed polar researchers, logistics officers, and clearance accreditations.</p>
+</div>
+<button class="bg-white border border-[#005B7F] text-[#005B7F] hover:bg-teal-50 px-3 py-1.5 rounded text-xs font-medium" onclick="alert('Exporting personnel roster...');">
+            Export Roster
+          </button>
+</div>
+<div class="flex flex-wrap items-center justify-between gap-3 text-xs">
+<div class="w-full max-w-sm">
+<input class="w-full border border-[#CBD5E1] rounded px-3 py-1.5 bg-white text-xs" placeholder="[ Search personnel __________________ ]" type="text"/>
+</div>
+<div class="flex items-center gap-2">
+<select class="border border-[#CBD5E1] rounded px-3 py-1.5 bg-white"><option>[ Station ▼ ]</option></select>
+<select class="border border-[#CBD5E1] rounded px-3 py-1.5 bg-white"><option>[ Status ▼ ]</option></select>
+<select class="border border-[#CBD5E1] rounded px-3 py-1.5 bg-white"><option>[ Role ▼ ]</option></select>
+</div>
+</div>
+<!-- Personnel Table -->
+<div class="bg-white border border-[#E2E8F0] rounded-md p-6 shadow-sm">
+<table class="w-full text-left text-xs">
+<thead>
+<tr class="border-b border-[#E2E8F0]">
+<th class="pb-2 font-semibold text-[#64748B] uppercase">Name</th>
+<th class="pb-2 font-semibold text-[#64748B] uppercase">Role</th>
+<th class="pb-2 font-semibold text-[#64748B] uppercase">Station</th>
+<th class="pb-2 font-semibold text-[#64748B] uppercase">Clearance</th>
+<th class="pb-2 font-semibold text-[#64748B] uppercase">Status</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-[#E2E8F0]">
+<tr class="hover:bg-[#F4F7F9] transition">
+<td class="py-3 font-bold text-slate-900">Dr. A Sharma</td>
+<td class="py-3">SCIENTIFIC</td>
+<td class="py-3">Maitri</td>
+<td class="py-3"><span class="bg-emerald-50 text-[#15803D] border border-emerald-200 px-2 py-0.5 rounded font-bold text-[10px]">CLEARED</span></td>
+<td class="py-3"><span class="bg-blue-50 text-[#005B7F] border border-blue-200 px-2 py-0.5 rounded-full font-bold text-[10px]">AT_STATION</span></td>
+</tr>
+<tr class="hover:bg-[#F4F7F9] transition">
+<td class="py-3 font-bold text-slate-900">R. Kumar</td>
+<td class="py-3">TECHNICAL</td>
+<td class="py-3">Bharati</td>
+<td class="py-3"><span class="bg-emerald-50 text-[#15803D] border border-emerald-200 px-2 py-0.5 rounded font-bold text-[10px]">CLEARED</span></td>
+<td class="py-3"><span class="bg-amber-50 text-amber-800 border border-amber-300 px-2 py-0.5 rounded-full font-bold text-[10px]">IN_TRANSIT</span></td>
+</tr>
+<tr class="hover:bg-[#F4F7F9] transition">
+<td class="py-3 font-bold text-slate-900">S. Singh</td>
+<td class="py-3">LOGISTICS</td>
+<td class="py-3">Maitri</td>
+<td class="py-3"><span class="bg-amber-50 text-amber-800 border border-amber-300 px-2 py-0.5 rounded font-bold text-[10px]">PENDING</span></td>
+<td class="py-3"><span class="bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full font-bold text-[10px]">TRAINING</span></td>
+</tr>
+</tbody>
+</table>
+<!-- Pagination -->
+<div class="flex items-center justify-end gap-2 pt-4 border-t border-[#E2E8F0] text-xs text-[#64748B]">
+<span>[ ← 1 2 3 → ]</span>
+</div>
+</div>
+</section>
+<!-- =================================================================== -->
+<!-- WIREFRAME 10: CARGO COMMAND OVERVIEW -->
+<!-- =================================================================== -->
+<section class="view-section hidden flex flex-col gap-6 max-w-[1500px] mx-auto" id="view-cargo">
+<div class="flex items-center justify-between pb-2 border-b border-[#E2E8F0]">
+<div>
+<h1 class="text-xl font-bold text-[#005B7F]">CARGO</h1>
+<p class="text-xs text-[#64748B]">Shipping manifests, port scanning checkpoints, and container discrepancy tracking.</p>
+</div>
+<button class="bg-[#005B7F] hover:bg-[#004a68] text-white px-3.5 py-1.5 rounded text-xs font-medium shadow-sm transition" onclick="alert('Scan container modal triggered');">
+            + Scan Manifest
+          </button>
+</div>
+<div class="flex flex-wrap items-center justify-between gap-3 text-xs">
+<div class="w-full max-w-sm">
+<input class="w-full border border-[#CBD5E1] rounded px-3 py-1.5 bg-white text-xs" placeholder="[ Search manifest __________________ ]" type="text"/>
+</div>
+<div class="flex items-center gap-2">
+<select class="border border-[#CBD5E1] rounded px-3 py-1.5 bg-white"><option>[ Status ▼ ]</option></select>
+<select class="border border-[#CBD5E1] rounded px-3 py-1.5 bg-white"><option>[ Expedition ▼ ]</option></select>
+<select class="border border-[#CBD5E1] rounded px-3 py-1.5 bg-white"><option>[ Destination ▼ ]</option></select>
+</div>
+</div>
+<!-- Cargo Manifest Table -->
+<div class="bg-white border border-[#E2E8F0] rounded-md p-6 shadow-sm">
+<table class="w-full text-left text-xs">
+<thead>
+<tr class="border-b border-[#E2E8F0]">
+<th class="pb-2 font-semibold text-[#64748B] uppercase">Manifest</th>
+<th class="pb-2 font-semibold text-[#64748B] uppercase">Expedition</th>
+<th class="pb-2 font-semibold text-[#64748B] uppercase">Destination</th>
+<th class="pb-2 font-semibold text-[#64748B] uppercase">Status</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-[#E2E8F0]">
+<tr class="hover:bg-[#F4F7F9] transition">
+<td class="py-3 font-bold font-['JetBrains_Mono'] text-[#005B7F]">AL-1403-021</td>
+<td class="py-3">EXP-46</td>
+<td class="py-3">Bharati</td>
+<td class="py-3"><span class="bg-amber-50 text-amber-800 border border-amber-300 px-2 py-0.5 rounded-full font-bold text-[10px]">IN_TRANSIT</span></td>
+</tr>
+<tr class="hover:bg-[#F4F7F9] transition">
+<td class="py-3 font-bold font-['JetBrains_Mono'] text-[#005B7F]">AL-1403-022</td>
+<td class="py-3">EXP-46</td>
+<td class="py-3">Maitri</td>
+<td class="py-3"><span class="bg-emerald-50 text-[#15803D] border border-emerald-200 px-2 py-0.5 rounded-full font-bold text-[10px]">VERIFIED</span></td>
+</tr>
+<tr class="hover:bg-[#F4F7F9] transition bg-orange-50/20">
+<td class="py-3 font-bold font-['JetBrains_Mono'] text-[#E65A28]">AL-1403-023</td>
+<td class="py-3">EXP-47</td>
+<td class="py-3">Bharati</td>
+<td class="py-3"><span class="bg-orange-50 text-[#E65A28] border border-orange-200 px-2 py-0.5 rounded-full font-bold text-[10px]">DISCREPANCY</span></td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Wireframe 10 Discrepancy Card -->
+<div class="bg-white border border-[#E2E8F0] rounded-md p-6 shadow-sm flex flex-col gap-3">
+<div class="text-xs font-bold text-[#E65A28] uppercase tracking-wider pb-2 border-b border-[#E2E8F0]">
+            🟠 DISCREPANCY
+          </div>
+<div class="bg-orange-50 border-l-4 border-l-[#E65A28] border-y border-r border-orange-200 rounded p-4 flex items-center justify-between text-xs">
+<div class="space-y-1">
+<div>Manifest: <strong class="text-slate-900 font-['JetBrains_Mono']">AL-1403-023</strong></div>
+<div>Expected: <strong class="text-slate-900">25 packages</strong></div>
+<div>Scanned: <strong class="text-[#E65A28]">23 packages</strong></div>
+</div>
+<button class="bg-[#005B7F] hover:bg-[#004a68] text-white px-3.5 py-1.5 rounded text-xs font-bold transition" onclick="alert('Viewing barcode details for AL-1403-023');">
+              [ VIEW ]
+            </button>
+</div>
+</div>
+</section>
+<!-- =================================================================== -->
+<!-- WIREFRAME 11: APPROVAL QUEUE & DETAIL -->
+<!-- =================================================================== -->
+<section class="view-section hidden flex flex-col gap-6 max-w-[1500px] mx-auto" id="view-approvals">
+<div class="flex items-center justify-between pb-2 border-b border-[#E2E8F0]">
+<div>
+<h1 class="text-xl font-bold text-[#005B7F]">APPROVALS</h1>
+<p class="text-xs text-[#64748B]">Director-level authorizations for expedition plans, sorties, and cargo sign-offs.</p>
+</div>
+<div class="flex items-center gap-1 text-xs">
+<button class="px-3 py-1 bg-[#005B7F] text-white font-bold rounded" id="btn-appr-pending" onclick="setApprTab('pending')">
+              [ PENDING ]
+            </button>
+<button class="px-3 py-1 bg-white border border-[#CBD5E1] text-slate-700 rounded" id="btn-appr-approved" onclick="setApprTab('approved')">
+              [ APPROVED ]
+            </button>
+<button class="px-3 py-1 bg-white border border-[#CBD5E1] text-slate-700 rounded" id="btn-appr-rejected" onclick="setApprTab('rejected')">
+              [ REJECTED ]
+            </button>
+</div>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+<!-- Approval Queue Table -->
+<div class="bg-white border border-[#E2E8F0] rounded-md p-6 shadow-sm">
+<table class="w-full text-left text-xs">
+<thead>
+<tr class="border-b border-[#E2E8F0]">
+<th class="pb-2 font-semibold text-[#64748B] uppercase">Request</th>
+<th class="pb-2 font-semibold text-[#64748B] uppercase">Type</th>
+<th class="pb-2 font-semibold text-[#64748B] uppercase">Submitted By</th>
+<th class="pb-2 font-semibold text-[#64748B] uppercase">Date</th>
+<th class="pb-2 font-semibold text-[#64748B] uppercase text-right">Action</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-[#E2E8F0]">
+<tr class="hover:bg-[#F4F7F9] transition bg-blue-50/20">
+<td class="py-3 font-bold font-['JetBrains_Mono'] text-[#005B7F]">EXP-47</td>
+<td class="py-3">Expedition</td>
+<td class="py-3">HQ Admin</td>
+<td class="py-3">20 Sep</td>
+<td class="py-3 text-right">
+<button class="bg-white border border-[#005B7F] text-[#005B7F] hover:bg-teal-50 px-2.5 py-1 rounded text-xs font-bold" onclick="loadApproval('EXP-47', 'Expedition', 'HQ Admin', '20 Sep 2026', 'Summer season Antarctic survey at Maitri and Bharati (10 Oct – 20 Mar).')">[REVIEW]</button>
+</td>
+</tr>
+<tr class="hover:bg-[#F4F7F9] transition">
+<td class="py-3 font-bold font-['JetBrains_Mono'] text-[#005B7F]">AL-1403-024</td>
+<td class="py-3">Cargo</td>
+<td class="py-3">Logistics Officer</td>
+<td class="py-3">21 Sep</td>
+<td class="py-3 text-right">
+<button class="bg-white border border-[#005B7F] text-[#005B7F] hover:bg-teal-50 px-2.5 py-1 rounded text-xs font-bold" onclick="loadApproval('AL-1403-024', 'Cargo', 'Logistics Officer', '21 Sep 2026', 'Dispatch of 12 containers of Arctic grade lubricants via charter ship.')">[REVIEW]</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Approval Detail Card (Wireframe 11) -->
+<div class="bg-white border border-[#E2E8F0] rounded-md p-6 shadow-sm flex flex-col gap-4">
+<div class="flex items-center justify-between pb-2 border-b border-[#E2E8F0]">
+<span class="text-xs font-bold text-[#005B7F] uppercase tracking-wider">← APPROVALS DETAIL</span>
+<span class="bg-blue-50 text-[#005B7F] font-bold text-[10px] px-2 py-0.5 rounded">Action Pending</span>
+</div>
+<div>
+<div class="font-['JetBrains_Mono'] font-bold text-base text-[#005B7F]" id="apprCode">EXP-47</div>
+<div class="text-sm font-semibold text-slate-800" id="apprTitle">Expedition Approval</div>
+<div class="text-xs text-[#64748B] mt-1">
+                Submitted By: <strong class="text-slate-800" id="apprSubmitter">HQ Admin</strong> • Submitted: <span id="apprDate">20 Sep 2026</span>
+</div>
+</div>
+<!-- Request Details Box -->
+<div class="bg-slate-50 border border-[#E2E8F0] rounded p-4 text-xs space-y-1">
+<div class="text-[#64748B] font-bold uppercase mb-1">Request Details</div>
+<div>Expedition: <strong class="text-slate-800">EXP-47</strong></div>
+<div>Season: <strong class="text-slate-800">SUMMER</strong></div>
+<div>Stations: <strong class="text-slate-800">Maitri, Bharati</strong></div>
+<div>Dates: <strong class="text-slate-800">10 Oct – 20 Mar</strong></div>
+</div>
+<!-- Reviewer Comments Box -->
+<div class="flex flex-col gap-1">
+<label class="text-xs font-medium text-[#0F172A]">Reviewer Comments</label>
+<textarea class="border border-[#CBD5E1] rounded p-2 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-[#005B7F]" placeholder="Enter conditions or director notes..." rows="3"></textarea>
+</div>
+<!-- Action Buttons -->
+<div class="flex items-center justify-end gap-3 pt-3 border-t border-[#E2E8F0]">
+<button class="bg-[#B91C1C] hover:bg-[#991b1b] text-white px-4 py-2 rounded text-xs font-bold transition" onclick="alert('Approval Rejected');">
+                [ REJECT ]
+              </button>
+<button class="bg-[#005B7F] hover:bg-[#004a68] text-white px-5 py-2 rounded text-xs font-bold shadow-sm transition" onclick="alert('Approval Granted by Mission Director');">
+                [ APPROVE ]
+              </button>
+</div>
+</div>
+</div>
+</section>
+<!-- =================================================================== -->
+<!-- WIREFRAME 12: HQ ALERT CENTER -->
+<!-- =================================================================== -->
+<section class="view-section hidden flex flex-col gap-6 max-w-[1500px] mx-auto" id="view-emergency">
+<div class="flex items-center justify-between pb-2 border-b border-[#E2E8F0]">
+<div>
+<h1 class="text-xl font-bold text-[#005B7F]">ALERTS &amp; EMERGENCIES</h1>
+<p class="text-xs text-[#64748B]">Operational exception queue: Medical SOS, missing check-ins, and high-priority logistics discrepancies.</p>
+</div>
+<div class="flex items-center gap-1 text-xs">
+<button class="px-3 py-1 bg-[#005B7F] text-white font-bold rounded" onclick="filterAlerts('all')">[ ALL ]</button>
+<button class="px-3 py-1 bg-white border border-[#CBD5E1] text-[#B91C1C] font-semibold rounded" onclick="filterAlerts('critical')">[ CRITICAL ]</button>
+<button class="px-3 py-1 bg-white border border-[#CBD5E1] text-slate-700 rounded" onclick="filterAlerts('active')">[ ACTIVE ]</button>
+<button class="px-3 py-1 bg-white border border-[#CBD5E1] text-slate-700 rounded" onclick="filterAlerts('resolved')">[ RESOLVED ]</button>
+</div>
+</div>
+<div class="bg-white border border-[#E2E8F0] rounded-md shadow-sm divide-y divide-[#E2E8F0]">
+<!-- 1. 🔴 CRITICAL Medical SOS -->
+<div class="p-5 flex items-center justify-between hover:bg-[#F4F7F9] transition">
+<div class="space-y-1">
+<div class="font-bold text-sm text-[#B91C1C]">🔴 CRITICAL</div>
+<div class="font-bold text-sm text-[#0F172A]">Medical SOS — Personnel P1023</div>
+<div class="text-xs text-[#64748B]">Maitri • 14:32 • Frostbite / Cold Trauma triage active</div>
+</div>
+<button class="bg-[#B91C1C] hover:bg-[#991b1b] text-white px-4 py-2 rounded text-xs font-bold transition" onclick="alert('Medical telemedicine bridge engaged with Maitri doctor');">
+              [ RESPOND ]
+            </button>
+</div>
+<!-- 2. 🟠 HIGH Cargo discrepancy -->
+<div class="p-5 flex items-center justify-between hover:bg-[#F4F7F9] transition">
+<div class="space-y-1">
+<div class="font-bold text-sm text-[#E65A28]">🟠 HIGH</div>
+<div class="font-bold text-sm text-[#0F172A]">Cargo discrepancy — AL-1403-023</div>
+<div class="text-xs text-[#64748B]">Bharati • 13:15 • 2 missing parcels flagged at offload</div>
+</div>
+<button class="bg-white border border-[#005B7F] text-[#005B7F] hover:bg-teal-50 px-4 py-2 rounded text-xs font-bold transition" onclick="switchView('cargo')">
+              [ VIEW ]
+            </button>
+</div>
+<!-- 3. ⚠ MISSED CHECK-IN -->
+<div class="p-5 flex items-center justify-between hover:bg-[#F4F7F9] transition">
+<div class="space-y-1">
+<div class="font-bold text-sm text-amber-800">⚠ MISSED CHECK-IN</div>
+<div class="font-bold text-sm text-[#0F172A]">Field excursion — Team 04</div>
+<div class="text-xs text-[#64748B]">Maitri • 12:40 • Sensor maintenance traverse 8km south</div>
+</div>
+<button class="bg-white border border-[#005B7F] text-[#005B7F] hover:bg-teal-50 px-4 py-2 rounded text-xs font-bold transition" onclick="alert('Satellite ping transmitted to Team 04 transceiver');">
+              [ VIEW ]
+            </button>
+</div>
+</div>
+</section>
+<!-- =================================================================== -->
+<!-- WIREFRAME 13: SYNCHRONIZATION -->
+<!-- =================================================================== -->
+<section class="view-section hidden flex flex-col gap-6 max-w-[1500px] mx-auto" id="view-synchronization">
+<div class="flex items-center justify-between pb-2 border-b border-[#E2E8F0]">
+<div>
+<h1 class="text-xl font-bold text-[#005B7F]">SYNCHRONIZATION</h1>
+<p class="text-xs text-[#64748B]">Node telemetry sync, encrypted local SQLite replication, and station outboxes.</p>
+</div>
+<div class="text-xs text-[#64748B]">
+            Last successful synchronization: <strong class="text-slate-800">Today, 14:20</strong>
+</div>
+</div>
+<!-- Wireframe 13 Locations Sync Table -->
+<div class="bg-white border border-[#E2E8F0] rounded-md p-6 shadow-sm">
+<table class="w-full text-left text-xs">
+<thead>
+<tr class="border-b border-[#E2E8F0]">
+<th class="pb-2 font-semibold text-[#64748B] uppercase">Location</th>
+<th class="pb-2 font-semibold text-[#64748B] uppercase">Status</th>
+<th class="pb-2 font-semibold text-[#64748B] uppercase">Pending</th>
+<th class="pb-2 font-semibold text-[#64748B] uppercase">Failed</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-[#E2E8F0]">
+<tr class="hover:bg-[#F4F7F9] transition">
+<td class="py-3 font-bold text-slate-900">HQ</td>
+<td class="py-3"><span class="text-[#15803D] font-bold">● Synced</span></td>
+<td class="py-3 font-['JetBrains_Mono']">0</td>
+<td class="py-3 font-['JetBrains_Mono']">0</td>
+</tr>
+<tr class="hover:bg-[#F4F7F9] transition">
+<td class="py-3 font-bold text-slate-900">Maitri</td>
+<td class="py-3"><span class="text-[#15803D] font-bold">● Synced</span></td>
+<td class="py-3 font-['JetBrains_Mono']">3</td>
+<td class="py-3 font-['JetBrains_Mono']">0</td>
+</tr>
+<tr class="hover:bg-[#F4F7F9] transition bg-amber-50/20">
+<td class="py-3 font-bold text-slate-900">Bharati</td>
+<td class="py-3"><span class="text-amber-800 font-bold">⚠ Pending</span></td>
+<td class="py-3 font-['JetBrains_Mono']">8</td>
+<td class="py-3 font-['JetBrains_Mono'] font-bold text-[#B91C1C]">1</td>
+</tr>
+<tr class="hover:bg-[#F4F7F9] transition">
+<td class="py-3 font-bold text-slate-900">Transit</td>
+<td class="py-3"><span class="text-[#15803D] font-bold">● Synced</span></td>
+<td class="py-3 font-['JetBrains_Mono']">0</td>
+<td class="py-3 font-['JetBrains_Mono']">0</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Wireframe 13 Orange Sync Error Box & Action -->
+<div class="bg-white border border-[#E2E8F0] rounded-md p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+<div class="bg-orange-50 border-l-4 border-l-[#E65A28] border-y border-r border-orange-200 rounded p-4 text-xs flex-1">
+<div class="font-bold text-[#E65A28]">🟠 1 synchronization error</div>
+<div class="text-slate-700 mt-0.5">Bharati • Inventory transaction schema conflict</div>
+</div>
+<button class="bg-[#005B7F] hover:bg-[#004a68] text-white px-5 py-2.5 rounded text-xs font-bold shadow-sm transition" onclick="alert('Forced replication initiated across Indian Ocean Inmarsat link!');">
+            [ SYNC NOW ]
+          </button>
+</div>
+<!-- Wireframe 13 Recent Synchronization -->
+<div class="bg-white border border-[#E2E8F0] rounded-md p-6 shadow-sm flex flex-col gap-3">
+<div class="text-xs font-bold text-[#64748B] uppercase tracking-wider pb-2 border-b border-[#E2E8F0]">
+            Recent Synchronization
+          </div>
+<table class="w-full text-left text-xs">
+<thead>
+<tr class="border-b border-[#E2E8F0]">
+<th class="pb-2 font-semibold text-[#64748B] uppercase">Time</th>
+<th class="pb-2 font-semibold text-[#64748B] uppercase">Location</th>
+<th class="pb-2 font-semibold text-[#64748B] uppercase">Result</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-[#E2E8F0]">
+<tr class="hover:bg-[#F4F7F9] transition">
+<td class="py-2.5 font-['JetBrains_Mono']">14:20</td>
+<td class="py-2.5">HQ</td>
+<td class="py-2.5"><span class="bg-emerald-50 text-[#15803D] px-2 py-0.5 rounded font-semibold">Successful</span></td>
+</tr>
+<tr class="hover:bg-[#F4F7F9] transition">
+<td class="py-2.5 font-['JetBrains_Mono']">14:18</td>
+<td class="py-2.5">Maitri</td>
+<td class="py-2.5"><span class="bg-emerald-50 text-[#15803D] px-2 py-0.5 rounded font-semibold">Successful</span></td>
+</tr>
+<tr class="hover:bg-[#F4F7F9] transition">
+<td class="py-2.5 font-['JetBrains_Mono']">14:15</td>
+<td class="py-2.5">Bharati</td>
+<td class="py-2.5"><span class="bg-amber-50 text-amber-800 px-2 py-0.5 rounded font-semibold">Partial</span></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<!-- =================================================================== -->
+<!-- WIREFRAME 14: COMMAND COPILOT -->
+<!-- =================================================================== -->
+<section class="view-section hidden flex flex-col gap-6 max-w-[1200px] mx-auto" id="view-copilot">
+<div class="flex items-center justify-between pb-2 border-b border-[#E2E8F0]">
+<div>
+<h1 class="text-xl font-bold text-[#005B7F]">COMMAND COPILOT</h1>
+<p class="text-xs text-[#64748B]">Ask about Nirantra operational data, field manifests, and personnel rosters.</p>
+</div>
+</div>
+<div class="bg-white border border-[#E2E8F0] rounded-md p-6 shadow-sm flex flex-col gap-5">
+<!-- Text prompt area -->
+<div class="flex flex-col gap-2">
+<label class="text-xs font-semibold uppercase text-[#64748B]">Operational Query Input</label>
+<textarea class="border border-[#CBD5E1] rounded p-3 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#005B7F]" id="copilotInput" placeholder="Ask a question..." rows="3">What is the current status of Expedition 46?</textarea>
+<div class="flex justify-end">
+<button class="bg-[#005B7F] hover:bg-[#004a68] text-white px-5 py-2 rounded text-xs font-bold shadow-sm transition" onclick="askCopilot()">
+                [ ASK ]
+              </button>
+</div>
+</div>
+<!-- Suggested queries chips -->
+<div>
+<div class="text-xs font-bold text-[#64748B] uppercase tracking-wider mb-2">Suggested</div>
+<div class="flex flex-wrap gap-2 text-xs">
+<button class="bg-white border border-[#CBD5E1] hover:border-[#005B7F] hover:text-[#005B7F] text-slate-700 px-3 py-1.5 rounded transition" onclick="fillQuery('What is the current status of Expedition 46?')">
+                [ Expedition 46 status ]
+              </button>
+<button class="bg-white border border-[#CBD5E1] hover:border-[#005B7F] hover:text-[#005B7F] text-slate-700 px-3 py-1.5 rounded transition" onclick="fillQuery('Which personnel are currently in transit?')">
+                [ Personnel currently in transit ]
+              </button>
+<button class="bg-white border border-[#CBD5E1] hover:border-[#005B7F] hover:text-[#005B7F] text-slate-700 px-3 py-1.5 rounded transition" onclick="fillQuery('Which cargo manifests have active discrepancies?')">
+                [ Cargo discrepancies ]
+              </button>
+<button class="bg-white border border-[#CBD5E1] hover:border-[#005B7F] hover:text-[#005B7F] text-slate-700 px-3 py-1.5 rounded transition" onclick="fillQuery('Which inventory items are below critical buffer threshold?')">
+                [ Inventory below critical stock ]
+              </button>
+</div>
+</div>
+<!-- Response Card (Wireframe 14) -->
+<div class="bg-slate-50 border border-[#E2E8F0] rounded-md p-5 flex flex-col gap-2">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[#005B7F] text-[18px]">psychology</span>
+<span class="text-xs font-bold text-[#005B7F] uppercase tracking-wider">Response</span>
+</div>
+<p class="text-xs text-slate-800 leading-relaxed font-normal" id="copilotResponse">
+              Expedition 46 is currently <strong>ACTIVE</strong> in its winter deployment phase at both Maitri and Bharati research stations. 73 total wintering personnel are accounted for with optimal life support and satellite uplink telemetry. 1 medical triage incident is active at Maitri (#P1023), and 1 cargo discrepancy exists on manifest AL-1403-023.
+            </p>
+</div>
+</div>
+</section>
+<!-- =================================================================== -->
+<!-- FALLBACK SIMPLE PANELS FOR REMAINING SIDEBAR ITEMS (Movement, Reports, Settings) -->
+<!-- =================================================================== -->
+<section class="view-section hidden flex flex-col gap-6 max-w-[1500px] mx-auto" id="view-movement">
+<div class="flex items-center justify-between pb-2 border-b border-[#E2E8F0]">
+<h1 class="text-xl font-bold text-[#005B7F]">MOVEMENT &amp; FIELD TRAVERSES</h1>
+<button class="bg-[#005B7F] text-white px-3.5 py-1.5 rounded text-xs font-medium" onclick="alert('New field sortie registered');">+ Log Traverse</button>
+</div>
+<div class="bg-white border border-[#E2E8F0] rounded-md p-6 shadow-sm">
+<div class="text-xs font-bold text-[#64748B] uppercase mb-3">Active Excursion Teams</div>
+<div class="space-y-3 text-xs">
+<div class="p-3 bg-slate-50 rounded border border-[#E2E8F0] flex items-center justify-between">
+<div>
+<span class="font-bold text-slate-800">Team 04 (Schirmacher Oasis Glacier Run)</span>
+<div class="text-[#64748B]">Leader: Insp. Vikram Singh (ITBP) • 4 Members • Snowmobile S-02</div>
+</div>
+<span class="bg-amber-50 text-amber-800 border border-amber-300 px-2 py-0.5 rounded font-bold">Check-in due: 14:00 UTC</span>
+</div>
+</div>
+</div>
+</section>
+<section class="view-section hidden flex flex-col gap-6 max-w-[1500px] mx-auto" id="view-reports">
+<div class="flex items-center justify-between pb-2 border-b border-[#E2E8F0]">
+<h1 class="text-xl font-bold text-[#005B7F]">OPERATIONAL REPORTS &amp; ARCHIVES</h1>
+<button class="bg-white border border-[#005B7F] text-[#005B7F] px-3.5 py-1.5 rounded text-xs font-medium" onclick="window.print()">Export PDF</button>
+</div>
+<div class="bg-white border border-[#E2E8F0] rounded-md p-6 shadow-sm space-y-2 text-xs">
+<div class="p-3 border border-[#E2E8F0] rounded flex justify-between items-center">
+<span>ISEA-44 Monthly Scientific Telemetry Dossier</span>
+<button class="text-[#005B7F] font-bold hover:underline">[DOWNLOAD]</button>
+</div>
+<div class="p-3 border border-[#E2E8F0] rounded flex justify-between items-center">
+<span>Bharati Base Fuel &amp; Energy Audit (Q3 2026)</span>
+<button class="text-[#005B7F] font-bold hover:underline">[DOWNLOAD]</button>
+</div>
+</div>
+</section>
+<section class="view-section hidden flex flex-col gap-6 max-w-[1200px] mx-auto" id="view-settings">
+<div class="flex items-center justify-between pb-2 border-b border-[#E2E8F0]">
+<h1 class="text-xl font-bold text-[#005B7F]">SETTINGS &amp; SYSTEM CONFIGURATION</h1>
+</div>
+<div class="bg-white border border-[#E2E8F0] rounded-md p-6 shadow-sm text-xs space-y-4">
+<div>
+<div class="font-bold text-slate-800">Node Configuration</div>
+<div class="text-[#64748B]">Assigned Station: HQ NCPOR (Vasco da Gama, Goa)</div>
+</div>
+<div class="border-t border-[#E2E8F0] pt-3">
+<div class="font-bold text-slate-800">Offline Cache Policy</div>
+<div class="text-[#64748B]">SQLite encrypted local outbox with automatic reconciliation on link restoration.</div>
+</div>
+</div>
+</section>
+</main>
+</div>
+<!-- ========================================================================= -->
+<!-- CLIENT INTERACTIVE CONTROLLER SCRIPT -->
+<!-- ========================================================================= -->
+<script>
+    // View Switcher logic
+    function switchView(viewId) {
+      // Hide all view sections
+      document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
+
+      // Target section
+      const target = document.getElementById('view-' + viewId);
+      if (target) {
+        target.classList.remove('hidden');
+      }
+
+      // Update sidebar nav highlights
+      document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('nav-active'));
+      const activeNav = document.getElementById('nav-' + viewId);
+      if (activeNav) {
+        activeNav.classList.add('nav-active');
+      } else if (viewId.startsWith('expedition')) {
+        document.getElementById('nav-expeditions')?.classList.add('nav-active');
+      } else if (viewId.startsWith('fleet')) {
+        document.getElementById('nav-fleet')?.classList.add('nav-active');
+      }
+
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // Online / Offline State Toggle
+    let isOffline = false;
+    function toggleOffline() {
+      isOffline = !isOffline;
+      const banner = document.getElementById('offlineBanner');
+      const dot = document.getElementById('statusDot');
+      const text = document.getElementById('statusText');
+
+      if (isOffline) {
+        banner.classList.remove('hidden');
+        dot.className = "w-2.5 h-2.5 rounded-full bg-[#FFC000]";
+        text.className = "font-semibold text-amber-300 tracking-wide text-xs";
+        text.textContent = "● Offline";
+      } else {
+        banner.classList.add('hidden');
+        dot.className = "w-2.5 h-2.5 rounded-full bg-[#15803D]";
+        text.className = "font-semibold text-emerald-300 tracking-wide text-xs";
+        text.textContent = "● Online";
+      }
+    }
+
+    // Approval Detail loader
+    function loadApproval(code, type, submitter, date, details) {
+      document.getElementById('apprCode').textContent = code;
+      document.getElementById('apprTitle').textContent = type + ' Authorization';
+      document.getElementById('apprSubmitter').textContent = submitter;
+      document.getElementById('apprDate').textContent = date;
+    }
+
+    function setApprTab(tab) {
+      document.getElementById('btn-appr-pending').className = tab === 'pending' ? 'px-3 py-1 bg-[#005B7F] text-white font-bold rounded' : 'px-3 py-1 bg-white border border-[#CBD5E1] text-slate-700 rounded';
+      document.getElementById('btn-appr-approved').className = tab === 'approved' ? 'px-3 py-1 bg-[#005B7F] text-white font-bold rounded' : 'px-3 py-1 bg-white border border-[#CBD5E1] text-slate-700 rounded';
+      document.getElementById('btn-appr-rejected').className = tab === 'rejected' ? 'px-3 py-1 bg-[#005B7F] text-white font-bold rounded' : 'px-3 py-1 bg-white border border-[#CBD5E1] text-slate-700 rounded';
+    }
+
+    function filterAlerts(type) {
+      alert('Filtering exception queue by: ' + type.toUpperCase());
+    }
+
+    // Copilot prompt helper
+    function fillQuery(text) {
+      document.getElementById('copilotInput').value = text;
+      askCopilot();
+    }
+
+    function askCopilot() {
+      const q = document.getElementById('copilotInput').value.toLowerCase();
+      const resp = document.getElementById('copilotResponse');
+
+      if (q.includes('transit') || q.includes('personnel')) {
+        resp.innerHTML = "Personnel currently in transit: <strong>R. Kumar</strong> (Technical Officer, transferring from Cape Town to Bharati Base on ORV Sagar Nidhi). 72 other personnel are on active station duty or training.";
+      } else if (q.includes('cargo') || q.includes('discrepanc')) {
+        resp.innerHTML = "Cargo Discrepancies: <strong>Manifest AL-1403-023</strong> has an active discrepancy at Bharati Base (25 packages expected, 23 scanned upon offloading. 2 radome crate units missing).";
+      } else if (q.includes('inventory') || q.includes('stock')) {
+        resp.innerHTML = "Inventory Alerts: <strong>Food-23 (Freeze-dried rations)</strong> at Bharati Station stands at 84 units, which is below the mandatory 90-day survival buffer threshold of 100 units.";
+      } else {
+        resp.innerHTML = "Expedition 46 is currently <strong>ACTIVE</strong> in its winter deployment phase at both Maitri and Bharati research stations. 73 total wintering personnel are accounted for with optimal life support and satellite uplink telemetry.";
+      }
+    }
+  </script>
+</body></html>

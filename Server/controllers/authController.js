@@ -8,7 +8,7 @@ const generateToken = (user) => {
             userId: user._id,
             role: user.role,
         },
-        process.env.JWT_SECRET,
+        process.env.JWT_SECRET || "default_jwt_secret",
         {
             expiresIn: "7d",
         }
@@ -44,7 +44,7 @@ export const login = async (req, res) => {
             });
         }
 
-        if (!user.isActive) {
+        if (user.isActive === false) {
             return res.status(403).json({
                 success: false,
                 message: "User account is inactive",
@@ -70,6 +70,7 @@ export const login = async (req, res) => {
         return res.status(200).json({
             success: true,
             message: "Login successful",
+            token,
             user: {
                 id: user._id,
                 employeeId: user.employeeId,
@@ -88,18 +89,14 @@ export const login = async (req, res) => {
 
         return res.status(500).json({
             success: false,
-            message: "Server error",
+            message: "Server error during login",
         });
     }
 };
 
 export const logout = async (req, res) => {
     try {
-        res.clearCookie("token", {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === "production",
-            sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-        });
+        res.clearCookie("token", cookieOptions);
 
         return res.status(200).json({
             success: true,
@@ -110,14 +107,14 @@ export const logout = async (req, res) => {
 
         return res.status(500).json({
             success: false,
-            message: "Server error",
+            message: "Server error during logout",
         });
     }
 };
 
 export const getMe = async (req, res) => {
     try {
-        const user = await User.findById(req.user.userId).populate(
+        const user = await User.findById(req.user.userId).select("-password").populate(
             "stationId",
             "code name stationType"
         );
@@ -131,14 +128,25 @@ export const getMe = async (req, res) => {
 
         return res.status(200).json({
             success: true,
-            user,
+            user: {
+                id: user._id,
+                employeeId: user.employeeId,
+                name: user.name,
+                email: user.email,
+                phone: user.phone,
+                designation: user.designation,
+                organization: user.organization,
+                role: user.role,
+                permissions: user.permissions,
+                stationId: user.stationId,
+            },
         });
     } catch (error) {
         console.error("Get me error:", error);
 
         return res.status(500).json({
             success: false,
-            message: "Server error",
+            message: "Server error fetching user profile",
         });
     }
 };

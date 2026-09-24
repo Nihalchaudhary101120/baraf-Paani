@@ -1,0 +1,1059 @@
+<!DOCTYPE html>
+
+<html class="" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>NIRANTRA - NCPOR Polar Station Operations Platform</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          ncpor: {
+            teal: "#005B7F",
+            tealDark: "#00425E",
+            tealLight: "#E6F3F8",
+            blue: "#337AB7",
+            amber: "#FFC000",
+            orange: "#E65A28",
+            orangeHover: "#CE4E20",
+            orangeLight: "#FFF4ED",
+            orangeBorder: "#FDBA74",
+            red: "#B91C1C",
+            green: "#15803D",
+            slate: "#0F172A",
+            muted: "#64748B",
+            bg: "#F4F7F9",
+            border: "#E2E8F0"
+          },
+          primary: "#00425E",
+          "primary-container": "#005B7F",
+          tertiary: "#E65A28",
+          "tertiary-container": "#FFF4ED",
+          surface: "#FFFFFF",
+          background: "#F4F7F9"
+        },
+        fontFamily: {
+          sans: ["Inter", "sans-serif"],
+          mono: ["JetBrains Mono", "monospace"]
+        }
+      }
+    }
+  };
+</script>
+<style>
+  .pulse-danger { animation: pulseRed 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+  @keyframes pulseRed { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .9; transform: scale(1.02); } }
+  .active-nav { background-color: #E6F3F8 !important; color: #005B7F !important; font-weight: 700 !important; border-left: 4px solid #005B7F !important; }
+</style>
+</head>
+<body class="bg-[#F4F7F9] text-[#0F172A] font-sans antialiased min-h-screen flex flex-col selection:bg-orange-100 selection:text-orange-900">
+<!-- ========================================================================= -->
+<!-- 1. REFINED TOP HEADER MASTHEAD -->
+<!-- ========================================================================= -->
+<header class="fixed top-0 left-0 right-0 z-50 bg-[#005B7F] text-white h-16 shadow-md border-b border-[#00425E] flex items-center justify-between px-4 lg:px-8">
+<!-- Left: Identity & Station Switcher -->
+<div class="flex items-center gap-5">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-lg bg-white/10 border border-white/20 flex items-center justify-center text-white shadow-inner">
+<span class="material-symbols-outlined text-[24px]">ac_unit</span>
+</div>
+<div class="flex flex-col">
+<div class="flex items-center gap-2">
+<span class="font-bold tracking-tight text-lg leading-tight font-sans text-white">NIRANTRA</span>
+<span class="font-mono text-[10px] font-bold bg-[#00425E] text-sky-200 px-2 py-0.5 rounded border border-white/15">v1.0-OPS</span>
+</div>
+<span class="font-mono text-[10px] tracking-wider text-sky-200/90 uppercase font-medium">NCPOR POLAR EXPEDITION PLATFORM</span>
+</div>
+</div>
+<div class="h-8 w-px bg-white/20 hidden md:block"></div>
+<!-- Station Selector Pill with Dropdown -->
+<div class="relative">
+<button class="flex items-center gap-3 bg-[#00425E] hover:bg-[#003850] border border-white/20 hover:border-orange-400/60 px-3.5 py-1.5 rounded-lg text-left transition shadow-sm group" id="stationDropdownBtn" onclick="toggleStationMenu()">
+<div class="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]"></div>
+<div class="flex flex-col">
+<div class="flex items-center gap-1.5 leading-tight">
+<span class="font-bold text-xs tracking-wide text-white group-hover:text-amber-200 transition" id="currentStationLabel">MAITRI STATION</span>
+<span class="material-symbols-outlined text-[16px] text-sky-300">arrow_drop_down</span>
+</div>
+<span class="font-mono text-[10px] text-sky-200" id="currentStationCoords">70°45′S 11°44′E (Schirmacher Oasis)</span>
+</div>
+</button>
+<!-- Dropdown -->
+<div class="hidden absolute top-full left-0 mt-2 w-80 bg-white text-slate-800 rounded-lg shadow-2xl border border-slate-200 py-1.5 z-50" id="stationDropdownMenu">
+<div class="px-4 py-2 text-[10px] font-mono uppercase text-slate-400 font-bold border-b border-slate-100 flex items-center justify-between">
+<span>Station Registry</span>
+<span class="text-orange-600 font-bold">NCPOR SATELLITE LINK</span>
+</div>
+<button class="w-full text-left px-4 py-2.5 text-xs hover:bg-orange-50/60 flex items-center justify-between transition" onclick="selectStation('MAITRI', '70°45′S 11°44′E (Schirmacher Oasis)', 'STN-01')">
+<div>
+<div class="font-bold text-slate-900 flex items-center gap-1.5">
+<span>MAITRI STATION</span>
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+</div>
+<div class="font-mono text-[10px] text-slate-500">70°45′S 11°44′E • Schirmacher Oasis</div>
+</div>
+<span class="text-[10px] font-mono bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-bold">PRIMARY</span>
+</button>
+<button class="w-full text-left px-4 py-2.5 text-xs hover:bg-sky-50 flex items-center justify-between transition border-t border-slate-100" onclick="selectStation('BHARATI', '69°24′S 76°11′E (Larsemann Hills)', 'STN-02')">
+<div>
+<div class="font-bold text-slate-900">BHARATI STATION</div>
+<div class="font-mono text-[10px] text-slate-500">69°24′S 76°11′E • Larsemann Hills</div>
+</div>
+<span class="text-[10px] font-mono bg-sky-100 text-[#005B7F] px-2 py-0.5 rounded font-bold">ACTIVE</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Right Controls: Status, SOS Dispatch CTA, Notifications, Profile -->
+<div class="flex items-center gap-3.5">
+<!-- Live Sync / Connectivity Toggle -->
+<button class="flex items-center gap-2.5 bg-[#00425E] hover:bg-[#003850] border border-white/20 px-3 py-1.5 rounded-lg transition text-left cursor-pointer" id="connToggleBtn" onclick="toggleConnectivity()" title="Click to test Offline Mode simulation">
+<span class="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]" id="connDot"></span>
+<div class="flex flex-col leading-none">
+<span class="font-mono text-[11px] font-bold tracking-wide text-white" id="connLabel">● ONLINE</span>
+<span class="font-mono text-[9px] text-sky-200 mt-0.5" id="connSub">GSAT-7A SYNCED</span>
+</div>
+<span class="material-symbols-outlined text-[15px] text-sky-300 ml-0.5">sync</span>
+</button>
+<!-- SOS Dispatch High-Touch Button with Tertiary Accent Hover -->
+<button class="pulse-danger flex items-center gap-2 bg-[#B91C1C] hover:bg-red-700 text-white font-mono text-xs font-bold px-3.5 py-1.5 rounded-lg shadow-md border border-red-400 transition" onclick="switchView('emergency')" title="Broadcast Station Emergency Alert">
+<span class="material-symbols-outlined text-[18px]">crisis_alert</span>
+<span>SOS DISPATCH</span>
+</button>
+<!-- Notifications with Tertiary Accent Badge -->
+<button class="relative w-9 h-9 rounded-lg bg-[#00425E] hover:bg-white/10 flex items-center justify-center text-white transition border border-white/15" onclick="switchView('emergency')">
+<span class="material-symbols-outlined text-[20px]">notifications</span>
+<span class="absolute -top-1 -right-1 bg-[#E65A28] text-white font-mono text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold ring-2 ring-[#005B7F] shadow-sm">2</span>
+</button>
+<div class="h-8 w-px bg-white/20 hidden lg:block"></div>
+<!-- User Profile -->
+<div class="flex items-center gap-3 bg-[#00425E]/85 border border-white/15 px-3 py-1.5 rounded-lg">
+<div class="w-8 h-8 rounded bg-sky-950 border border-white/20 flex items-center justify-center font-bold text-sky-200 text-xs shadow-inner">
+        PS
+      </div>
+<div class="hidden sm:flex flex-col text-left leading-tight">
+<span class="font-semibold text-xs text-white">Dr. P. Sen</span>
+<span class="font-mono text-[10px] text-sky-200">Station Leader • 44th ISEA</span>
+</div>
+</div>
+</div>
+</header>
+<!-- OFFLINE FULL-WIDTH BANNER -->
+<div class="hidden fixed top-16 left-0 right-0 z-40 bg-[#FFC000] border-b border-amber-500 px-6 py-2 text-slate-900 shadow-sm flex items-center justify-between text-xs" id="offlineBanner">
+<div class="flex items-center gap-2.5 font-medium">
+<span class="material-symbols-outlined text-amber-950 text-[18px]">cloud_off</span>
+<span class="font-bold tracking-tight uppercase font-mono text-amber-950">⚠ OFFLINE MODE ACTIVE:</span>
+<span>Operations continue locally in SQLite buffer; auto-sync engages on satellite link reacquisition.</span>
+</div>
+<div class="flex items-center gap-4">
+<span class="font-mono text-[11px] bg-amber-200/90 border border-amber-300 px-2.5 py-0.5 rounded font-bold text-amber-950">BUFFER: 4 LOCAL RECORDS</span>
+<button class="text-[11px] font-bold underline text-amber-950 hover:text-black transition" onclick="toggleConnectivity()">FORCE RECONNECT</button>
+</div>
+</div>
+<!-- ========================================================================= -->
+<!-- MAIN WORKSPACE: PERSISTENT SIDEBAR + CONTENT VIEWS -->
+<!-- ========================================================================= -->
+<div class="flex flex-1 pt-16">
+<!-- PERSISTENT SIDEBAR NAVIGATION -->
+<aside class="w-64 bg-[#F4F7F9] border-r border-[#E2E8F0] flex flex-col justify-between fixed top-16 bottom-0 z-30 select-none">
+<div class="flex-1 overflow-y-auto py-4 px-3">
+<div class="px-3 pb-3 mb-3 border-b border-slate-200 flex items-center justify-between">
+<span class="font-mono text-[11px] uppercase tracking-wider text-slate-500 font-bold">Station Navigation</span>
+<span class="font-mono text-[10px] bg-slate-200 text-slate-700 px-2 py-0.5 rounded font-bold" id="sidebarStationCode">STN-01</span>
+</div>
+<!-- Navigation Links -->
+<nav class="space-y-1.5" id="sidebarNav">
+<button class="nav-item active-nav w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg text-xs transition font-semibold text-slate-700 hover:bg-slate-100" id="nav-dashboard" onclick="switchView('dashboard')">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-[20px]">space_dashboard</span>
+<span>Dashboard (4.1)</span>
+</div>
+<span class="w-2 h-2 rounded-full bg-[#005B7F]"></span>
+</button>
+<button class="nav-item w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg text-xs transition font-medium text-slate-700 hover:bg-slate-100" id="nav-inventory" onclick="switchView('inventory')">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-[20px]">inventory_2</span>
+<span>Inventory &amp; Stock</span>
+</div>
+<span class="font-mono text-[10px] bg-orange-100 text-[#E65A28] border border-orange-200 px-1.5 py-0.5 rounded font-bold">3 Low</span>
+</button>
+<button class="nav-item w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg text-xs transition font-medium text-slate-700 hover:bg-slate-100" id="nav-health" onclick="switchView('health')">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-[20px]">vital_signs</span>
+<span>Supply Health (4.6)</span>
+</div>
+<span class="font-mono text-[10px] bg-orange-50 text-[#E65A28] border border-orange-200 px-1.5 py-0.5 rounded font-bold">Alert</span>
+</button>
+<button class="nav-item w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg text-xs transition font-medium text-slate-700 hover:bg-slate-100" id="nav-personnel" onclick="switchView('personnel')">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-[20px]">badge</span>
+<span>Personnel &amp; Duty</span>
+</div>
+<span class="font-mono text-[10px] bg-red-100 text-red-700 border border-red-200 px-1.5 py-0.5 rounded font-bold">1 Overdue</span>
+</button>
+<button class="nav-item w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg text-xs transition font-medium text-slate-700 hover:bg-slate-100" id="nav-cargo" onclick="switchView('cargo')">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-[20px]">local_shipping</span>
+<span>Cargo Receiving</span>
+</div>
+<span class="font-mono text-[10px] bg-sky-100 text-[#005B7F] px-1.5 py-0.5 rounded font-bold">2 Pending</span>
+</button>
+<button class="nav-item w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg text-xs transition font-medium text-slate-700 hover:bg-slate-100" id="nav-emergency" onclick="switchView('emergency')">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-[20px] text-red-600">emergency</span>
+<span>Emergency Center</span>
+</div>
+<span class="font-mono text-[10px] bg-red-600 text-white px-2 py-0.5 rounded font-bold animate-pulse">1 SOS</span>
+</button>
+<button class="nav-item w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg text-xs transition font-medium text-slate-700 hover:bg-slate-100" id="nav-sync" onclick="switchView('sync')">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-[20px]">sync_problem</span>
+<span>Synchronization</span>
+</div>
+<span class="font-mono text-[10px] bg-orange-100 text-orange-800 border border-orange-200 px-1.5 py-0.5 rounded font-bold">1 Retry</span>
+</button>
+</nav>
+</div>
+<!-- Sidebar Bottom Badge -->
+<div class="p-3.5 border-t border-[#E2E8F0] bg-white">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded bg-[#005B7F] text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-sm">
+          🇮🇳
+        </div>
+<div class="flex flex-col leading-tight">
+<span class="font-bold text-[11px] text-slate-800">MoES / NCPOR GOVT. OF INDIA</span>
+<span class="text-[10px] text-slate-500">National Polar Research Wing</span>
+</div>
+</div>
+</div>
+</aside>
+<!-- CONTENT DISPLAY AREA -->
+<main class="ml-64 flex-1 p-6 lg:p-8 max-w-[1720px] w-full">
+<!-- TOP SUB-HEADER & CRISP AMBIENT WEATHER STRIP -->
+<div class="bg-white rounded-xl border border-[#E2E8F0] px-5 py-3.5 mb-6 shadow-sm flex flex-wrap items-center justify-between gap-4">
+<div class="flex items-center gap-3">
+<span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+<span class="font-mono text-xs font-bold text-[#005B7F] tracking-wide" id="subStationTitle">MAITRI POLAR BASE</span>
+<span class="text-slate-300 font-light">/</span>
+<span class="text-xs font-semibold text-slate-800" id="currentViewBreadcrumb">Station Dashboard (4.1)</span>
+</div>
+<!-- Telemetry Pills Group -->
+<div class="flex items-center gap-2.5 font-mono text-[11px] flex-wrap">
+<div class="bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-md text-slate-700 flex items-center gap-1.5">
+<span class="text-slate-400">Temp:</span>
+<strong class="text-slate-900">-24.6°C</strong>
+</div>
+<div class="bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-md text-slate-700 flex items-center gap-1.5">
+<span class="text-slate-400">Wind:</span>
+<strong class="text-slate-900">38 kt WNW</strong>
+</div>
+<div class="bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-md text-slate-700 flex items-center gap-1.5">
+<span class="text-slate-400">Baro:</span>
+<strong class="text-slate-900">984.2 hPa</strong>
+</div>
+<span class="bg-sky-50 text-[#005B7F] border border-sky-200 px-3 py-1.5 rounded-md font-bold tracking-tight" id="telemetryCoords">70°45′S 11°44′E</span>
+</div>
+</div>
+<!-- ========================================================================= -->
+<!-- VIEW 1: DASHBOARD (WIREFRAME 4.1) -->
+<!-- ========================================================================= -->
+<div class="content-view space-y-6" id="view-dashboard">
+<!-- Dual Critical Incident Banners (with Tertiary Color Accents) -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+<!-- SOS Triage -->
+<div class="bg-red-50/90 border-l-4 border-[#B91C1C] border-y border-r border-red-200 rounded-r-xl p-5 shadow-sm flex items-center justify-between gap-4">
+<div class="flex items-start gap-3.5">
+<span class="material-symbols-outlined text-red-600 text-[28px] animate-pulse mt-0.5">crisis_alert</span>
+<div>
+<div class="flex items-center gap-2.5 flex-wrap">
+<h4 class="font-bold text-sm text-red-950">CRITICAL ALARM: SOS P1023</h4>
+<span class="font-mono text-[10px] bg-red-600 text-white px-2 py-0.5 rounded font-bold uppercase">Field Excursion 04</span>
+</div>
+<p class="text-xs text-red-900/90 mt-1 leading-relaxed">Dr. M. Patel reported severe hypothermia symptoms during Schirmacher Oasis core sampling.</p>
+</div>
+</div>
+<button class="bg-[#B91C1C] hover:bg-red-700 text-white font-mono text-xs font-bold px-3.5 py-2 rounded-lg tracking-wide shrink-0 shadow transition" onclick="switchView('emergency')">
+            RESPOND NOW
+          </button>
+</div>
+<!-- Supply Risk (Highlighted with Tertiary Warm Orange #E65A28) -->
+<div class="bg-[#FFF4ED] border-l-4 border-[#E65A28] border-y border-r border-orange-200 rounded-r-xl p-5 shadow-sm flex items-center justify-between gap-4">
+<div class="flex items-start gap-3.5">
+<div class="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center shrink-0 mt-0.5">
+<span class="material-symbols-outlined text-[#E65A28] text-[22px]">warning</span>
+</div>
+<div>
+<div class="flex items-center gap-2.5 flex-wrap">
+<h4 class="font-bold text-sm text-orange-950">SUPPLY COMPROMISE: Food-23</h4>
+<span class="font-mono text-[10px] bg-[#E65A28] text-white px-2 py-0.5 rounded font-bold uppercase shadow-xs">Low Stock (84 U)</span>
+</div>
+<p class="text-xs text-orange-950/85 mt-1 leading-relaxed">Depletion threshold reached (<strong class="text-orange-900 font-semibold">9-day runway</strong>). Air bridge delayed 18 hrs due to blizzard.</p>
+</div>
+</div>
+<button class="bg-[#E65A28] hover:bg-orange-700 text-white font-mono text-xs font-bold px-3.5 py-2 rounded-lg tracking-wide shrink-0 shadow transition" onclick="switchView('inventory')">
+            VIEW ITEM
+          </button>
+</div>
+</div>
+<!-- 4 Generously Spaced Metric Cards -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+<!-- Base Operations -->
+<div class="bg-white rounded-xl border border-[#E2E8F0] p-6 shadow-sm flex flex-col justify-between hover:border-slate-300 transition">
+<div class="flex items-center justify-between mb-3">
+<span class="font-mono text-[11px] uppercase tracking-wider text-slate-500 font-bold">Base Operations</span>
+<span class="inline-flex items-center gap-1.5 font-mono text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-md font-bold">
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span> ACTIVE OPS
+            </span>
+</div>
+<div class="my-2">
+<div class="text-2xl font-bold text-[#005B7F]" id="dashStationName">MAITRI</div>
+<div class="text-xs text-slate-500 mt-0.5">Central Antarctic Plateau Sector</div>
+</div>
+<div class="bg-slate-50 border border-slate-100 p-2.5 rounded-lg text-[11px] flex justify-between items-center text-slate-700 font-mono mt-3">
+<span>Baro: 984.2 hPa</span>
+<span class="text-[#005B7F] font-bold">SECTOR 1A</span>
+</div>
+</div>
+<!-- Crew Roster -->
+<div class="bg-white rounded-xl border border-[#E2E8F0] p-6 shadow-sm flex flex-col justify-between hover:border-slate-300 transition">
+<div class="flex items-center justify-between mb-3">
+<span class="font-mono text-[11px] uppercase tracking-wider text-slate-500 font-bold">Crew Roster</span>
+<button class="text-xs font-semibold text-[#005B7F] hover:text-[#E65A28] transition flex items-center gap-1" onclick="switchView('personnel')">
+<span>View Roster</span>
+<span class="text-sm">→</span>
+</button>
+</div>
+<div class="flex items-baseline gap-2.5 my-2">
+<span class="text-3xl font-bold text-slate-900 tracking-tight">42</span>
+<span class="text-xs text-slate-500">Present at Station</span>
+</div>
+<div class="bg-slate-50 border border-slate-100 p-2.5 rounded-lg text-[11px] flex justify-between items-center font-mono mt-3">
+<span class="text-slate-700 font-medium">Away / Field: <strong>6</strong></span>
+<span class="bg-[#FFF4ED] text-[#E65A28] border border-orange-200 px-2 py-0.5 rounded font-bold">1 Overdue</span>
+</div>
+</div>
+<!-- Stock Reserves (Tertiary Accent Highlight) -->
+<div class="bg-white rounded-xl border border-orange-200/80 p-6 shadow-sm flex flex-col justify-between relative overflow-hidden group hover:border-[#E65A28] transition">
+<div class="absolute top-0 left-0 right-0 h-1 bg-[#E65A28]"></div>
+<div class="flex items-center justify-between mb-3">
+<span class="font-mono text-[11px] uppercase tracking-wider text-slate-500 font-bold">Stock Reserves</span>
+<button class="text-xs font-semibold text-[#005B7F] hover:text-[#E65A28] transition flex items-center gap-1" onclick="switchView('health')">
+<span>Runway Audit</span>
+<span class="text-sm">→</span>
+</button>
+</div>
+<div class="flex items-baseline gap-2.5 my-2">
+<span class="text-3xl font-bold text-[#E65A28] tracking-tight">3</span>
+<span class="text-xs text-slate-600 font-medium">Low Stock SKUs</span>
+</div>
+<div class="bg-orange-50/60 border border-orange-100 p-2.5 rounded-lg text-[11px] flex justify-between items-center text-slate-700 font-mono mt-3">
+<span>Fuel: 28 Days</span>
+<span class="text-[#E65A28] font-bold bg-white px-2 py-0.5 rounded border border-orange-200">Food: 9 Days</span>
+</div>
+</div>
+<!-- Incoming Cargo -->
+<div class="bg-white rounded-xl border border-[#E2E8F0] p-6 shadow-sm flex flex-col justify-between hover:border-slate-300 transition">
+<div class="flex items-center justify-between mb-3">
+<span class="font-mono text-[11px] uppercase tracking-wider text-slate-500 font-bold">Incoming Cargo</span>
+<button class="text-xs font-semibold text-[#005B7F] hover:text-[#E65A28] transition flex items-center gap-1" onclick="switchView('cargo')">
+<span>Manifests</span>
+<span class="text-sm">→</span>
+</button>
+</div>
+<div class="flex items-baseline gap-2.5 my-2">
+<span class="text-3xl font-bold text-[#005B7F] tracking-tight">4</span>
+<span class="text-xs text-slate-500">Active Manifests</span>
+</div>
+<div class="bg-slate-50 border border-slate-100 p-2.5 rounded-lg text-[11px] flex justify-between items-center text-slate-700 font-mono mt-3">
+<span>AL-1403-021</span>
+<span class="bg-sky-100 text-[#005B7F] px-2 py-0.5 rounded font-bold">In Transit</span>
+</div>
+</div>
+</div>
+<!-- Telemetry Map & Inbound Cargo Manifests -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+<!-- Telemetry Map Box -->
+<div class="lg:col-span-2 bg-white rounded-xl border border-[#E2E8F0] p-6 shadow-sm flex flex-col justify-between">
+<div>
+<div class="flex items-center justify-between pb-3.5 border-b border-slate-100 mb-4">
+<div class="flex items-center gap-2.5">
+<span class="material-symbols-outlined text-[#005B7F] text-[22px]">explore</span>
+<h3 class="font-bold text-sm text-slate-900 tracking-tight">Field Excursion Telemetry &amp; Waypoints</h3>
+</div>
+<div class="flex items-center gap-2.5 font-mono text-[10px]">
+<span class="bg-slate-100 text-slate-700 px-2.5 py-1 rounded font-semibold border border-slate-200">VHF CH-16 LINK</span>
+<span class="bg-sky-50 text-[#005B7F] border border-sky-200 px-2.5 py-1 rounded font-bold">2 ACTIVE GROUPS</span>
+</div>
+</div>
+<!-- Graphic Polar Map Preview -->
+<div class="w-full h-80 rounded-xl relative overflow-hidden bg-gradient-to-b from-[#005B7F]/10 via-[#005B7F]/5 to-slate-100 border border-slate-200 p-4 flex flex-col justify-between">
+<div class="flex items-center justify-between">
+<div class="bg-white/95 backdrop-blur-sm px-3 py-1.5 rounded-lg shadow-sm text-xs flex items-center gap-2 border border-slate-200 font-mono">
+<span class="w-2.5 h-2.5 rounded-full bg-red-600 animate-ping"></span>
+<span class="font-bold text-red-700">BEACON ACTIVE: 406.025 MHz</span>
+</div>
+<div class="bg-white/95 backdrop-blur-sm px-3 py-1.5 rounded-lg shadow-sm font-mono text-xs text-slate-800 border border-slate-200 font-medium">
+                  GPS: -70.7672, 11.7340
+                </div>
+</div>
+<!-- Overlaid Waypoint Cards -->
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+<!-- Overdue Excursion Highlighted with Tertiary Orange & Alert Red -->
+<div class="bg-white/95 backdrop-blur-sm p-3.5 rounded-lg shadow-sm border-l-4 border-[#E65A28] border-y border-r border-slate-200">
+<div class="flex items-center justify-between">
+<span class="font-mono text-[10px] font-bold text-orange-950 uppercase">Excursion 04 (Lake Priyadarshini)</span>
+<span class="font-mono text-[9px] bg-red-100 text-red-800 border border-red-200 px-1.5 py-0.5 rounded font-bold">OVERDUE</span>
+</div>
+<div class="text-xs text-slate-700 mt-1 font-medium">Personnel: Dr. Patel, S. Singh | Dist: 4.8 km NE</div>
+<div class="text-[11px] text-[#E65A28] font-mono font-bold mt-1 flex items-center gap-1">
+<span class="material-symbols-outlined text-[13px]">schedule</span>
+<span>Missed check-in: 14:15 UTC</span>
+</div>
+</div>
+<div class="bg-white/95 backdrop-blur-sm p-3.5 rounded-lg shadow-sm border-l-4 border-[#005B7F] border-y border-r border-slate-200">
+<div class="flex items-center justify-between">
+<span class="font-mono text-[10px] font-bold text-[#005B7F] uppercase">Excursion 03 (Nunatak Sensor Ridge)</span>
+<span class="font-mono text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-bold">NOMINAL</span>
+</div>
+<div class="text-xs text-slate-700 mt-1 font-medium">Personnel: T. Roy, K. Vardhan | Dist: 12.3 km SW</div>
+<div class="text-[11px] text-slate-500 font-mono mt-1">Next ping: 16:00 UTC</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Manifests Panel -->
+<div class="bg-white rounded-xl border border-[#E2E8F0] p-6 shadow-sm flex flex-col justify-between">
+<div>
+<div class="flex items-center justify-between pb-3.5 border-b border-slate-100 mb-4">
+<div class="flex items-center gap-2.5">
+<span class="material-symbols-outlined text-[#005B7F] text-[22px]">flight_land</span>
+<h3 class="font-bold text-sm text-slate-900">Air &amp; Sledge Manifests</h3>
+</div>
+<span class="font-mono text-[10px] text-slate-500 font-bold bg-slate-100 px-2 py-0.5 rounded">Season 44</span>
+</div>
+<div class="space-y-3.5">
+<div class="p-3.5 rounded-xl border border-slate-200 bg-slate-50 hover:border-slate-300 transition">
+<div class="flex items-center justify-between mb-1.5">
+<span class="font-mono text-xs font-bold text-[#005B7F]">AL-1403-021</span>
+<span class="font-mono text-[10px] bg-sky-100 text-[#005B7F] font-bold px-2 py-0.5 rounded">IN TRANSIT</span>
+</div>
+<div class="text-xs text-slate-700 font-medium">Cape Town Port → Novo Runway</div>
+<div class="flex items-center justify-between text-[11px] text-slate-500 mt-2.5 font-mono">
+<span>24 Packages Total</span>
+<strong class="text-slate-800">ETA: Today 18:00 UTC</strong>
+</div>
+<button class="mt-2.5 text-xs font-bold text-[#005B7F] hover:text-[#E65A28] hover:underline flex items-center gap-1 transition" onclick="switchView('cargo')">
+<span>Inspect Manifest &amp; Scan</span>
+<span class="text-sm">→</span>
+</button>
+</div>
+<div class="p-3.5 rounded-xl border border-slate-200 bg-slate-50 hover:border-slate-300 transition">
+<div class="flex items-center justify-between mb-1.5">
+<span class="font-mono text-xs font-bold text-slate-800">AL-1403-022</span>
+<span class="font-mono text-[10px] bg-slate-200 text-slate-700 font-bold px-2 py-0.5 rounded">ARRIVING</span>
+</div>
+<div class="text-xs text-slate-700 font-medium">Novolazarevskaya Blue Ice Runway</div>
+<div class="flex items-center justify-between text-[11px] text-slate-500 mt-2.5 font-mono">
+<span>18 Pkgs (Medical/Food)</span>
+<strong class="text-slate-800">ETA: Tomorrow 09:30</strong>
+</div>
+<button class="mt-2.5 text-xs font-bold text-[#005B7F] hover:text-[#E65A28] hover:underline flex items-center gap-1 transition" onclick="switchView('cargo')">
+<span>Review Pre-Clearance</span>
+<span class="text-sm">→</span>
+</button>
+</div>
+</div>
+</div>
+<button class="w-full mt-4 py-2.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 font-mono text-xs font-bold transition border border-slate-200" onclick="switchView('cargo')">
+            VIEW ALL MANIFESTS
+          </button>
+</div>
+</div>
+</div>
+<!-- ========================================================================= -->
+<!-- VIEW 2: INVENTORY & STOCK (WIREFRAMES 4.2 - 4.5) -->
+<!-- ========================================================================= -->
+<div class="content-view hidden space-y-6" id="view-inventory">
+<div class="bg-white p-5 rounded-xl border border-[#E2E8F0] shadow-sm flex flex-wrap items-center justify-between gap-4">
+<div class="flex flex-wrap items-center gap-3 flex-1 min-w-[280px]">
+<div class="relative flex-1 min-w-[220px]">
+<span class="material-symbols-outlined absolute left-3 top-2.5 text-slate-400 text-[18px]">search</span>
+<input class="w-full pl-9 pr-3.5 py-2 text-xs rounded-lg border border-slate-300 focus:outline-none focus:border-[#005B7F]" placeholder="Search inventory codes, lots, or items..." type="text"/>
+</div>
+<select class="text-xs py-2 px-3 rounded-lg border border-slate-300 bg-white text-slate-700">
+<option>All Categories (Fuel, Food, Medical, Spares)</option>
+<option>Food Rations &amp; Freeze-Dried</option>
+<option>Polar Diesel &amp; Aviation ATF</option>
+<option>Medical &amp; Pharmaceuticals</option>
+</select>
+</div>
+<button class="bg-[#005B7F] hover:bg-[#00425E] text-white text-xs font-semibold px-4 py-2 rounded-lg flex items-center gap-2 shadow transition" onclick="toggleTxModal()">
+<span class="material-symbols-outlined text-[18px]">add_circle</span>
+<span>Record Transaction</span>
+</button>
+</div>
+<!-- FIFO Priority Depletion Banner with Tertiary Orange Accents -->
+<div class="bg-[#FFF4ED] border-l-4 border-[#E65A28] border-y border-r border-orange-200 rounded-r-xl p-5 shadow-sm flex flex-wrap items-center justify-between gap-4">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-lg bg-[#E65A28] text-white flex items-center justify-center font-bold shrink-0 shadow-sm">
+<span class="material-symbols-outlined text-[22px]">priority_high</span>
+</div>
+<div>
+<div class="flex items-center gap-2.5 flex-wrap">
+<h4 class="font-bold text-sm text-slate-900">FIFO Depletion Priority: Food-23 (Standard Rations)</h4>
+<span class="font-mono text-[10px] bg-orange-600 text-white px-2 py-0.5 rounded font-bold">LOT: F-2026-08</span>
+</div>
+<p class="text-xs text-slate-700 mt-1 leading-relaxed">Batch F-2026-08 expires on <strong class="text-orange-900">12/11/2026</strong>. Strictly dispense this batch before opening Lot F-2026-09 to prevent winter-over expiry.</p>
+</div>
+</div>
+<button class="bg-[#E65A28] hover:bg-orange-700 text-white font-mono text-xs font-bold px-4 py-2 rounded-lg transition shadow" onclick="alert('Viewing Food-23 detail specification and audit trail.')">
+          VIEW ITEM DETAIL
+        </button>
+</div>
+<!-- Master Inventory Table -->
+<div class="bg-white rounded-xl border border-[#E2E8F0] shadow-sm overflow-hidden">
+<div class="px-5 py-4 bg-slate-50 border-b border-[#E2E8F0] flex justify-between items-center">
+<div class="flex items-center gap-2.5">
+<span class="material-symbols-outlined text-[#005B7F] text-[20px]">table_chart</span>
+<span class="font-bold text-xs text-slate-800 uppercase tracking-wide">Maitri Central Storage Ledger</span>
+</div>
+<span class="font-mono text-[10px] bg-slate-200 text-slate-700 px-2.5 py-0.5 rounded font-bold">4 MONITORED SKUs</span>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left text-xs">
+<thead class="bg-slate-100 border-b border-slate-200 font-mono text-[11px] text-slate-600 uppercase">
+<tr>
+<th class="py-3 px-5 font-semibold">SKU Code</th>
+<th class="py-3 px-4 font-semibold">Category &amp; Description</th>
+<th class="py-3 px-4 font-semibold text-right">Available Qty</th>
+<th class="py-3 px-4 font-semibold text-center">Batch Lot</th>
+<th class="py-3 px-4 font-semibold">Expiry Date</th>
+<th class="py-3 px-4 font-semibold text-center">Status</th>
+<th class="py-3 px-5 font-semibold text-right">Actions</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-slate-200 text-slate-800">
+<tr class="hover:bg-slate-50">
+<td class="py-3 px-5 font-mono font-bold text-[#005B7F]">FUEL-01</td>
+<td class="py-3 px-4 font-medium">Polar Grade Arctic Diesel ATF</td>
+<td class="py-3 px-4 text-right font-mono font-bold">8,400 L</td>
+<td class="py-3 px-4 text-center font-mono text-slate-600">D-2025-TANK-A</td>
+<td class="py-3 px-4 font-mono text-slate-500">— INDEFINITE</td>
+<td class="py-3 px-4 text-center">
+<span class="font-mono text-[10px] bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded font-bold">NORMAL (28d)</span>
+</td>
+<td class="py-3 px-5 text-right">
+<button class="text-xs font-semibold text-[#005B7F] hover:text-[#E65A28] hover:underline" onclick="toggleTxModal()">Log Dispense</button>
+</td>
+</tr>
+<tr class="bg-orange-50/50 hover:bg-orange-50/80">
+<td class="py-3 px-5 font-mono font-bold text-orange-950">FOOD-23</td>
+<td class="py-3 px-4 font-medium text-slate-900">High-Calorie Freeze-Dried Rations</td>
+<td class="py-3 px-4 text-right font-mono font-bold text-[#E65A28]">84 Units</td>
+<td class="py-3 px-4 text-center font-mono bg-orange-100 text-orange-900 rounded font-bold text-[11px]">F-2026-08</td>
+<td class="py-3 px-4 font-mono font-bold text-orange-900">12/11/2026</td>
+<td class="py-3 px-4 text-center">
+<span class="font-mono text-[10px] bg-[#E65A28] text-white px-2.5 py-0.5 rounded font-bold shadow-xs">🟠 LOW (9d)</span>
+</td>
+<td class="py-3 px-5 text-right">
+<button class="bg-[#E65A28] text-white text-[11px] font-bold px-3 py-1 rounded-md hover:bg-orange-700 transition shadow-sm" onclick="toggleTxModal()">
+                    Dispense / FIFO
+                  </button>
+</td>
+</tr>
+<tr class="hover:bg-slate-50">
+<td class="py-3 px-5 font-mono font-bold text-[#005B7F]">MED-08</td>
+<td class="py-3 px-4 font-medium">Emergency Hypothermia Antidote Kits</td>
+<td class="py-3 px-4 text-right font-mono font-bold">42 Units</td>
+<td class="py-3 px-4 text-center font-mono text-slate-600">M-982-LOT4</td>
+<td class="py-3 px-4 font-mono text-slate-600">05/03/2027</td>
+<td class="py-3 px-4 text-center">
+<span class="font-mono text-[10px] bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded font-bold">NORMAL (35d)</span>
+</td>
+<td class="py-3 px-5 text-right">
+<button class="text-xs font-semibold text-[#005B7F] hover:text-[#E65A28] hover:underline" onclick="toggleTxModal()">Log Dispense</button>
+</td>
+</tr>
+<tr class="hover:bg-slate-50">
+<td class="py-3 px-5 font-mono font-bold text-[#005B7F]">FOOD-31</td>
+<td class="py-3 px-4 font-medium">Fortified Electrolyte Rations</td>
+<td class="py-3 px-4 text-right font-mono font-bold">120 Units</td>
+<td class="py-3 px-4 text-center font-mono text-slate-600">F-31-POW-2</td>
+<td class="py-3 px-4 font-mono text-slate-600">19/08/2027</td>
+<td class="py-3 px-4 text-center">
+<span class="font-mono text-[10px] bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded font-bold">NORMAL</span>
+</td>
+<td class="py-3 px-5 text-right">
+<button class="text-xs font-semibold text-[#005B7F] hover:text-[#E65A28] hover:underline" onclick="toggleTxModal()">Log Dispense</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<!-- ========================================================================= -->
+<!-- VIEW 3: SUPPLY HEALTH (WIREFRAME 4.6) -->
+<!-- ========================================================================= -->
+<div class="content-view hidden space-y-6" id="view-health">
+<div class="bg-[#FFF4ED] border-l-4 border-[#E65A28] border-y border-r border-orange-200 rounded-r-xl p-5 shadow-sm flex flex-wrap items-center justify-between gap-4">
+<div class="flex items-center gap-3.5">
+<span class="material-symbols-outlined text-[#E65A28] text-[32px]">crisis_alert</span>
+<div>
+<h4 class="font-bold text-sm text-slate-900 uppercase font-mono">Critical Supply Runway Forecasting Model</h4>
+<p class="text-xs text-slate-700 mt-1">
+              🟠 <strong>Food-23 standard rations</strong> will reach critical threshold in approximately <strong class="text-[#E65A28] font-mono">5.2 days</strong> at current consumption rate (9 units/day).
+            </p>
+</div>
+</div>
+<button class="bg-[#E65A28] hover:bg-orange-700 text-white font-mono text-xs font-bold px-4 py-2 rounded-lg transition shadow" onclick="switchView('cargo')">
+          EXPEDITE INBOUND AIRLIFT
+        </button>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+<div class="bg-white rounded-xl border border-[#E2E8F0] p-6 shadow-sm flex flex-col justify-between">
+<div>
+<div class="flex items-center justify-between mb-2">
+<span class="font-mono text-[11px] uppercase tracking-wider text-slate-500 font-bold">Arctic Diesel (Fuel-01)</span>
+<span class="font-mono text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-bold">STABLE</span>
+</div>
+<div class="text-3xl font-bold text-slate-900 font-mono">8,400 L</div>
+<p class="text-xs text-slate-500 mt-1">Expected runway: <strong class="text-slate-900">28 days remaining</strong></p>
+</div>
+<div class="mt-5 pt-3.5 border-t border-slate-100">
+<div class="flex justify-between text-[11px] text-slate-600 mb-1.5 font-mono">
+<span>Burn: 300 L / day</span>
+<span class="font-bold text-slate-900">68% Capacity</span>
+</div>
+<div class="w-full bg-slate-100 rounded-full h-2">
+<div class="bg-[#005B7F] h-2 rounded-full" style="width: 68%"></div>
+</div>
+</div>
+</div>
+<div class="bg-white rounded-xl border-2 border-orange-300 p-6 shadow-sm flex flex-col justify-between bg-orange-50/20">
+<div>
+<div class="flex items-center justify-between mb-2">
+<span class="font-mono text-[11px] uppercase tracking-wider text-orange-950 font-bold">Rations (Food-23)</span>
+<span class="font-mono text-[10px] bg-[#E65A28] text-white px-2 py-0.5 rounded font-bold">🟠 AT RISK</span>
+</div>
+<div class="text-3xl font-bold text-[#E65A28] font-mono">84 Units</div>
+<p class="text-xs text-orange-950 mt-1">Expected runway: <strong class="text-orange-900">9 days remaining</strong></p>
+</div>
+<div class="mt-5 pt-3.5 border-t border-orange-200">
+<div class="flex justify-between text-[11px] text-slate-700 mb-1.5 font-mono">
+<span>Daily Draw: 9 units / day</span>
+<span class="font-bold text-[#E65A28]">24% Left</span>
+</div>
+<div class="w-full bg-orange-100 rounded-full h-2">
+<div class="bg-[#E65A28] h-2 rounded-full" style="width: 24%"></div>
+</div>
+</div>
+</div>
+<div class="bg-white rounded-xl border border-[#E2E8F0] p-6 shadow-sm flex flex-col justify-between">
+<div>
+<div class="flex items-center justify-between mb-2">
+<span class="font-mono text-[11px] uppercase tracking-wider text-slate-500 font-bold">Trauma &amp; Hypo (Med-08)</span>
+<span class="font-mono text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-bold">STABLE</span>
+</div>
+<div class="text-3xl font-bold text-slate-900 font-mono">42 Units</div>
+<p class="text-xs text-slate-500 mt-1">Expected runway: <strong class="text-slate-900">35 days remaining</strong></p>
+</div>
+<div class="mt-5 pt-3.5 border-t border-slate-100">
+<div class="flex justify-between text-[11px] text-slate-600 mb-1.5 font-mono">
+<span>Daily: 1.2 units / day</span>
+<span class="font-bold text-slate-900">85% Stable</span>
+</div>
+<div class="w-full bg-slate-100 rounded-full h-2">
+<div class="bg-[#337AB7] h-2 rounded-full" style="width: 85%"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- ========================================================================= -->
+<!-- VIEW 4: PERSONNEL & DUTY (WIREFRAMES 4.7 - 4.8) -->
+<!-- ========================================================================= -->
+<div class="content-view hidden space-y-6" id="view-personnel">
+<div class="grid grid-cols-2 sm:grid-cols-4 gap-5">
+<div class="bg-white p-5 rounded-xl border border-[#E2E8F0] shadow-sm flex items-center justify-between">
+<div>
+<span class="font-mono text-[10px] uppercase font-bold text-slate-500">Present at Base</span>
+<div class="text-2xl font-bold text-slate-900 mt-0.5">42</div>
+</div>
+<span class="material-symbols-outlined text-[#005B7F] text-[28px]">home</span>
+</div>
+<div class="bg-white p-5 rounded-xl border border-[#E2E8F0] shadow-sm flex items-center justify-between">
+<div>
+<span class="font-mono text-[10px] uppercase font-bold text-slate-500">Away / Field Duty</span>
+<div class="text-2xl font-bold text-slate-900 mt-0.5">6</div>
+</div>
+<span class="material-symbols-outlined text-[#005B7F] text-[28px]">hiking</span>
+</div>
+<div class="bg-white p-5 rounded-xl border border-[#E2E8F0] shadow-sm flex items-center justify-between">
+<div>
+<span class="font-mono text-[10px] uppercase font-bold text-slate-500">Active Excursions</span>
+<div class="text-2xl font-bold text-[#337AB7] mt-0.5">4 Teams</div>
+</div>
+<span class="material-symbols-outlined text-[#337AB7] text-[28px]">share_location</span>
+</div>
+<div class="bg-red-50 p-5 rounded-xl border border-red-200 shadow-sm flex items-center justify-between">
+<div>
+<span class="font-mono text-[10px] uppercase font-bold text-red-700">Check-in Issues</span>
+<div class="text-2xl font-bold text-red-700 mt-0.5">1 Overdue</div>
+</div>
+<span class="material-symbols-outlined text-red-600 text-[28px] animate-pulse">warning</span>
+</div>
+</div>
+<div class="bg-white rounded-xl border border-[#E2E8F0] p-6 shadow-sm">
+<div class="flex items-center justify-between pb-3.5 border-b border-slate-100 mb-4">
+<h3 class="font-bold text-xs text-slate-900 uppercase tracking-wide">Station Personnel Operations Roster</h3>
+<span class="font-mono text-[10px] text-slate-500 font-bold bg-slate-100 px-2 py-0.5 rounded">48 RESEARCHERS REGISTERED</span>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left text-xs">
+<thead class="bg-slate-100 font-mono text-[10px] text-slate-600 uppercase border-b border-slate-200">
+<tr>
+<th class="py-3 px-4">Personnel</th>
+<th class="py-3 px-4">Role / Wing</th>
+<th class="py-3 px-4">Station Sector</th>
+<th class="py-3 px-4 text-center">Safety Status</th>
+<th class="py-3 px-4 text-center">Duty</th>
+<th class="py-3 px-4 text-right">Action</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-slate-100">
+<tr class="hover:bg-slate-50">
+<td class="py-3 px-4 font-semibold text-slate-900">A. Sharma (NCP-0841)</td>
+<td class="py-3 px-4 text-slate-600">Atmospheric Physics</td>
+<td class="py-3 px-4 font-mono text-[11px]">Station Met Lab</td>
+<td class="py-3 px-4 text-center"><span class="font-mono text-[10px] bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded font-bold">✓ SAFE</span></td>
+<td class="py-3 px-4 text-center"><span class="font-mono text-[10px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded font-bold">ON</span></td>
+<td class="py-3 px-4 text-right"><button class="text-[#005B7F] font-semibold hover:text-[#E65A28] hover:underline">Reassign</button></td>
+</tr>
+<tr class="hover:bg-slate-50">
+<td class="py-3 px-4 font-semibold text-slate-900">R. Kumar (NCP-0922)</td>
+<td class="py-3 px-4 text-slate-600">Logistics Lead</td>
+<td class="py-3 px-4 font-mono text-[11px]">Fuel Depot Bunkers</td>
+<td class="py-3 px-4 text-center"><span class="font-mono text-[10px] bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded font-bold">✓ SAFE</span></td>
+<td class="py-3 px-4 text-center"><span class="font-mono text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-bold">OFF</span></td>
+<td class="py-3 px-4 text-right"><button class="text-[#005B7F] font-semibold hover:text-[#E65A28] hover:underline">Reassign</button></td>
+</tr>
+<tr class="bg-red-50/70 hover:bg-red-50">
+<td class="py-3 px-4 font-bold text-red-950">Dr. M. Patel (NCP-0650)</td>
+<td class="py-3 px-4 text-red-800 font-medium">Station Medical Surgeon</td>
+<td class="py-3 px-4 font-mono text-[11px] text-red-700">Field Excursion 04</td>
+<td class="py-3 px-4 text-center"><span class="font-mono text-[10px] bg-red-600 text-white px-2.5 py-0.5 rounded font-bold animate-pulse">⚠ OVERDUE</span></td>
+<td class="py-3 px-4 text-center"><span class="font-mono text-[10px] bg-red-100 text-red-800 px-2 py-0.5 rounded font-bold">ON</span></td>
+<td class="py-3 px-4 text-right">
+<button class="bg-red-600 hover:bg-red-700 text-white font-mono text-[10px] px-2.5 py-1 rounded font-bold" onclick="switchView('emergency')">
+                    SOS Triage
+                  </button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<!-- ========================================================================= -->
+<!-- VIEW 5: CARGO RECEIVING (WIREFRAMES 4.9 - 4.10) -->
+<!-- ========================================================================= -->
+<div class="content-view hidden space-y-6" id="view-cargo">
+<div class="bg-white p-5 rounded-xl border border-[#E2E8F0] shadow-sm flex flex-wrap items-center justify-between gap-4">
+<div class="flex items-center gap-3">
+<button class="bg-[#005B7F] hover:bg-[#00425E] text-white font-mono text-xs font-bold px-4 py-2.5 rounded-lg flex items-center gap-2 shadow transition" onclick="alert('Barcode / QR scanner hardware initiated.')">
+<span class="material-symbols-outlined text-[20px]">qr_code_scanner</span>
+<span>QR / BARCODE SCANNER</span>
+</button>
+<button class="bg-slate-100 hover:bg-slate-200 text-slate-800 font-mono text-xs font-semibold px-3.5 py-2.5 rounded-lg flex items-center gap-2 transition border border-slate-300" onclick="alert('Pallet tag scanned.')">
+<span class="material-symbols-outlined text-[18px]">document_scanner</span>
+<span>SCAN PALLET TAG</span>
+</button>
+</div>
+<div class="font-mono text-xs text-slate-600">
+          Active Freight Air Bridge: <strong class="text-[#005B7F]">CAPE TOWN ⇄ NOVO RUNWAY (AB-14)</strong>
+</div>
+</div>
+<div class="bg-white rounded-xl border border-[#E2E8F0] p-6 shadow-sm space-y-4">
+<div class="flex items-center justify-between pb-3.5 border-b border-slate-100">
+<div>
+<div class="flex items-center gap-2.5">
+<h3 class="font-bold text-sm text-slate-900">De-stuffing &amp; Verification Detail: AL-1403-021</h3>
+<span class="font-mono text-[10px] bg-[#E65A28] text-white px-2.5 py-0.5 rounded font-bold uppercase">MISSING ITEM AUDIT ACTIVE</span>
+</div>
+<p class="text-xs text-slate-500 mt-1">Origin: Cape Town Naval Yard • Transship Carrier: Sledge Train ST-02</p>
+</div>
+<button class="bg-[#005B7F] hover:bg-[#00425E] text-white font-mono text-xs font-semibold px-4 py-2 rounded-lg transition shadow" onclick="alert('Manifest AL-1403-021 digitally signed and sealed.')">
+            COMPLETE VERIFICATION &amp; SIGN
+          </button>
+</div>
+<div class="overflow-x-auto rounded-lg border border-slate-200">
+<table class="w-full text-left text-xs">
+<thead class="bg-slate-100 font-mono text-[10px] text-slate-600 uppercase">
+<tr>
+<th class="py-3 px-4">Item Description</th>
+<th class="py-3 px-4">SKU Code</th>
+<th class="py-3 px-4 text-center">Expected</th>
+<th class="py-3 px-4 text-center">Scanned</th>
+<th class="py-3 px-4 text-center">Variance</th>
+<th class="py-3 px-4 text-center">Status</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-slate-100">
+<tr class="hover:bg-slate-50">
+<td class="py-3 px-4 font-medium text-slate-900">Freeze-Dried Standard Rations (Lot F-2026-08)</td>
+<td class="py-3 px-4 font-mono font-bold text-[#005B7F]">FOOD-23</td>
+<td class="py-3 px-4 text-center font-mono">10</td>
+<td class="py-3 px-4 text-center font-mono font-bold text-[#005B7F]">10</td>
+<td class="py-3 px-4 text-center font-mono">0</td>
+<td class="py-3 px-4 text-center"><span class="font-mono text-[10px] bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded font-bold">✓ VERIFIED</span></td>
+</tr>
+<tr class="bg-orange-50/70 hover:bg-orange-50">
+<td class="py-3 px-4 font-bold text-orange-950">Emergency Hypothermia Antidote Kits</td>
+<td class="py-3 px-4 font-mono font-bold text-orange-900">MED-08</td>
+<td class="py-3 px-4 text-center font-mono">6</td>
+<td class="py-3 px-4 text-center font-mono font-bold text-[#E65A28]">5</td>
+<td class="py-3 px-4 text-center font-mono font-bold text-[#B91C1C]">-1</td>
+<td class="py-3 px-4 text-center"><span class="font-mono text-[10px] bg-[#E65A28] text-white px-2.5 py-0.5 rounded font-bold uppercase">🟠 1 PKG MISSING</span></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<!-- ========================================================================= -->
+<!-- VIEW 6: EMERGENCY CENTER (WIREFRAME 4.11) -->
+<!-- ========================================================================= -->
+<div class="content-view hidden space-y-6" id="view-emergency">
+<div class="bg-red-50 border-2 border-red-600 rounded-xl p-6 shadow-sm flex flex-wrap items-center justify-between gap-5">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-lg bg-[#B91C1C] text-white flex items-center justify-center animate-pulse shrink-0">
+<span class="material-symbols-outlined text-[32px]">crisis_alert</span>
+</div>
+<div>
+<h3 class="font-bold text-lg text-red-950">STATION EMERGENCY RESPONSE CENTER</h3>
+<p class="text-xs text-red-900 font-medium">Maitri Station Command • Defense &amp; Triage Incident Response: ELEVATED</p>
+</div>
+</div>
+<button class="bg-[#B91C1C] hover:bg-red-800 text-white font-mono text-xs font-bold px-5 py-3 rounded-lg shadow-lg border border-red-400 flex items-center gap-2.5" onclick="alert('🚨 ALL-STATION SOS BEACON BROADCAST ACTIVATED!')">
+<span class="material-symbols-outlined text-[20px] animate-ping">warning</span>
+<span>BROADCAST ALL-STATION SOS</span>
+</button>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+<div class="bg-white rounded-xl border-l-4 border-red-600 border border-[#E2E8F0] p-6 shadow-sm flex flex-col justify-between">
+<div>
+<div class="flex items-center justify-between mb-2">
+<span class="font-mono text-[10px] bg-red-600 text-white px-2 py-0.5 rounded font-bold">🔴 ACTIVE CRITICAL SOS</span>
+<span class="font-mono text-[10px] text-slate-500">TODAY 14:32 UTC</span>
+</div>
+<h4 class="font-bold text-sm text-slate-900">PERSONNEL P1023 (Dr. M. Patel)</h4>
+<div class="font-mono text-[11px] text-red-700 font-bold uppercase mt-0.5">TYPE: HYPOTHERMIA EMERGENCY</div>
+<p class="text-xs text-slate-600 mt-2.5 leading-relaxed">
+              Automated biometric telemetry collar tripped hypothermia alert (core temp &lt;35°C). Position pinged 4.8 km Northeast of Maitri main bunker during ice core drill.
+            </p>
+<div class="mt-3 font-mono text-xs text-[#005B7F] bg-sky-50 p-2.5 rounded-lg border border-sky-100">
+              GPS COORDINATES: -70.7672, 11.7340 (Bearing 042°)
+            </div>
+</div>
+<div class="mt-5 pt-3.5 border-t border-slate-100 flex items-center justify-between">
+<span class="font-mono text-xs text-slate-500">SNOWCAT S-01 READY</span>
+<button class="bg-red-600 hover:bg-red-700 text-white font-mono text-xs font-bold px-4 py-2 rounded-lg transition shadow" onclick="alert('Rescue Snowcat S-01 dispatched with medical crew.')">
+              DISPATCH RESCUE TEAM
+            </button>
+</div>
+</div>
+<div class="bg-white rounded-xl border-l-4 border-[#E65A28] border border-[#E2E8F0] p-6 shadow-sm flex flex-col justify-between">
+<div>
+<div class="flex items-center justify-between mb-2">
+<span class="font-mono text-[10px] bg-[#E65A28] text-white px-2 py-0.5 rounded font-bold">MISSED CHECK-IN</span>
+<span class="font-mono text-[10px] text-orange-950 font-bold">OVERDUE BY 47 MINS</span>
+</div>
+<h4 class="font-bold text-sm text-slate-900">S. SINGH • FIELD EXCURSION 04</h4>
+<div class="font-mono text-[11px] text-slate-500 uppercase mt-0.5">LOCATION: LAKE PRIYADARSHINI RIDGE</div>
+<p class="text-xs text-slate-600 mt-2.5 leading-relaxed">
+              Expected VHF radio contact at 14:15 UTC. Two automatic beacon pings sent to mobile terminal handheld without handshake confirmation.
+            </p>
+<div class="mt-3 font-mono text-xs text-slate-700 bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+              VHF EMERGENCY CH-16 (148.550 MHz)
+            </div>
+</div>
+<div class="mt-5 pt-3.5 border-t border-slate-100 flex items-center justify-between">
+<span class="font-mono text-xs text-slate-500">REPEATER 2 ACTIVE</span>
+<button class="bg-[#E65A28] hover:bg-orange-700 text-white font-mono text-xs font-bold px-4 py-2 rounded-lg transition shadow" onclick="alert('Repeater beacon ping broadcast on 148.550 MHz.')">
+              POLL REPEATER BEACON
+            </button>
+</div>
+</div>
+</div>
+</div>
+<!-- ========================================================================= -->
+<!-- VIEW 7: SYNCHRONIZATION (WIREFRAME 4.12) -->
+<!-- ========================================================================= -->
+<div class="content-view hidden space-y-6" id="view-sync">
+<div class="bg-white rounded-xl border border-[#E2E8F0] p-6 shadow-sm flex flex-wrap items-center justify-between gap-4">
+<div class="flex items-center gap-3.5">
+<div class="w-12 h-12 rounded-xl bg-sky-100 text-[#005B7F] flex items-center justify-center font-bold">
+<span class="material-symbols-outlined text-[28px]">satellite_alt</span>
+</div>
+<div>
+<div class="flex items-center gap-2.5">
+<h3 class="font-bold text-sm text-slate-900">SATELLITE SYNCHRONIZATION HUB</h3>
+<span class="font-mono text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-bold">● ONLINE</span>
+</div>
+<p class="text-xs text-slate-500 mt-0.5">Last successful uplink to NCPOR Goa Server: <strong>Today, 14:20 UTC</strong> (GSAT-7A)</p>
+</div>
+</div>
+<button class="bg-[#005B7F] hover:bg-[#00425E] text-white font-mono text-xs font-bold px-4 py-2.5 rounded-lg flex items-center gap-2 transition shadow" onclick="alert('Synchronizing 6 local records with NCPOR central master database... Done!')">
+<span class="material-symbols-outlined text-[18px]">sync</span>
+<span>SYNC NOW</span>
+</button>
+</div>
+<div class="bg-[#FFF4ED] border-l-4 border-[#E65A28] border-y border-r border-orange-200 rounded-r-xl p-5 shadow-sm flex flex-wrap items-center justify-between gap-4">
+<div class="flex items-center gap-3.5">
+<span class="material-symbols-outlined text-[#E65A28] text-[28px]">sync_problem</span>
+<div>
+<h4 class="font-bold text-xs text-orange-950 uppercase font-mono">Synchronization Checksum Collision Notice</h4>
+<p class="text-xs text-slate-700 mt-1">
+              🟠 <strong>1 operation could not be merged</strong>: Inventory transaction FOOD-23 (Checksum mismatch with central HQ master database).
+            </p>
+</div>
+</div>
+<button class="bg-[#E65A28] hover:bg-orange-700 text-white font-mono text-xs font-bold px-4 py-2 rounded-lg transition shadow" onclick="alert('Retrying synchronization with master ledger.')">
+          RETRY RESOLUTION
+        </button>
+</div>
+</div>
+</main>
+</div>
+<!-- SIMPLE TRANSACTION MODAL -->
+<div class="hidden fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4" id="txModal">
+<div class="bg-white rounded-xl border border-[#E2E8F0] shadow-2xl max-w-md w-full p-6 space-y-5">
+<div class="flex items-center justify-between pb-3.5 border-b border-slate-200">
+<h3 class="font-bold text-sm text-slate-900">Record Local Inventory Transaction</h3>
+<button class="text-slate-400 hover:text-slate-600 transition" onclick="toggleTxModal()">
+<span class="material-symbols-outlined text-[20px]">close</span>
+</button>
+</div>
+<form class="space-y-4 text-xs" onsubmit="handleTxSubmit(event)">
+<div>
+<label class="block font-mono text-[10px] text-slate-500 uppercase font-bold mb-1.5">Item Code</label>
+<select class="w-full text-xs py-2 px-3 rounded-lg border border-slate-300">
+<option>FOOD-23 (Standard Rations)</option>
+<option>FUEL-01 (Arctic Diesel ATF)</option>
+<option>MED-08 (Emergency Kits)</option>
+</select>
+</div>
+<div class="grid grid-cols-2 gap-3">
+<div>
+<label class="block font-mono text-[10px] text-slate-500 uppercase font-bold mb-1.5">Quantity</label>
+<input class="w-full text-xs py-1.5 px-3 rounded-lg border border-slate-300 font-mono" type="number" value="12"/>
+</div>
+<div>
+<label class="block font-mono text-[10px] text-slate-500 uppercase font-bold mb-1.5">Batch #</label>
+<input class="w-full text-xs py-1.5 px-3 rounded-lg border border-slate-300 font-mono" type="text" value="F-2026-08"/>
+</div>
+</div>
+<div>
+<label class="block font-mono text-[10px] text-slate-500 uppercase font-bold mb-1.5">Destination / Excursion</label>
+<input class="w-full text-xs py-2 px-3 rounded-lg border border-slate-300" placeholder="e.g. Field Excursion 04" type="text"/>
+</div>
+<div class="flex justify-end gap-2.5 pt-3 border-t border-slate-100">
+<button class="px-4 py-2 rounded-lg border border-slate-300 text-slate-700 font-medium hover:bg-slate-50 transition" onclick="toggleTxModal()" type="button">Cancel</button>
+<button class="px-4 py-2 rounded-lg bg-[#005B7F] hover:bg-[#00425E] text-white font-bold transition shadow" type="submit">Commit Transaction</button>
+</div>
+</form>
+</div>
+</div>
+<!-- JAVASCRIPT FOR DYNAMIC TABS, STATION SWITCHER & OFFLINE TOGGLE -->
+<script>
+  // 1. Dynamic View Switching
+  function switchView(viewName) {
+    document.querySelectorAll('.content-view').forEach(view => {
+      view.classList.add('hidden');
+    });
+
+    const target = document.getElementById('view-' + viewName);
+    if (target) {
+      target.classList.remove('hidden');
+    }
+
+    document.querySelectorAll('.nav-item').forEach(item => {
+      item.classList.remove('active-nav');
+    });
+    const activeNav = document.getElementById('nav-' + viewName);
+    if (activeNav) {
+      activeNav.classList.add('active-nav');
+    }
+
+    const names = {
+      dashboard: 'Station Dashboard (4.1)',
+      inventory: 'Local Inventory & Transactions (4.2-4.5)',
+      health: 'Supply Health & Forecast (4.6)',
+      personnel: 'Personnel & Duty Assignment (4.7-4.8)',
+      cargo: 'Cargo Receiving & Manifest (4.9-4.10)',
+      emergency: 'Emergency Center & SOS (4.11)',
+      sync: 'Synchronization Hub (4.12)'
+    };
+    if (names[viewName]) {
+      document.getElementById('currentViewBreadcrumb').innerText = names[viewName];
+    }
+  }
+
+  // 2. Station Switcher
+  function toggleStationMenu() {
+    const menu = document.getElementById('stationDropdownMenu');
+    menu.classList.toggle('hidden');
+  }
+
+  function selectStation(name, coords, code) {
+    document.getElementById('currentStationLabel').innerText = name + ' STATION';
+    document.getElementById('currentStationCoords').innerText = coords;
+    document.getElementById('dashStationName').innerText = name;
+    document.getElementById('subStationTitle').innerText = name + ' POLAR BASE';
+    document.getElementById('sidebarStationCode').innerText = code;
+    document.getElementById('telemetryCoords').innerText = coords.split(' ')[0] + ' ' + coords.split(' ')[1];
+    document.getElementById('stationDropdownMenu').classList.add('hidden');
+  }
+
+  // 3. Online / Offline Mode Toggle
+  let isOnline = true;
+  function toggleConnectivity() {
+    isOnline = !isOnline;
+    const banner = document.getElementById('offlineBanner');
+    const dot = document.getElementById('connDot');
+    const label = document.getElementById('connLabel');
+    const sub = document.getElementById('connSub');
+
+    if (!isOnline) {
+      banner.classList.remove('hidden');
+      dot.className = 'w-2.5 h-2.5 rounded-full bg-amber-400';
+      label.innerText = '● OFFLINE';
+      sub.innerText = 'LOCAL CACHE BUFFER';
+    } else {
+      banner.classList.add('hidden');
+      dot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]';
+      label.innerText = '● ONLINE';
+      sub.innerText = 'GSAT-7A SYNCED';
+    }
+  }
+
+  // 4. Modal handling
+  function toggleTxModal() {
+    document.getElementById('txModal').classList.toggle('hidden');
+  }
+
+  function handleTxSubmit(e) {
+    e.preventDefault();
+    alert('Transaction logged to local SQLite buffer and queued for satellite sync.');
+    toggleTxModal();
+  }
+</script>
+</body></html>
