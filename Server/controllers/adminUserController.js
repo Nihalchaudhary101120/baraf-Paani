@@ -76,7 +76,7 @@ export const createUserByAdmin = async (req, res) => {
 
         // Create role-specific profile
         switch (role) {
-            case  "STATION_OPERATOR" || "INVENTORY_MANAGER" || "SCIENTIST" || "MEDICAL_OFFICER":
+            case "STATION_OPERATOR" || "INVENTORY_MANAGER" || "SCIENTIST" || "MEDICAL_OFFICER":
                 await Personnel.create({
                     userId: user._id,
                 });
@@ -85,7 +85,6 @@ export const createUserByAdmin = async (req, res) => {
             default:
                 break;
         }
-
 
         return res.status(201).json({
             success: true,
