@@ -1,15 +1,32 @@
 import React from 'react';
-import { BrowserRouter } from 'react-router-dom';
-import { AuthProvider } from '@/context/AuthContext';
+import { useEffect } from "react";
+
+import {
+  syncOfflineQueue,
+  startSyncListener,
+  stopSyncListener
+} from "./services/syncServices/syncService";
+
 import AppRoutes from '@/routes/AppRoutes';
 
 function App() {
+  useEffect(() => {
+
+    // Sync immediately if internet already exists
+    syncOfflineQueue();
+
+    // Listen for internet restoration
+    startSyncListener();
+
+    return () => {
+      stopSyncListener();
+    };
+
+  }, []);
+
   return (
-    <BrowserRouter>
-      <AuthProvider>
-        <AppRoutes />
-      </AuthProvider>
-    </BrowserRouter>
+    <AppRoutes />
+
   );
 }
 

@@ -11,7 +11,7 @@ const CargoCheckpointSchema = new mongoose.Schema(
       unique: true,
       sparse: true
     },
-    
+
     manifestId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "CargoManifest",
@@ -61,6 +61,7 @@ const CargoCheckpointSchema = new mongoose.Schema(
       default: "GOOD"
     },
 
+//yaha par ayega logistic officer jo user se uth ke ayega 
     scannedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User"

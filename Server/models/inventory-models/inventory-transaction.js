@@ -27,6 +27,23 @@ const InventoryTransactionSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Expedition"
     },
+    //jab cargo aaya to station operator ne receipt baniye aur inventory transaction create jisse stock change hua 
+
+    //ab man lo scientist ko chaiye MED-001 Quantity: 5 to station operator scans the item qr  with type consumption 
+
+    //compelete trace hoga Goa
+    /*↓
+   Cape Town
+    ↓
+   Bharati
+    ↓
+   Inventory +100
+    ↓
+   Scientist takes 5
+    ↓
+   Inventory 145*/
+
+
 
     transactionType: {
       type: String,
@@ -36,7 +53,9 @@ const InventoryTransactionSchema = new mongoose.Schema(
         "TRANSFER_IN",
         "TRANSFER_OUT",
         "ADJUSTMENT",
-        "DISPOSAL"
+        "DISPOSAL", 
+        "CHECKOUT",
+        "CHECKIN"
       ],
       required: true
     },

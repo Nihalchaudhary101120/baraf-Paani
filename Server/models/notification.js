@@ -46,9 +46,14 @@ const NotificationSchema = new mongoose.Schema(
       ref: "Station"
     },
 
-    read: {
-      type: Boolean,
-      default: false
+    deliveryStatus: {
+      type: String,
+      enum: [
+        "PENDING",
+        "DELIVERED",
+        "READ"
+      ],
+      default: "PENDING"
     },
 
     priority: {

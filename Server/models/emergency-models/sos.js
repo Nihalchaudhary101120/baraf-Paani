@@ -62,22 +62,18 @@ const SOSSchema = new mongoose.Schema(
 
     description: String,
 
-    transmissionStatus: {
-      type: String,
-      enum: [
-        "LOCAL_ONLY",
-        "QUEUED",
-        "TRANSMITTED",
-        "ACKNOWLEDGED"
-      ],
-      default: "LOCAL_ONLY"
-    },
-
+    
     assignedTo: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User"
     },
-    
+
+    eventId: {
+      type: String,
+      unique: true,
+      sparse: true,
+      index: true
+    },
      offlineCreated: {
       type: Boolean,
       default: false

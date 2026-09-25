@@ -29,6 +29,12 @@ const FieldCheckInSchema = new mongoose.Schema(
     notes: String,
 
     deviceId: String,
+    eventId: {
+      type: String,
+      unique: true,
+      sparse: true,
+      index: true
+    },
 
     offlineCreated: {
       type: Boolean,

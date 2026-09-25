@@ -32,6 +32,13 @@ const FieldExcursionSchema = new mongoose.Schema(
       ref: "Personnel"
     }],
 
+    eventId: {
+      type: String,
+      unique: true,
+      sparse: true,
+      index: true
+    },
+
     purpose: {
       type: String,
       required: true
@@ -54,6 +61,7 @@ const FieldExcursionSchema = new mongoose.Schema(
         "FOOT"
       ]
     },
+
 
     departureTime: Date,
     expectedReturnTime: Date,

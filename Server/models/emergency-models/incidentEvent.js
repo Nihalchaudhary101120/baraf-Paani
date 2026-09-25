@@ -9,6 +9,8 @@ const IncidentEventSchema = new mongoose.Schema(
       required: true
     },
 
+    deviceId:String,
+
     eventType: {
       type: String,
       enum: [
