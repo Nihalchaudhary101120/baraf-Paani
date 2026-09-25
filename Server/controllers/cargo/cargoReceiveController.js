@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 
 import CargoManifest from "../../models/cargo-models/cargo-menifest.js";
-import CargoCheckpoint from "../models/cargo-models/cargo-checkpoint.js";
+import CargoCheckpoint from "../../models/cargo-models/cargo-checkpoint.js";
 
 import InventoryItem from "../../models/inventory-models/inventory-item.js";
 import InventoryTransaction from "../../models/inventory-models/inventory-transaction.js";

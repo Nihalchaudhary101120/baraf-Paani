@@ -1,95 +1,32 @@
-
 import mongoose from "mongoose";
 
-const ExpeditionSchema = new mongoose.Schema(
+const TransportSchema = new mongoose.Schema(
   {
-    expeditionCode: {
-      type: String,
-      required: true,
-      unique: true
-    },
-
     name: {
       type: String,
       required: true
     },
 
-    year: {
-      type: Number,
-      required: true
-    },
-
-    season: {
+    code: {
       type: String,
-      enum: ["SUMMER", "WINTER"],
-      required: true
+      unique: true,
+      sparse: true
     },
 
-    startDate: Date,
+    type: {
+      type: String,
+      enum: ["SHIP", "AIRCRAFT", "HELICOPTER", "SNOWCAT", "TRUCK", "OTHER"],
+      default: "SHIP"
+    },
 
-    endDate: Date,
+    capacityKg: Number,
 
-    stations: [
-      {
-        stationId: {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: "Station"
-        },
-
-        deploymentType: {
-          type: String,
-          enum: ["SUMMER", "WINTER"]
-        }
-      }
-    ],
-
-    transports: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Transport"
-      }
-    ],
-
-    phases: [
-      {
-        name: String,
-
-        type: {
-          type: String,
-          enum: [
-            "TRAINING",
-            "TRAVEL",
-            "DEPLOYMENT",
-            "RESUPPLY",
-            "RETURN"
-          ]
-        },
-
-        startDate: Date,
-
-        endDate: Date,
-
-        status: {
-          type: String,
-          enum: [
-            "PENDING",
-            "ACTIVE",
-            "COMPLETED"
-          ]
-        }
-      }
-    ],
+    passengerCapacity: Number,
 
     status: {
       type: String,
-      enum: [
-        "PLANNING",
-        "APPROVED",
-        "ACTIVE",
-        "COMPLETED",
-        "CANCELLED"
-      ],
-      default: "PLANNING"
+      enum: ["AVAILABLE", "IN_TRANSIT", "MAINTENANCE", "DECOMMISSIONED"],
+      default: "AVAILABLE"
     },
 
     createdBy: {
@@ -102,6 +39,4 @@ const ExpeditionSchema = new mongoose.Schema(
   }
 );
 
-ExpeditionSchema.index({ year: 1, season: 1 });
-
-export default mongoose.model("Expedition", ExpeditionSchema);
+export default mongoose.models.Transport || mongoose.model("Transport", TransportSchema);

@@ -13,7 +13,8 @@ import cargoCheckpointRoutes from "./routes/cargoRoutes/cargoCheckpointRoutes.js
 import cargoManifestRoutes from "./routes/cargoRoutes/cargoMenifestRoutes.js";
 import shipmentRoutes from "./routes/cargoRoutes/shipmentRoutes.js";
 import syncRoutes from "./routes/syncRoutes.js";
-import cargoReceiveRoutes from "./routes/cargoReceiveRoutes.js";
+import cargoReceiveRoutes from "./routes/cargoRoutes/cargoReceiveRoutes.js";
+import stationRoutes from "./routes/stationRoutes.js";
 
 
 dotenv.config();
@@ -61,6 +62,7 @@ app.use("/api/personnel", personnelRoutes);
 app.use("/api/medical", medicalRoutes);
 app.use("/api/training", trainingRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/stations", stationRoutes);
 app.use("/api/cargo/manifests", cargoManifestRoutes);
 app.use("/api/cargo/shipments", shipmentRoutes);
 app.use("/api/cargo/checkpoints", cargoCheckpointRoutes);

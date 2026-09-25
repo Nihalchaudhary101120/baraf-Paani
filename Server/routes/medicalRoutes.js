@@ -7,8 +7,8 @@ import {
     updateClearance
 } from "../controllers/medicalController.js";
 
-import requireAuth from "../middleware/requireAuth.js";
-import requireRole from "../middleware/requireRole.js";
+import requireAuth from "../middleware/authMiddleware.js";
+import requireRole from "../middleware/roleMiddleware.js";
 
 const router = express.Router();
 

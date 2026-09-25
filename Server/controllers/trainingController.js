@@ -1,6 +1,6 @@
-import TrainingClearance from "../models/trainingClearance.js";
-import Personnel from "../models/personnel.js";
-import Expedition from "../models/expedition.js";
+import TrainingClearance from "../models/approval-models/training.js";
+import Personnel from "../models/master-models/personnel.js";
+import Expedition from "../models/master-models/expedition.js";
 
 const allowedCategories = [
     "SURVIVAL",

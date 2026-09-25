@@ -16,5 +16,12 @@ export const ENDPOINTS = {
     BY_ID: (id) => `/users/${id}`,
     PROFILE: '/users/profile',
   },
+  ADMIN: {
+    USERS: '/admin/users',
+    USER_STATUS: (id) => `/admin/users/${id}/status`,
+  },
+  STATIONS: {
+    BASE: '/stations',
+  },
   HEALTH: '/health',
 };

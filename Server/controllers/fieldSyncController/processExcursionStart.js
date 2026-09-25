@@ -1,4 +1,4 @@
-import FieldExcursion from "../../models/field-operatio-models/fieldExcursion.js";
+import FieldExcursion from "../../models/field-operation-models/fieldExcursion.js";
 
 const processExcursionStart = async (event, session) => {
 

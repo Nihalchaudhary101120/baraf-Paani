@@ -1,18 +1,19 @@
-
 import mongoose from "mongoose";
 
 const StationSchema = new mongoose.Schema(
   {
     code: {
       type: String,
-      enum: ["MAITRI", "BHARATI"],
       required: true,
-      unique: true
+      unique: true,
+      uppercase: true,
+      trim: true
     },
 
     name: {
       type: String,
-      required: true
+      required: true,
+      trim: true
     },
 
     location: {
@@ -24,46 +25,25 @@ const StationSchema = new mongoose.Schema(
 
       coordinates: {
         type: [Number],
-        required: true
+        default: [70.7667, -11.7333] // Longitude, Latitude
       },
 
-      elevationMeters: Number
+      elevationMeters: {
+        type: Number,
+        default: 130
+      }
     },
 
     stationType: {
       type: String,
-      enum: ["INLAND", "COASTAL"]
+      enum: ["INLAND", "COASTAL", "HEADQUARTERS"],
+      default: "COASTAL"
     },
 
     capacity: {
-      summer: Number,
-      winter: Number,
-      emergency: Number
-    },
-
-    facilities: [
-      {
-        type: String,
-        description: String,
-        status: {
-          type: String,
-          enum: ["ACTIVE", "MAINTENANCE", "INACTIVE"],
-          default: "ACTIVE"
-        }
-      }
-    ],
-
-    communication: {
-      satelliteAvailable: Boolean,
-      radioAvailable: Boolean,
-
-      connectionStatus: {
-        type: String,
-        enum: ["ONLINE", "LIMITED", "OFFLINE"],
-        default: "ONLINE"
-      },
-
-      lastConnectedAt: Date
+      summer: { type: Number, default: 40 },
+      winter: { type: Number, default: 25 },
+      emergency: { type: Number, default: 60 }
     },
 
     operationalStatus: {
@@ -79,6 +59,6 @@ const StationSchema = new mongoose.Schema(
   }
 );
 
-StationSchema.index({ location: "2dsphere" });
+StationSchema.index({ code: 1 });
 
-export default mongoose.model("Station", StationSchema);
+export default mongoose.models.Station || mongoose.model("Station", StationSchema);

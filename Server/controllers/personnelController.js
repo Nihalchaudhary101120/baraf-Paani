@@ -1,4 +1,4 @@
-import Personnel from "../models/personnel.js";
+import Personnel from "../models/master-models/personnel.js";
 
 export const updateMyProfile = async (req, res) => {
     try {

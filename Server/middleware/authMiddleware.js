@@ -1,6 +1,6 @@
 import jwt from "jsonwebtoken";
 
-export const protect = (req, res, next) => {
+const requireAuth = (req, res, next) => {
   try {
     let token = req.cookies?.token;
 
@@ -27,3 +27,5 @@ export const protect = (req, res, next) => {
     });
   }
 };
+
+export default requireAuth;

@@ -1,12 +1,15 @@
 import mongoose from "mongoose";
 
 import CargoCheckpoint from "../../models/cargo-models/cargo-checkpoint.js";
+import CargoManifest from "../../models/cargo-models/cargo-menifest.js";
 import InventoryTransaction from "../../models/inventory-models/inventory-transaction.js";
 import InventoryItem from "../../models/inventory-models/inventory-item.js";
-import processFieldCheckIn from "./fieldSyncController/processFieldCheckIn.js";
-import processSOS from "./fieldSyncController/processSOS.js";
-import processExcursionEnd from "./fieldSyncController/processExcursionEnd.js";
-import processEquipmentReturn from "./fieldSyncController/processEquipmentReturn.js";
+import ExcursionEquipment from "../../models/field-operation-models/excursionEquipment.js";
+import processFieldCheckIn from "../fieldSyncController/processFieldCheckIn.js";
+import processSOS from "../fieldSyncController/processSos.js";
+import processExcursionStart from "../fieldSyncController/processExcursionStart.js";
+import processExcursionEnd from "../fieldSyncController/processExcursionEnd.js";
+import processEquipmentReturn from "../fieldSyncController/processEquipmentReturn.js";
 
 const processCheckpointScan = async (event, session) => {
     await CargoCheckpoint.create(
@@ -145,7 +148,72 @@ const processCargoReceive = async (event, session) => {
     );
 };
 
+const processEquipmentIssue = async (event, session) => {
+    // Prevent duplicate
+    const existing = await ExcursionEquipment.findOne({
+        eventId: event.eventId
+    }).session(session);
 
+    if (existing) return existing;
+
+    const item = await InventoryItem.findById(event.inventoryItemId).session(session);
+
+    if (!item) throw new Error("Inventory item not found.");
+
+    if (item.currentStock < event.quantityIssued) {
+        throw new Error("Insufficient stock for equipment issue.");
+    }
+
+    item.currentStock -= event.quantityIssued;
+
+    if (item.currentStock <= 0) {
+        item.status = "OUT_OF_STOCK";
+    } else if (item.currentStock <= item.criticalStock) {
+        item.status = "CRITICAL";
+    } else if (item.currentStock <= item.minimumStock) {
+        item.status = "LOW_STOCK";
+    } else {
+        item.status = "AVAILABLE";
+    }
+
+    await item.save({ session });
+
+    await ExcursionEquipment.create(
+        [{
+            eventId: event.eventId,
+            excursionId: event.excursionId,
+            inventoryItemId: event.inventoryItemId,
+            itemName: event.itemName,
+            quantityIssued: event.quantityIssued,
+            quantityReturned: 0,
+            issuedAt: event.issuedAt || new Date(),
+            issuedBy: event.performedBy,
+            deviceId: event.deviceId,
+            offlineCreated: true,
+            syncStatus: "SYNCED"
+        }],
+        { session }
+    );
+
+    await InventoryTransaction.create(
+        [{
+            eventId: `${event.eventId}-checkout`,
+            transactionNumber: `CHK-${Date.now()}`,
+            inventoryItemId: item._id,
+            stationId: event.stationId,
+            expeditionId: event.expeditionId,
+            transactionType: "CHECKOUT",
+            quantity: event.quantityIssued,
+            balanceAfterTransaction: item.currentStock,
+            performedBy: event.performedBy,
+            deviceId: event.deviceId,
+            offlineCreated: true,
+            syncStatus: "SYNCED",
+            remarks: event.remarks
+        }],
+        { session }
+    );
+};
 
 export const syncOfflineEvents = async (req, res) => {
     try {

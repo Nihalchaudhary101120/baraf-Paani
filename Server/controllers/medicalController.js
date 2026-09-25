@@ -1,6 +1,6 @@
-import MedicalAssessment from "../models/medicalAssessment.js";
-import Personnel from "../models/personnel.js";
-import Expedition from "../models/expedition.js";
+import MedicalAssessment from "../models/approval-models/medical-assessment.js";
+import Personnel from "../models/master-models/personnel.js";
+import Expedition from "../models/master-models/expedition.js"
 
 export const createMedicalAssessment = async (req, res) => {
     try {

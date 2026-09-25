@@ -5,12 +5,12 @@ import {
   getMe,
 } from "../controllers/authController.js";
 
-import { protect } from "../middleware/authMiddleware.js";
+import requireAuth from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
 router.post("/login", login);
 router.post("/logout", logout);
-router.get("/me", protect, getMe);
+router.get("/me", requireAuth, getMe);
 
 export default router;

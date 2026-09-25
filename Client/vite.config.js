@@ -13,4 +13,12 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  define: {
+    // PouchDB uses 'global' — polyfill for browser
+    global: 'globalThis',
+  },
+  optimizeDeps: {
+    // Force Vite to pre-bundle PouchDB (CJS → ESM transformation)
+    include: ['pouchdb-browser'],
+  },
 })

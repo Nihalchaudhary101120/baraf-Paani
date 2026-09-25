@@ -1,6 +1,6 @@
 import SOS from "../../models/emergency-models/sos.js";
 import FieldExcursion from "../../models/field-operation-models/fieldExcursion.js";
-import IncidentEvent from "../../models/field-operation-models/incidentEvent.js";
+import IncidentEvent from "../../models/emergency-models/incidentEvent.js";
 
 const processSOS = async (event, session) => {
 

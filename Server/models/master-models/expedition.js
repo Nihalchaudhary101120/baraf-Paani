@@ -1,4 +1,5 @@
 // mtlb yatara vala hai ye 
+import mongoose from "mongoose";
 
 const ExpeditionSchema = new mongoose.Schema({
 
@@ -20,7 +21,7 @@ const ExpeditionSchema = new mongoose.Schema({
 
   stations: [{
     stationId: {
-      type: ObjectId,
+      type: mongoose.Schema.Types.ObjectId,
       ref: "Station"
     },
 
@@ -39,4 +40,4 @@ const ExpeditionSchema = new mongoose.Schema({
 
 }, { timestamps: true });
 
-
+export default mongoose.models.Expedition || mongoose.model("Expedition", ExpeditionSchema);
