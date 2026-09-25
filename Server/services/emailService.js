@@ -1,11 +1,19 @@
 import nodemailer from "nodemailer";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 const getTransporter = () => {
+    const user = process.env.EMAIL_USER?.trim();
+    const pass = process.env.EMAIL_PASSWORD;
+
     return nodemailer.createTransport({
-        service: "gmail",
+        host: "smtp.gmail.com",
+        port: 465,
+        secure: true,
         auth: {
-            user: process.env.EMAIL_USER,
-            pass: process.env.EMAIL_PASSWORD
+            user,
+            pass
         }
     });
 };
@@ -18,15 +26,25 @@ export const sendAccountEmail = async ({
     role
 }) => {
     try {
-        if (!process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD) {
+        const user = process.env.EMAIL_USER?.trim();
+        const pass = process.env.EMAIL_PASSWORD;
+
+        if (!user || !pass) {
             console.log(`[EMAIL NOTICE] Credentials not set in .env. Account created for ${email} (Emp ID: ${employeeId}, Role: ${role}). Password: ${password}`);
             return;
         }
 
         const transporter = getTransporter();
+        await transporter.verify();
+
+        let frontendHost = (process.env.FRONTEND_URL || 'http://localhost:5174').trim();
+        if (!frontendHost.startsWith('http://') && !frontendHost.startsWith('https://')) {
+            frontendHost = `http://${frontendHost}`;
+        }
+        const loginUrl = `${frontendHost}/login`;
 
         await transporter.sendMail({
-            from: `"NCPOR Polar Operations" <${process.env.EMAIL_USER}>`,
+            from: `"NCPOR Polar Operations" <${user}>`,
             to: email,
             subject: "NIRANTRA Antarctic Operations Platform - Your Account Details",
             html: `
@@ -51,8 +69,16 @@ export const sendAccountEmail = async ({
                         <p style="margin-top: 20px;">
                             You can log in to the portal using your email and temporary password:
                             <br/><br/>
-                            <a href="${process.env.FRONTEND_URL || 'http://localhost:5174'}/login" style="display: inline-block; background-color: #005B7F; color: #ffffff; padding: 10px 20px; text-decoration: none; border-radius: 4px; font-weight: bold;">
+                            <a href="${loginUrl}" target="_blank" style="display: inline-block; background-color: #005B7F; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 14px;">
                                 Login to NIRANTRA Portal
+                            </a>
+                        </p>
+
+                        <p style="font-size: 12px; color: #475569; margin-top: 15px; background-color: #F8FAFC; padding: 10px; border-radius: 4px; border: 1px solid #E2E8F0;">
+                            <strong>Direct Portal Link:</strong>
+                            <br/>
+                            <a href="${loginUrl}" target="_blank" style="color: #005B7F; word-break: break-all; font-weight: 600;">
+                                ${loginUrl}
                             </a>
                         </p>
 

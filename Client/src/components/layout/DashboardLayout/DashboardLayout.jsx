@@ -5,6 +5,7 @@ import OfflineWidget from '@/components/common/OfflineWidget/OfflineWidget';
 
 const NAV_ITEMS = [
   { path: '/dashboard', icon: 'space_dashboard', label: 'Dashboard', roles: ['Admin', 'HQ_ADMIN', 'HQ_COMMAND', 'STATION_COMMANDER', 'LOGISTICS_OFFICER', 'INVENTORY_MANAGER', 'MEDICAL_OFFICER', 'SCIENTIST', 'Station Commander', 'Cargo Officer', 'Team Leader'] },
+  { path: '/dashboard/stations', icon: 'location_city', label: 'Stations', roles: ['Admin', 'HQ_ADMIN', 'HQ_COMMAND', 'STATION_COMMANDER', 'LOGISTICS_OFFICER'] },
   { path: '/dashboard/users', icon: 'manage_accounts', label: 'User Accounts', roles: ['Admin', 'HQ_ADMIN', 'HQ_COMMAND', 'STATION_COMMANDER'] },
   { path: '/dashboard/cargo', icon: 'inventory_2', label: 'Cargo', roles: ['Admin', 'HQ_ADMIN', 'HQ_COMMAND', 'STATION_COMMANDER', 'LOGISTICS_OFFICER', 'INVENTORY_MANAGER', 'Cargo Officer'] },
   { path: '/dashboard/inventory', icon: 'category', label: 'Inventory', roles: ['Admin', 'HQ_ADMIN', 'HQ_COMMAND', 'STATION_COMMANDER', 'INVENTORY_MANAGER', 'LOGISTICS_OFFICER', 'Inventory Manager'] },

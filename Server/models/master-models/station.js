@@ -59,6 +59,4 @@ const StationSchema = new mongoose.Schema(
   }
 );
 
-StationSchema.index({ code: 1 });
-
 export default mongoose.models.Station || mongoose.model("Station", StationSchema);

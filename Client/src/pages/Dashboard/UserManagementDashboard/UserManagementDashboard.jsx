@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createUserApi, getAdminUsersApi, toggleUserStatusApi } from '@/api/admin.api';
-import { getStationsApi, createStationApi } from '@/api/station.api';
+import { getStationsApi } from '@/api/station.api';
 
 // Supported polar roles with human labels and badge styling
 const ROLES = [
@@ -24,10 +24,8 @@ const UserManagementDashboard = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('ALL');
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showStationModal, setShowStationModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState(null);
-  const [stationFeedback, setStationFeedback] = useState(null);
   const [createdCredentialsModal, setCreatedCredentialsModal] = useState(null);
 
   // Form State for User
@@ -41,13 +39,6 @@ const UserManagementDashboard = () => {
     organization: 'NCPOR',
     phone: '',
     stationId: '', // valid ObjectId or empty string for HQ
-  });
-
-  // Form State for New Station
-  const [newStation, setNewStation] = useState({
-    code: '',
-    name: '',
-    stationType: 'COASTAL',
   });
 
   const [showPassword, setShowPassword] = useState(false);
@@ -177,31 +168,6 @@ const UserManagementDashboard = () => {
     }
   };
 
-  // Create Station Submission
-  const handleStationSubmit = async (e) => {
-    e.preventDefault();
-    if (!newStation.code || !newStation.name) {
-      setStationFeedback({ type: 'error', message: 'Station code and name are required' });
-      return;
-    }
-
-    try {
-      const res = await createStationApi(newStation);
-      if (res && (res.success || res.station)) {
-        const created = res.station;
-        setStations((prev) => [...prev, created]);
-        setFormData((prev) => ({ ...prev, stationId: created._id }));
-        setShowStationModal(false);
-        setNewStation({ code: '', name: '', stationType: 'COASTAL' });
-        setStationFeedback(null);
-      } else {
-        setStationFeedback({ type: 'error', message: res.message || 'Failed to create station' });
-      }
-    } catch (err) {
-      setStationFeedback({ type: 'error', message: err.response?.data?.message || err.message || 'Error creating station' });
-    }
-  };
-
   const handleToggleStatus = async (userId) => {
     try {
       const res = await toggleUserStatusApi(userId);
@@ -258,47 +224,30 @@ const UserManagementDashboard = () => {
             </h1>
           </div>
           <p style={{ margin: '0.25rem 0 0', color: '#64748B', fontSize: '0.85rem' }}>
-            HQ Command portal to create stations, provision member accounts, and manage expedition complements.
+            HQ Command portal to provision member accounts and manage expedition complements.
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-          <button
-            type="button"
-            onClick={() => setShowStationModal(true)}
-            style={{
-              display: 'flex', alignItems: 'center', gap: '0.4rem',
-              padding: '0.65rem 1rem',
-              backgroundColor: '#F8FAFC', color: '#005B7F',
-              borderRadius: '6px', border: '1px solid #005B7F',
-              fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer'
-            }}
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>add_location_alt</span>
-            + Add Station to DB
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              generateEmpId();
-              generateTempPassword();
-              setShowCreateModal(true);
-            }}
-            style={{
-              display: 'flex', alignItems: 'center', gap: '0.5rem',
-              padding: '0.65rem 1.25rem',
-              backgroundColor: '#005B7F', color: '#ffffff',
-              borderRadius: '6px', border: 'none',
-              fontSize: '0.875rem', fontWeight: 700,
-              cursor: 'pointer',
-              boxShadow: '0 2px 4px rgba(0, 91, 127, 0.25)',
-            }}
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>person_add</span>
-            + Provision New Member Account
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => {
+            generateEmpId();
+            generateTempPassword();
+            setShowCreateModal(true);
+          }}
+          style={{
+            display: 'flex', alignItems: 'center', gap: '0.5rem',
+            padding: '0.65rem 1.25rem',
+            backgroundColor: '#005B7F', color: '#ffffff',
+            borderRadius: '6px', border: 'none',
+            fontSize: '0.875rem', fontWeight: 700,
+            cursor: 'pointer',
+            boxShadow: '0 2px 4px rgba(0, 91, 127, 0.25)',
+          }}
+        >
+          <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>person_add</span>
+          + Provision New Member Account
+        </button>
       </div>
 
       {/* ── STATS CARDS ───────────────────────────────────────────── */}
@@ -816,21 +765,9 @@ const UserManagementDashboard = () => {
               {/* Grid Row 5: Station Assignment from DB & Phone */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
-                    <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#334155' }}>
-                      Primary Station (from DB)
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowCreateModal(false);
-                        setShowStationModal(true);
-                      }}
-                      style={{ background: 'none', border: 'none', color: '#005B7F', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}
-                    >
-                      + Add New Station
-                    </button>
-                  </div>
+                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: '0.35rem' }}>
+                    Primary Station (from DB)
+                  </label>
                   <select
                     name="stationId"
                     value={formData.stationId}
@@ -907,101 +844,6 @@ const UserManagementDashboard = () => {
                 </button>
               </div>
 
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* ── CREATE STATION MODAL ────────────────────────────────────── */}
-      {showStationModal && (
-        <div style={{
-          position: 'fixed', inset: 0, zIndex: 2000,
-          backgroundColor: 'rgba(15, 23, 42, 0.6)',
-          backdropFilter: 'blur(3px)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          padding: '1rem',
-        }}>
-          <div style={{
-            backgroundColor: '#ffffff', borderRadius: '10px',
-            width: '100%', maxWidth: '480px', padding: '1.5rem',
-            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2)',
-            border: '1px solid #E2E8F0',
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#005B7F', margin: 0 }}>
-                + Create Station in MongoDB
-              </h3>
-              <button
-                onClick={() => setShowStationModal(false)}
-                style={{ background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer' }}
-              >✕</button>
-            </div>
-
-            {stationFeedback && (
-              <div style={{ padding: '0.6rem 0.8rem', borderRadius: '4px', backgroundColor: '#FEF2F2', color: '#991B1B', fontSize: '0.8rem', marginBottom: '1rem' }}>
-                {stationFeedback.message}
-              </div>
-            )}
-
-            <form onSubmit={handleStationSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: '0.25rem' }}>
-                  Station Code * (e.g., MAITRI, BHARATI, HIMADRI)
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. HIMADRI"
-                  value={newStation.code}
-                  onChange={(e) => setNewStation((p) => ({ ...p, code: e.target.value.toUpperCase() }))}
-                  style={{ width: '100%', padding: '0.5rem 0.75rem', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '0.85rem' }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: '0.25rem' }}>
-                  Station Name *
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Himadri Station (Arctic)"
-                  value={newStation.name}
-                  onChange={(e) => setNewStation((p) => ({ ...p, name: e.target.value }))}
-                  style={{ width: '100%', padding: '0.5rem 0.75rem', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '0.85rem' }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: '0.25rem' }}>
-                  Station Type
-                </label>
-                <select
-                  value={newStation.stationType}
-                  onChange={(e) => setNewStation((p) => ({ ...p, stationType: e.target.value }))}
-                  style={{ width: '100%', padding: '0.5rem 0.75rem', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '0.85rem' }}
-                >
-                  <option value="COASTAL">COASTAL</option>
-                  <option value="INLAND">INLAND</option>
-                  <option value="HEADQUARTERS">HEADQUARTERS</option>
-                </select>
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.5rem' }}>
-                <button
-                  type="button"
-                  onClick={() => setShowStationModal(false)}
-                  style={{ padding: '0.5rem 1rem', border: '1px solid #CBD5E1', backgroundColor: '#fff', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem' }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  style={{ padding: '0.5rem 1.25rem', backgroundColor: '#005B7F', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: 700, cursor: 'pointer', fontSize: '0.8rem' }}
-                >
-                  Save Station to DB
-                </button>
-              </div>
             </form>
           </div>
         </div>

@@ -110,9 +110,14 @@ export const createUserByAdmin = async (req, res) => {
             name: user.name,
             email: user.email,
             employeeId: user.employeeId,
-            password: password,
+            password,
             role: user.role
-        }).catch(err => console.error("Account email dispatch error:", err.message));
+        }).catch(error => {
+            console.error(
+                "Account email dispatch error:",
+                error
+            );
+        });
 
         return res.status(201).json({
             success: true,

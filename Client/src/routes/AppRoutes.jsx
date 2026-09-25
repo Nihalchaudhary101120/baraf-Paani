@@ -9,6 +9,7 @@ import { ROUTES } from '@/utils/constants';
 
 // Dashboard Pages — lazy loaded
 const DashboardPage          = lazy(() => import('@/pages/Dashboard/DashboardPage'));
+const StationDashboard        = lazy(() => import('@/pages/Dashboard/StationDashboard/StationDashboard'));
 const CargoDashboard         = lazy(() => import('@/pages/Dashboard/CargoDashboard/CargoDashboard'));
 const InventoryDashboard     = lazy(() => import('@/pages/Dashboard/InventoryDashboard/InventoryDashboard'));
 const FieldOpsDashboard      = lazy(() => import('@/pages/Dashboard/FieldOpsDashboard/FieldOpsDashboard'));
@@ -54,6 +55,9 @@ const AppRoutes = () => {
         <Route index element={
           <Suspense fallback={<PageLoader />}><DashboardPage /></Suspense>
         } />
+        <Route path="stations" element={
+          <Suspense fallback={<PageLoader />}><StationDashboard /></Suspense>
+        } />
         <Route path="users" element={
           <Suspense fallback={<PageLoader />}><UserManagementDashboard /></Suspense>
         } />
@@ -77,8 +81,8 @@ const AppRoutes = () => {
         } />
       </Route>
 
-      {/* Legacy /stations redirect */}
-      <Route path={ROUTES.STATIONS} element={<Navigate to="/dashboard" replace />} />
+      {/* Legacy /stations route redirect to /dashboard/stations */}
+      <Route path={ROUTES.STATIONS} element={<Navigate to="/dashboard/stations" replace />} />
 
       {/* Catch-all 404 */}
       <Route path="*" element={<NotFoundPage />} />
