@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { queueEvent } from '@/services/syncServices/queueService';
+import { getManifests } from '@/api/cargo.api';
 
 // ── Demo data ───────────────────────────────────────────────────────
 const DEMO_SHIPMENTS = [
@@ -49,10 +50,42 @@ const StatusBadge = ({ status }) => {
 
 const CargoDashboard = () => {
   const [activeTab, setActiveTab] = useState('shipments');
+  const [manifestsList, setManifestsList] = useState(DEMO_MANIFESTS);
   const [selectedManifest, setSelectedManifest] = useState(null);
   const [receiveForm, setReceiveForm] = useState({ manifestId: '', itemCode: '', acceptedQty: '', remarks: '' });
   const [scanItem, setScanItem] = useState(null);
   const [toast, setToast] = useState(null);
+
+  const fetchLiveManifests = useCallback(async () => {
+    try {
+      const res = await getManifests();
+      const list = res?.data?.manifests || res?.manifests || [];
+      if (list.length > 0) {
+        const formatted = list.map(m => ({
+          _id: m._id,
+          manifestNumber: m.manifestNumber || m.manifestCode || 'CGM-MANIFEST',
+          shipmentId: m.shipmentId || 'LIVE',
+          itemCount: m.items?.length || 0,
+          status: m.status || 'CREATED',
+          items: (m.items || []).map(it => ({
+            itemCode: it.itemCode,
+            name: it.description || it.itemCode,
+            qty: it.packageCount || 1,
+          }))
+        }));
+        // Merge without duplicating IDs
+        const existingIds = new Set(formatted.map(m => m._id));
+        const combined = [...formatted, ...DEMO_MANIFESTS.filter(d => !existingIds.has(d._id))];
+        setManifestsList(combined);
+      }
+    } catch (e) {
+      console.log('Using default manifests fallback:', e.message);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchLiveManifests();
+  }, [fetchLiveManifests]);
 
   const showToast = (msg, type = 'success') => {
     setToast({ msg, type });
@@ -233,7 +266,7 @@ const CargoDashboard = () => {
       {/* ── TAB: MANIFESTS ──────────────────────────────────────── */}
       {activeTab === 'manifests' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          {DEMO_MANIFESTS.map(manifest => (
+          {manifestsList.map(manifest => (
             <div key={manifest._id} style={{
               backgroundColor: '#fff', border: '1px solid #E2E8F0', borderRadius: '8px', overflow: 'hidden',
             }}>
@@ -323,7 +356,7 @@ const CargoDashboard = () => {
                   style={{ width: '100%', height: '38px', padding: '0 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem', backgroundColor: '#fff' }}
                 >
                   <option value="">Choose manifest...</option>
-                  {DEMO_MANIFESTS.map(m => (
+                  {manifestsList.map(m => (
                     <option key={m._id} value={m._id}>{m.manifestNumber}</option>
                   ))}
                 </select>
@@ -338,7 +371,7 @@ const CargoDashboard = () => {
                   style={{ width: '100%', height: '38px', padding: '0 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem', backgroundColor: '#fff' }}
                 >
                   <option value="">Choose item...</option>
-                  {(DEMO_MANIFESTS.find(m => m._id === receiveForm.manifestId)?.items || []).map(item => (
+                  {(manifestsList.find(m => m._id === receiveForm.manifestId)?.items || []).map(item => (
                     <option key={item.itemCode} value={item.itemCode}>{item.itemCode} — {item.name}</option>
                   ))}
                 </select>

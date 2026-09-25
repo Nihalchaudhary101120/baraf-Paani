@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import CargoManifest from "../../models/cargo-models/cargo-menifest.js";
 import Expedition from "../../models/master-models/expedition.js";
 import Station from "../../models/master-models/station.js";
@@ -5,7 +6,7 @@ import Station from "../../models/master-models/station.js";
 const calculateTotals = (items = []) => {
     return items.reduce(
         (totals, item) => {
-            totals.totalPackages += item.packageCount || 0;
+            totals.totalPackages += item.packageCount || 1;
             totals.totalWeightKg +=
                 (item.weightKg || 0) * (item.packageCount || 1);
             totals.totalDeclaredValue += item.declaredValueINR || 0;
@@ -70,7 +71,14 @@ export const createManifest = async (req, res) => {
             });
         }
 
-        const station = await Station.findById(destination);
+        let station = null;
+        if (mongoose.Types.ObjectId.isValid(destination)) {
+            station = await Station.findById(destination);
+        }
+        if (!station) {
+            station = await Station.findOne({ code: String(destination).toUpperCase() }) ||
+                      await Station.findOne({ name: new RegExp(`^${destination}$`, "i") });
+        }
 
         if (!station) {
             return res.status(404).json({
@@ -93,15 +101,20 @@ export const createManifest = async (req, res) => {
 
         const manifest = await CargoManifest.create({
             manifestNumber,
-            expeditionId,
+            expeditionId: expedition._id,
             declarationType,
             owner,
             origin: origin || "Goa",
-            destination,
+            destination: station._id,
             items,
             totals: calculateTotals(items),
-            createdBy: req.user.userId
+            createdBy: req.user?.userId || req.user?.id
         });
+
+        // Update expedition summary counter
+        await Expedition.findByIdAndUpdate(expedition._id, {
+            $inc: { "summary.cargoManifestCount": 1 }
+        }).catch(() => {});
 
         return res.status(201).json({
             success: true,
@@ -113,7 +126,7 @@ export const createManifest = async (req, res) => {
 
         return res.status(500).json({
             success: false,
-            message: "Failed to create cargo manifest"
+            message: error.message || "Failed to create cargo manifest"
         });
     }
 };

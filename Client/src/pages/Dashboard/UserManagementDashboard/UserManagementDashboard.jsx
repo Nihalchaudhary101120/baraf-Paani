@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { createUserApi, getAdminUsersApi, toggleUserStatusApi } from '@/api/admin.api';
-import { getStationsApi } from '@/api/station.api';
+import { createUserApi, toggleUserStatusApi } from '@/api/admin.api';
+import { useAdminData } from '@/context/AdminContext';
 
 // Supported polar roles with human labels and badge styling
 const ROLES = [
@@ -17,9 +17,7 @@ const ROLES = [
 ];
 
 const UserManagementDashboard = () => {
-  const [users, setUsers] = useState([]);
-  const [stations, setStations] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { users, stations, addUser, toggleUserStatus, fetchUsers, fetchStations, loading: contextLoading, isInitialized } = useAdminData();
   const [errorMsg, setErrorMsg] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('ALL');
@@ -43,34 +41,13 @@ const UserManagementDashboard = () => {
 
   const [showPassword, setShowPassword] = useState(false);
 
-  // Fetch users & stations from MongoDB APIs
-  const fetchUsersAndStations = async () => {
-    setLoading(true);
-    setErrorMsg(null);
-    try {
-      const [userRes, stationRes] = await Promise.all([
-        getAdminUsersApi().catch((e) => ({ success: false, users: [], error: e })),
-        getStationsApi().catch((e) => ({ success: false, stations: [], error: e })),
-      ]);
-
-      if (userRes && (userRes.success || Array.isArray(userRes.users))) {
-        setUsers(userRes.users || []);
-      }
-
-      if (stationRes && (stationRes.success || Array.isArray(stationRes.stations))) {
-        setStations(stationRes.stations || []);
-      }
-    } catch (err) {
-      console.error('Failed to load DB records:', err);
-      setErrorMsg(err.message || 'Failed to load accounts from database');
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // Silent background revalidation on mount
   useEffect(() => {
-    fetchUsersAndStations();
-  }, []);
+    fetchUsers(true);
+    fetchStations(true);
+  }, [fetchUsers, fetchStations]);
+
+  const loading = !isInitialized && users.length === 0 && contextLoading.users;
 
   // Helper to generate employee ID
   const generateEmpId = () => {
@@ -129,8 +106,8 @@ const UserManagementDashboard = () => {
           createdAt: new Date().toISOString(),
         };
 
-        // Prepend created user & refresh list from DB
-        setUsers((prev) => [createdUser, ...prev]);
+        // Optimistically add created user to shared context
+        addUser(createdUser);
 
         setCreatedCredentialsModal({
           name: formData.name,
@@ -155,7 +132,7 @@ const UserManagementDashboard = () => {
           stationId: '',
         });
 
-        fetchUsersAndStations();
+        fetchUsers(true);
       } else {
         setFeedback({ type: 'error', message: res.message || 'Failed to create user in database' });
       }
@@ -170,14 +147,11 @@ const UserManagementDashboard = () => {
 
   const handleToggleStatus = async (userId) => {
     try {
-      const res = await toggleUserStatusApi(userId);
-      if (res && res.success) {
-        setUsers((prev) =>
-          prev.map((u) => (u._id === userId ? { ...u, isActive: res.user.isActive } : u))
-        );
-      }
+      toggleUserStatus(userId);
+      await toggleUserStatusApi(userId);
     } catch (err) {
       console.error('Status toggle error:', err);
+      toggleUserStatus(userId); // revert on error
     }
   };
 
@@ -364,7 +338,7 @@ const UserManagementDashboard = () => {
 
         <button
           type="button"
-          onClick={fetchUsersAndStations}
+          onClick={() => { fetchUsers(false); fetchStations(false); }}
           style={{
             display: 'flex', alignItems: 'center', gap: '0.4rem',
             padding: '0.55rem 0.85rem', backgroundColor: '#F1F5F9',
@@ -405,7 +379,7 @@ const UserManagementDashboard = () => {
             <span className="material-symbols-outlined" style={{ fontSize: '36px' }}>error</span>
             <div style={{ fontWeight: 700, marginTop: '0.5rem' }}>{errorMsg}</div>
             <button
-              onClick={fetchUsersAndStations}
+              onClick={() => { fetchUsers(false); fetchStations(false); }}
               style={{ marginTop: '0.75rem', padding: '0.4rem 1rem', backgroundColor: '#005B7F', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 }}
             >
               Retry Database Connection

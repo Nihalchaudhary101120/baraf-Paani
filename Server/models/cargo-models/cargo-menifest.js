@@ -23,8 +23,10 @@ const CargoItemSchema = new mongoose.Schema(
         "PERSONAL",
         "SPARES",
         "ELECTRONICS",
+        "EQUIPMENT",
         "GENERAL"
-      ]
+      ],
+      default: "GENERAL"
     },
 
     make: String,
@@ -45,7 +47,8 @@ const CargoItemSchema = new mongoose.Schema(
         "CYLINDER",
         "CONTAINER",
         "BAG"
-      ]
+      ],
+      default: "BOX"
     },
 
     weightKg: {
@@ -86,8 +89,17 @@ const CargoManifestSchema = new mongoose.Schema(
 
     declarationType: {
       type: String,
-      enum: ["OFFICIAL", "PERSONAL"],
-      required: true
+      enum: [
+        "OFFICIAL",
+        "PERSONAL",
+        "SCIENTIFIC",
+        "SCIENTIFIC_SAMPLES",
+        "EQUIPMENT",
+        "CONSUMABLES",
+        "MEDICAL",
+        "HAZMAT"
+      ],
+      default: "OFFICIAL"
     },
 
     owner: {

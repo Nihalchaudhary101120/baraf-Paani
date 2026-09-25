@@ -62,6 +62,7 @@ app.use("/api/personnel", personnelRoutes);
 app.use("/api/medical", medicalRoutes);
 app.use("/api/training", trainingRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/users", adminRoutes);
 app.use("/api/stations", stationRoutes);
 app.use("/api/cargo/manifests", cargoManifestRoutes);
 app.use("/api/cargo/shipments", shipmentRoutes);

@@ -16,7 +16,7 @@ const router = express.Router();
 router.post(
     "/",
     requireAuth,
-    requireRole("LOGISTICS_OFFICER", "HQ_COMMAND"),
+    requireRole("HQ_ADMIN", "LOGISTICS_OFFICER", "HQ_COMMAND"),
     createManifest
 );
 
@@ -35,14 +35,14 @@ router.get(
 router.put(
     "/:id",
     requireAuth,
-    requireRole("LOGISTICS_OFFICER", "HQ_COMMAND"),
+    requireRole("HQ_ADMIN", "LOGISTICS_OFFICER", "HQ_COMMAND"),
     updateManifest
 );
 
 router.patch(
     "/:id/status",
     requireAuth,
-    requireRole("LOGISTICS_OFFICER", "HQ_COMMAND"),
+    requireRole("HQ_ADMIN", "LOGISTICS_OFFICER", "HQ_COMMAND"),
     updateManifestStatus
 );
 

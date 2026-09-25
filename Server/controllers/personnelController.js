@@ -1,5 +1,24 @@
 import Personnel from "../models/master-models/personnel.js";
 
+export const getMyProfile = async (req, res) => {
+    try {
+        const userId = req.user.userId;
+        const personnel = await Personnel.findOne({ userId });
+
+        if (!personnel) {
+            return res.status(404).json({
+                success: false,
+                message: "Personnel profile not found"
+            });
+        }
+
+        return res.status(200).json({ success: true, personnel });
+    } catch (error) {
+        console.error("Get personnel profile error:", error);
+        return res.status(500).json({ success: false, message: "Failed to fetch personnel profile" });
+    }
+};
+
 export const updateMyProfile = async (req, res) => {
     try {
         const userId = req.user.userId;

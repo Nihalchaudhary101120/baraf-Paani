@@ -17,6 +17,15 @@ const EquipmentDashboard     = lazy(() => import('@/pages/Dashboard/EquipmentDas
 const SOSDashboard           = lazy(() => import('@/pages/Dashboard/SOSDashboard/SOSDashboard'));
 const PersonnelDashboard     = lazy(() => import('@/pages/Dashboard/PersonnelDashboard/PersonnelDashboard'));
 const UserManagementDashboard = lazy(() => import('@/pages/Dashboard/UserManagementDashboard/UserManagementDashboard'));
+const DeviceManagementDashboard = lazy(() => import('@/pages/Dashboard/DeviceManagement/DeviceManagementDashboard'));
+const ExpeditionDashboard    = lazy(() => import('@/pages/Dashboard/ExpeditionDashboard/ExpeditionDashboard'));
+const CompleteProfilePage    = lazy(() => import('@/pages/CompleteProfile/CompleteProfilePage'));
+
+// HQ_ADMIN Read-Only Operational Views
+const AdminMedicalView       = lazy(() => import('@/pages/Dashboard/HQAdmin/AdminMedicalView'));
+const AdminCargoView         = lazy(() => import('@/pages/Dashboard/HQAdmin/AdminCargoView'));
+const AdminFieldOpsView      = lazy(() => import('@/pages/Dashboard/HQAdmin/AdminFieldOpsView'));
+const AdminInventoryView     = lazy(() => import('@/pages/Dashboard/HQAdmin/AdminInventoryView'));
 
 const PageLoader = () => (
   <div style={{
@@ -61,6 +70,12 @@ const AppRoutes = () => {
         <Route path="users" element={
           <Suspense fallback={<PageLoader />}><UserManagementDashboard /></Suspense>
         } />
+        <Route path="devices" element={
+          <Suspense fallback={<PageLoader />}><DeviceManagementDashboard /></Suspense>
+        } />
+        <Route path="expeditions" element={
+          <Suspense fallback={<PageLoader />}><ExpeditionDashboard /></Suspense>
+        } />
         <Route path="cargo" element={
           <Suspense fallback={<PageLoader />}><CargoDashboard /></Suspense>
         } />
@@ -79,10 +94,35 @@ const AppRoutes = () => {
         <Route path="personnel" element={
           <Suspense fallback={<PageLoader />}><PersonnelDashboard /></Suspense>
         } />
+        {/* HQ_ADMIN Read-Only Operational Views */}
+        <Route path="admin-medical" element={
+          <Suspense fallback={<PageLoader />}><AdminMedicalView /></Suspense>
+        } />
+        <Route path="admin-cargo" element={
+          <Suspense fallback={<PageLoader />}><AdminCargoView /></Suspense>
+        } />
+        <Route path="admin-field" element={
+          <Suspense fallback={<PageLoader />}><AdminFieldOpsView /></Suspense>
+        } />
+        <Route path="admin-inventory" element={
+          <Suspense fallback={<PageLoader />}><AdminInventoryView /></Suspense>
+        } />
       </Route>
 
       {/* Legacy /stations route redirect to /dashboard/stations */}
       <Route path={ROUTES.STATIONS} element={<Navigate to="/dashboard/stations" replace />} />
+
+      {/* Profile Completion — only authenticated personnel see this */}
+      <Route
+        path="/complete-profile"
+        element={
+          <ProtectedRoute>
+            <Suspense fallback={<PageLoader />}>
+              <CompleteProfilePage />
+            </Suspense>
+          </ProtectedRoute>
+        }
+      />
 
       {/* Catch-all 404 */}
       <Route path="*" element={<NotFoundPage />} />

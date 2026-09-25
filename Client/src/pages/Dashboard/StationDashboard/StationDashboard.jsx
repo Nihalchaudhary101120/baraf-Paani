@@ -1,11 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { getStationsApi, createStationApi } from '@/api/station.api';
-import { getAdminUsersApi } from '@/api/admin.api';
+import { createStationApi } from '@/api/station.api';
+import { useAdminData } from '@/context/AdminContext';
 
 const StationDashboard = () => {
-  const [stations, setStations] = useState([]);
-  const [users, setUsers] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { stations, users, addStation, fetchStations, fetchUsers, loading: contextLoading, isInitialized } = useAdminData();
   const [errorMsg, setErrorMsg] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('ALL');
@@ -25,32 +23,12 @@ const StationDashboard = () => {
     emergencyCapacity: 60,
   });
 
-  const fetchData = async () => {
-    setLoading(true);
-    setErrorMsg(null);
-    try {
-      const [stationRes, userRes] = await Promise.all([
-        getStationsApi().catch(() => ({ success: false, stations: [] })),
-        getAdminUsersApi().catch(() => ({ success: false, users: [] })),
-      ]);
-
-      if (stationRes && (stationRes.success || Array.isArray(stationRes.stations))) {
-        setStations(stationRes.stations || []);
-      }
-      if (userRes && (userRes.success || Array.isArray(userRes.users))) {
-        setUsers(userRes.users || []);
-      }
-    } catch (err) {
-      console.error('Failed to load station records:', err);
-      setErrorMsg(err.message || 'Failed to fetch stations from database');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    fetchData();
-  }, []);
+    fetchStations(true);
+    fetchUsers(true);
+  }, [fetchStations, fetchUsers]);
+
+  const loading = !isInitialized && stations.length === 0 && contextLoading.stations;
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -88,7 +66,7 @@ const StationDashboard = () => {
       const res = await createStationApi(payload);
       if (res && (res.success || res.station)) {
         const newSt = res.station || payload;
-        setStations((prev) => [newSt, ...prev]);
+        addStation(newSt);
         setShowCreateModal(false);
         setFormData({
           code: '',
@@ -100,7 +78,7 @@ const StationDashboard = () => {
           winterCapacity: 25,
           emergencyCapacity: 60,
         });
-        fetchData();
+        fetchStations(true);
       } else {
         setFeedback({ type: 'error', message: res.message || 'Failed to create station' });
       }
@@ -285,7 +263,7 @@ const StationDashboard = () => {
 
         <button
           type="button"
-          onClick={fetchData}
+          onClick={() => { fetchStations(false); fetchUsers(false); }}
           style={{
             display: 'flex', alignItems: 'center', gap: '0.4rem',
             padding: '0.55rem 0.85rem', backgroundColor: '#F1F5F9',
