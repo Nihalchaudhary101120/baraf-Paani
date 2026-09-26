@@ -53,18 +53,6 @@ export default function MedicalOfficerDashboard() {
   const [createCandidateId, setCreateCandidateId] = useState('');
   const [customRestrictionText, setCustomRestrictionText] = useState('');
 
-  // Training Modal State
-  const [selectedTrainingPersonnel, setSelectedTrainingPersonnel] = useState(null);
-  const [isTrainingModalOpen, setIsTrainingModalOpen] = useState(false);
-  const [newTrainingRecord, setNewTrainingRecord] = useState({
-    trainingName: '',
-    category: 'SURVIVAL',
-    completedOn: new Date().toISOString().split('T')[0],
-    certificateNumber: '',
-    validUntil: '',
-    passed: true
-  });
-
   // Historical Records Modal State
   const [historyPersonnel, setHistoryPersonnel] = useState(null);
   const [historyRecords, setHistoryRecords] = useState(null);
@@ -226,41 +214,6 @@ export default function MedicalOfficerDashboard() {
     }
   };
 
-  // Open Training Modal
-  const handleOpenTraining = (personnelItem) => {
-    setSelectedTrainingPersonnel(personnelItem);
-    setIsTrainingModalOpen(true);
-  };
-
-  // Add Training Record
-  const handleAddTrainingRecord = async () => {
-    if (!newTrainingRecord.trainingName) {
-      alert('Please enter training name');
-      return;
-    }
-    const clearance = selectedTrainingPersonnel.trainingClearance;
-    const clearanceId = clearance?._id;
-
-    await addTraining(selectedTrainingPersonnel.personnelId, clearanceId, { ...newTrainingRecord });
-
-    setNewTrainingRecord({
-      trainingName: '',
-      category: 'SURVIVAL',
-      completedOn: new Date().toISOString().split('T')[0],
-      certificateNumber: '',
-      validUntil: '',
-      passed: true
-    });
-    alert('Training record added successfully!');
-  };
-
-  // Complete Training Clearance
-  const handleCompleteTraining = async (personnelItem) => {
-    const clearanceId = personnelItem.trainingClearance?._id;
-    await completeTraining(personnelItem.personnelId, clearanceId);
-    alert('Training clearance completed and marked as COMPLETED!');
-  };
-
   // Helper Badge Renderers
   const renderMedicalBadge = (status) => {
     switch (status) {
@@ -353,7 +306,7 @@ export default function MedicalOfficerDashboard() {
               </span>
             </div>
             <p style={{ fontSize: '0.8rem', color: '#64748B', margin: '0.2rem 0 0' }}>
-              Antarctic Medical Clearances, Cold-Weather Fitness, Psychological Assessments & Polar Training
+              Antarctic Medical Clearances, Cold-Weather Fitness & Psychological Assessments
             </p>
           </div>
         </div>
@@ -454,13 +407,6 @@ export default function MedicalOfficerDashboard() {
           <span style={{ fontSize: '1.8rem', fontWeight: 800, color: '#DC2626' }}>{overviewStats.notFit || 3}</span>
           <span style={{ fontSize: '0.68rem', color: '#B91C1C' }}>Deployment contraindicated</span>
         </div>
-
-        {/* Training Pending */}
-        <div style={{ backgroundColor: '#fff', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.3rem', borderLeft: '4px solid #6366F1' }}>
-          <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#4F46E5', textTransform: 'uppercase' }}>Training Pending</span>
-          <span style={{ fontSize: '1.8rem', fontWeight: 800, color: '#4F46E5' }}>{overviewStats.trainingPending || 12}</span>
-          <span style={{ fontSize: '0.68rem', color: '#64748B' }}>Survival / Fire / Radio</span>
-        </div>
       </div>
 
       {/* ── WORKFLOW NAVIGATION TABS ── */}
@@ -476,7 +422,6 @@ export default function MedicalOfficerDashboard() {
           { key: 'personnel', label: 'Personnel & Assessments', icon: 'person_search' },
           { key: 'pending', label: 'Pending Examinations', icon: 'pending_actions', badge: overviewStats.pendingMedical },
           { key: 'clearances', label: 'Medical Clearances', icon: 'verified_user' },
-          { key: 'training', label: 'Training Clearance', icon: 'model_training', badge: overviewStats.trainingPending },
           { key: 'reports', label: 'Medical Reports & Stats', icon: 'summarize' },
           { key: 'alerts', label: 'Medical Alerts', icon: 'notifications_active', badge: alerts.length, badgeColor: '#B91C1C' },
           { key: 'history', label: 'Historical Archives', icon: 'history' }
@@ -642,40 +587,9 @@ export default function MedicalOfficerDashboard() {
 
           </div>
 
-          {/* Right Column: Training Clearance & Medical Alerts */}
+          {/* Right Column: Medical Alerts & Critical Warnings */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
             
-            {/* Training Clearance Summary */}
-            <div style={{ backgroundColor: '#fff', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '1.25rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <span className="material-symbols-outlined" style={{ color: '#4338ca', fontSize: '20px' }}>school</span>
-                  <span style={{ fontWeight: 700, color: '#0F172A', fontSize: '0.9rem' }}>Polar Training Status</span>
-                </div>
-                <button
-                  onClick={() => setActiveTab('training')}
-                  style={{ background: 'none', border: 'none', color: '#005B7F', fontWeight: 700, fontSize: '0.78rem', cursor: 'pointer' }}
-                >
-                  Manage →
-                </button>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.6rem 0.75rem', backgroundColor: '#eef2ff', borderRadius: '6px' }}>
-                  <span style={{ fontWeight: 600, color: '#3730a3', fontSize: '0.82rem' }}>Training Completed</span>
-                  <span style={{ fontWeight: 800, color: '#3730a3', fontSize: '1rem' }}>{overviewStats.trainingCompleted || 0}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.6rem 0.75rem', backgroundColor: '#fefce8', borderRadius: '6px' }}>
-                  <span style={{ fontWeight: 600, color: '#854d0e', fontSize: '0.82rem' }}>Partial / In-Progress</span>
-                  <span style={{ fontWeight: 800, color: '#854d0e', fontSize: '1rem' }}>{overviewStats.trainingPartial || 0}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.6rem 0.75rem', backgroundColor: '#f8fafc', borderRadius: '6px' }}>
-                  <span style={{ fontWeight: 600, color: '#475569', fontSize: '0.82rem' }}>Pending Enrollment</span>
-                  <span style={{ fontWeight: 800, color: '#475569', fontSize: '1rem' }}>{overviewStats.trainingPending || 0}</span>
-                </div>
-              </div>
-            </div>
-
             {/* Critical Medical Alerts */}
             <div style={{ backgroundColor: '#fff', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '1.25rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
@@ -890,95 +804,7 @@ export default function MedicalOfficerDashboard() {
         </div>
       )}
 
-      {/* ── TAB 4: TRAINING CLEARANCE MATRIX ── */}
-      {activeTab === 'training' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-          <div style={{ backgroundColor: '#fff', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '1.25rem' }}>
-            <h2 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#005B7F', margin: '0 0 0.4rem 0' }}>
-              POLAR PRE-DEPLOYMENT TRAINING MATRIX
-            </h2>
-            <p style={{ fontSize: '0.8rem', color: '#64748B', margin: 0 }}>
-              Mandatory certifications: Polar Survival, Station Fire Safety, HF/VHF Satcom Radio, First Aid, Field Crevasse Safety.
-            </p>
-          </div>
 
-          <div style={{ backgroundColor: '#fff', border: '1px solid #E2E8F0', borderRadius: '8px', overflow: 'hidden' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
-              <thead>
-                <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #E2E8F0' }}>
-                  {['Personnel', 'ID', 'Survival', 'Fire Safety', 'Radio Comms', 'Medical/Trauma', 'Field Safety', 'Overall Status', 'Action'].map(h => (
-                    <th key={h} style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.72rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {roster.map((item, idx) => {
-                  const trainings = item.trainingClearance?.trainings || [];
-                  const getTr = (cat) => trainings.find(t => t.category === cat);
-                  const sSurvival = getTr('SURVIVAL');
-                  const sFire = getTr('FIRE');
-                  const sRadio = getTr('RADIO');
-                  const sMed = getTr('MEDICAL');
-                  const sField = getTr('FIELD');
-
-                  return (
-                    <tr key={item.personnelId || idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                      <td style={{ padding: '0.85rem 1rem', fontWeight: 600, color: '#0F172A' }}>{item.user?.name}</td>
-                      <td style={{ padding: '0.85rem 1rem', fontFamily: 'monospace', fontWeight: 700, color: '#005B7F' }}>{item.user?.employeeId}</td>
-                      <td style={{ padding: '0.85rem 1rem' }}>
-                        <span style={{ color: sSurvival?.passed ? '#15803d' : '#b91c1c', fontWeight: 700 }}>
-                          {sSurvival?.passed ? '✓ Passed' : 'Pending'}
-                        </span>
-                      </td>
-                      <td style={{ padding: '0.85rem 1rem' }}>
-                        <span style={{ color: sFire?.passed ? '#15803d' : '#b91c1c', fontWeight: 700 }}>
-                          {sFire?.passed ? '✓ Passed' : 'Pending'}
-                        </span>
-                      </td>
-                      <td style={{ padding: '0.85rem 1rem' }}>
-                        <span style={{ color: sRadio?.passed ? '#15803d' : '#b91c1c', fontWeight: 700 }}>
-                          {sRadio?.passed ? '✓ Passed' : 'Pending'}
-                        </span>
-                      </td>
-                      <td style={{ padding: '0.85rem 1rem' }}>
-                        <span style={{ color: sMed?.passed ? '#15803d' : '#b91c1c', fontWeight: 700 }}>
-                          {sMed?.passed ? '✓ Passed' : 'Pending'}
-                        </span>
-                      </td>
-                      <td style={{ padding: '0.85rem 1rem' }}>
-                        <span style={{ color: sField?.passed ? '#15803d' : '#b91c1c', fontWeight: 700 }}>
-                          {sField?.passed ? '✓ Passed' : 'Pending'}
-                        </span>
-                      </td>
-                      <td style={{ padding: '0.85rem 1rem' }}>
-                        {renderTrainingBadge(item.trainingStatus)}
-                      </td>
-                      <td style={{ padding: '0.85rem 1rem' }}>
-                        <div style={{ display: 'flex', gap: '0.4rem' }}>
-                          <button
-                            onClick={() => handleOpenTraining(item)}
-                            style={{ backgroundColor: '#4338ca', color: '#fff', border: 'none', padding: '0.3rem 0.6rem', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 600, cursor: 'pointer' }}
-                          >
-                            Update Training
-                          </button>
-                          {item.trainingStatus !== 'COMPLETED' && (
-                            <button
-                              onClick={() => handleCompleteTraining(item)}
-                              style={{ backgroundColor: '#15803d', color: '#fff', border: 'none', padding: '0.3rem 0.6rem', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 600, cursor: 'pointer' }}
-                            >
-                              Mark Completed
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
 
       {/* ── TAB 5: MEDICAL REPORTS & SUMMARIES ── */}
       {activeTab === 'reports' && (
@@ -1785,138 +1611,7 @@ export default function MedicalOfficerDashboard() {
         </div>
       )}
 
-      {/* ════════════════════════════════════════════════════════════════ */}
-      {/* ── MODAL 2: TRAINING RECORD & CLEARANCE MANAGEMENT ─────────── */}
-      {/* ════════════════════════════════════════════════════════════════ */}
-      {isTrainingModalOpen && selectedTrainingPersonnel && (
-        <div style={{
-          position: 'fixed', inset: 0, zIndex: 3000,
-          backgroundColor: 'rgba(15, 23, 42, 0.65)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          padding: '1rem'
-        }}>
-          <div style={{
-            backgroundColor: '#ffffff',
-            borderRadius: '12px',
-            width: '100%',
-            maxWidth: '750px',
-            maxHeight: '90vh',
-            display: 'flex',
-            flexDirection: 'column',
-            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2)',
-            overflow: 'hidden'
-          }}>
-            <div style={{ backgroundColor: '#4338ca', color: '#fff', padding: '1rem 1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <h2 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0 }}>TRAINING CLEARANCE AUDIT</h2>
-                <div style={{ fontSize: '0.8rem', color: '#c7d2fe', marginTop: '0.2rem' }}>
-                  {selectedTrainingPersonnel.user?.name} ({selectedTrainingPersonnel.user?.employeeId})
-                </div>
-              </div>
-              <button onClick={() => setIsTrainingModalOpen(false)} style={{ background: 'none', border: 'none', color: '#fff', fontSize: '1.25rem', cursor: 'pointer' }}>✕</button>
-            </div>
 
-            <div style={{ padding: '1.25rem', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-              
-              {/* Existing Trainings Table */}
-              <div>
-                <h3 style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e293b', marginBottom: '0.5rem' }}>Completed Training Records</h3>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem', border: '1px solid #e2e8f0' }}>
-                  <thead>
-                    <tr style={{ backgroundColor: '#f8fafc' }}>
-                      <th style={{ padding: '0.5rem', textAlign: 'left' }}>Course</th>
-                      <th style={{ padding: '0.5rem', textAlign: 'left' }}>Category</th>
-                      <th style={{ padding: '0.5rem', textAlign: 'left' }}>Cert #</th>
-                      <th style={{ padding: '0.5rem', textAlign: 'left' }}>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(selectedTrainingPersonnel.trainingClearance?.trainings || []).map((t, idx) => (
-                      <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '0.5rem', fontWeight: 600 }}>{t.trainingName}</td>
-                        <td style={{ padding: '0.5rem' }}>{t.category}</td>
-                        <td style={{ padding: '0.5rem', fontFamily: 'monospace' }}>{t.certificateNumber || '—'}</td>
-                        <td style={{ padding: '0.5rem' }}>
-                          <span style={{ color: t.passed ? '#15803d' : '#b91c1c', fontWeight: 700 }}>
-                            {t.passed ? '✓ Passed' : 'Failed'}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Add New Training Form */}
-              <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '1rem' }}>
-                <h3 style={{ fontSize: '0.85rem', fontWeight: 800, color: '#4338ca', margin: '0 0 0.75rem 0' }}>Add New Certification / Record</h3>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                  <div>
-                    <label style={{ fontSize: '0.75rem', fontWeight: 700 }}>Training Name *</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Glacier Crevasse Extrication"
-                      value={newTrainingRecord.trainingName}
-                      onChange={e => setNewTrainingRecord({ ...newTrainingRecord, trainingName: e.target.value })}
-                      style={{ width: '100%', padding: '0.45rem', border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '0.8rem', marginTop: '0.2rem' }}
-                    />
-                  </div>
-                  <div>
-                    <label style={{ fontSize: '0.75rem', fontWeight: 700 }}>Category *</label>
-                    <select
-                      value={newTrainingRecord.category}
-                      onChange={e => setNewTrainingRecord({ ...newTrainingRecord, category: e.target.value })}
-                      style={{ width: '100%', padding: '0.45rem', border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '0.8rem', marginTop: '0.2rem', backgroundColor: '#fff' }}
-                    >
-                      {['SURVIVAL', 'FIRE', 'RADIO', 'MEDICAL', 'FIELD', 'ENVIRONMENT', 'EQUIPMENT'].map(c => (
-                        <option key={c} value={c}>{c}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label style={{ fontSize: '0.75rem', fontWeight: 700 }}>Certificate Number</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. POLAR-2026-99"
-                      value={newTrainingRecord.certificateNumber}
-                      onChange={e => setNewTrainingRecord({ ...newTrainingRecord, certificateNumber: e.target.value })}
-                      style={{ width: '100%', padding: '0.45rem', border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '0.8rem', marginTop: '0.2rem' }}
-                    />
-                  </div>
-                  <div>
-                    <label style={{ fontSize: '0.75rem', fontWeight: 700 }}>Completion Date</label>
-                    <input
-                      type="date"
-                      value={newTrainingRecord.completedOn}
-                      onChange={e => setNewTrainingRecord({ ...newTrainingRecord, completedOn: e.target.value })}
-                      style={{ width: '100%', padding: '0.45rem', border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '0.8rem', marginTop: '0.2rem' }}
-                    />
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={handleAddTrainingRecord}
-                  style={{ marginTop: '0.75rem', padding: '0.45rem 0.9rem', backgroundColor: '#4338ca', color: '#fff', border: 'none', borderRadius: '4px', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer' }}
-                >
-                  + Add Training Record
-                </button>
-              </div>
-
-            </div>
-
-            <div style={{ backgroundColor: '#f8fafc', padding: '0.75rem 1.5rem', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end' }}>
-              <button
-                type="button"
-                onClick={() => setIsTrainingModalOpen(false)}
-                style={{ padding: '0.5rem 1rem', backgroundColor: '#005B7F', color: '#fff', border: 'none', borderRadius: '4px', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer' }}
-              >
-                Done
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ════════════════════════════════════════════════════════════════ */}
       {/* ── MODAL 3: MULTI-EXPEDITION HISTORICAL MEDICAL TIMELINE ────── */}

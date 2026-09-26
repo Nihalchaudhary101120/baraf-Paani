@@ -746,10 +746,11 @@ const ExpeditionDetailPanel = ({ expedition, allPersonnel, stations, onClose, on
           </div>
 
           {/* Tabs */}
-          <div style={{ display: 'flex', borderBottom: '2px solid #E2E8F0', flexShrink: 0, backgroundColor: '#f8fafc' }}>
+          <div style={{ display: 'flex', borderBottom: '2px solid #E2E8F0', flexShrink: 0, backgroundColor: '#f8fafc', overflowX: 'auto' }}>
             {[
               ['overview', 'Overview'],
               ['personnel', `Personnel (${candidates.length})`],
+              ['training', 'Polar Training'],
               ['manifests', 'Cargo Manifests'],
               ['projects', 'Scientific Projects'],
               ['logistics', 'Transport Plan']
@@ -759,6 +760,7 @@ const ExpeditionDetailPanel = ({ expedition, allPersonnel, stations, onClose, on
                 borderBottom: tab === key ? '2px solid #005B7F' : '2px solid transparent',
                 marginBottom: '-2px', color: tab === key ? '#005B7F' : '#64748B',
                 fontWeight: tab === key ? 700 : 500, fontSize: '0.8rem', cursor: 'pointer',
+                whiteSpace: 'nowrap'
               }}>{label}</button>
             ))}
           </div>
@@ -772,6 +774,7 @@ const ExpeditionDetailPanel = ({ expedition, allPersonnel, stations, onClose, on
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                   <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Mission Components</div>
                   <ManageLink icon="badge" label="Personnel Roster & Clearances" count={candidateMetrics.confirmed} note={`confirmed · ${candidateMetrics.totalNominated} nominated`} onClick={() => setTab('personnel')} />
+                  <ManageLink icon="school" label="Polar Training Clearances" count={candidateMetrics.trainingPending} note="pending / in progress" onClick={() => setTab('training')} />
                   <ManageLink icon="description" label="Cargo Manifests" count={expedition.summary?.cargoManifestCount ?? manifests.length} note="manifests" onClick={() => setTab('manifests')} />
                   <ManageLink icon="science" label="Scientific Projects" count={expedition.scientificProjects?.length ?? 0} note="projects" onClick={() => setTab('projects')} />
                   <ManageLink icon="local_shipping" label="Transport Plan" note={expedition.summary?.transportConfigured ? 'Configured' : 'Not configured'} onClick={() => setTab('logistics')} />
@@ -1131,6 +1134,109 @@ const ExpeditionDetailPanel = ({ expedition, allPersonnel, stations, onClose, on
                     </div>
                   )}
                 </div>
+              </div>
+            )}
+
+            {/* POLAR TRAINING MATRIX TAB */}
+            {tab === 'training' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#f0f9ff', padding: '1rem 1.25rem', borderRadius: '8px', border: '1px solid #bae6fd' }}>
+                  <div>
+                    <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0369a1', margin: '0 0 0.2rem 0', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>school</span>
+                      POLAR PRE-DEPLOYMENT TRAINING MATRIX ({expedition.expeditionCode})
+                    </h3>
+                    <div style={{ fontSize: '0.75rem', color: '#0c4a6e' }}>
+                      Mandatory polar survival, firefighting, radio communications, medical first aid, and crevasse rescue certifications.
+                    </div>
+                  </div>
+                  <button
+                    onClick={fetchCandidates}
+                    style={{ padding: '0.4rem 0.75rem', backgroundColor: '#fff', color: '#0369a1', border: '1px solid #bae6fd', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>refresh</span>
+                    Refresh
+                  </button>
+                </div>
+
+                {candidates.length === 0 ? (
+                  <div style={{ padding: '2.5rem', textAlign: 'center', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px dashed #CBD5E1', color: '#94a3b8' }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: '36px', display: 'block', marginBottom: '0.5rem' }}>school</span>
+                    <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>No Candidates Nominated for this Expedition</div>
+                    <div style={{ fontSize: '0.75rem', marginTop: '0.2rem' }}>Switch to the "Personnel" tab to nominate personnel first.</div>
+                  </div>
+                ) : (
+                  <div style={{ border: '1px solid #E2E8F0', borderRadius: '8px', overflow: 'hidden' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem' }}>
+                      <thead style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #E2E8F0' }}>
+                        <tr>
+                          {['Candidate', 'Role / Station', 'Medical Status', 'Training Status', 'Clearance Action'].map(h => (
+                            <th key={h} style={{ padding: '0.65rem 0.85rem', textAlign: 'left', fontWeight: 700, color: '#475569', fontSize: '0.68rem', textTransform: 'uppercase' }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {candidates.map((c, i) => {
+                          const p = c.personnelId || {};
+                          const name = p.name || p.userId?.name || '—';
+                          const empId = p.employeeId || p.userId?.employeeId || '—';
+                          const role = p.role || p.userId?.role || '—';
+                          const stationName = c.assignedStation?.name || p.expedition?.assignedStation?.name || p.station || 'Maitri';
+                          const trn = c.trainingStatus || 'PENDING';
+                          const med = c.medicalStatus || 'PENDING';
+
+                          return (
+                            <tr key={c._id || i} style={{ borderBottom: '1px solid #F1F5F9', backgroundColor: trn === 'COMPLETED' ? '#f0fdf4' : i % 2 === 0 ? '#fff' : '#fafafa' }}>
+                              <td style={{ padding: '0.65rem 0.85rem' }}>
+                                <div style={{ fontWeight: 700, color: '#0F172A' }}>{name}</div>
+                                <div style={{ fontSize: '0.7rem', color: '#64748B', fontFamily: 'monospace' }}>{empId}</div>
+                              </td>
+
+                              <td style={{ padding: '0.65rem 0.85rem' }}>
+                                <div style={{ color: '#334155', fontWeight: 600 }}>{role}</div>
+                                <div style={{ fontSize: '0.7rem', color: '#64748B' }}>{stationName}</div>
+                              </td>
+
+                              <td style={{ padding: '0.65rem 0.85rem' }}>
+                                <span style={{
+                                  display: 'inline-block', padding: '0.12rem 0.45rem', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 700,
+                                  backgroundColor: med === 'FIT' ? '#dcfce7' : med === 'FIT_WITH_RESTRICTIONS' ? '#fef3c7' : med === 'NOT_FIT' ? '#fee2e2' : '#f1f5f9',
+                                  color: med === 'FIT' ? '#15803d' : med === 'FIT_WITH_RESTRICTIONS' ? '#b45309' : med === 'NOT_FIT' ? '#dc2626' : '#64748B'
+                                }}>
+                                  {med === 'FIT' ? '✔ FIT' : med === 'FIT_WITH_RESTRICTIONS' ? '⚠ RESTRICTED' : med === 'NOT_FIT' ? '✖ NOT FIT' : '⏳ PENDING'}
+                                </span>
+                              </td>
+
+                              <td style={{ padding: '0.65rem 0.85rem' }}>
+                                <span style={{
+                                  display: 'inline-block', padding: '0.15rem 0.55rem', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 700,
+                                  backgroundColor: trn === 'COMPLETED' ? '#dcfce7' : trn === 'PARTIAL' ? '#fef3c7' : '#f1f5f9',
+                                  color: trn === 'COMPLETED' ? '#15803d' : trn === 'PARTIAL' ? '#b45309' : '#64748B'
+                                }}>
+                                  {trn === 'COMPLETED' ? '✔ COMPLETED' : trn === 'PARTIAL' ? '◐ PARTIAL' : '⏳ PENDING'}
+                                </span>
+                              </td>
+
+                              <td style={{ padding: '0.65rem 0.85rem' }}>
+                                <button
+                                  onClick={() => setSelectedTrainingCandidate(c)}
+                                  style={{
+                                    padding: '0.35rem 0.85rem', backgroundColor: '#005B7F', color: '#fff',
+                                    border: 'none', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 700,
+                                    cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem'
+                                  }}
+                                >
+                                  <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>tune</span>
+                                  Manage Training
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             )}
 

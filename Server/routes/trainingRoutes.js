@@ -21,14 +21,14 @@ const router = express.Router();
 router.get(
     "/",
     requireAuth,
-    requireRole("MEDICAL_OFFICER", "STATION_COMMANDER", "HQ_COMMAND", "HQ_ADMIN"),
+    requireRole("STATION_COMMANDER", "HQ_COMMAND", "HQ_ADMIN"),
     getAllTrainingClearances
 );
 
 router.get(
     "/candidate/:expeditionId/:personnelId",
     requireAuth,
-    requireRole("MEDICAL_OFFICER", "STATION_COMMANDER", "HQ_COMMAND", "HQ_ADMIN"),
+    requireRole("STATION_COMMANDER", "HQ_COMMAND", "HQ_ADMIN"),
     getCandidateTrainingClearance
 );
 
@@ -42,7 +42,7 @@ router.post(
 router.post(
     "/",
     requireAuth,
-    requireRole("MEDICAL_OFFICER", "STATION_COMMANDER", "HQ_COMMAND", "HQ_ADMIN"),
+    requireRole("STATION_COMMANDER", "HQ_COMMAND", "HQ_ADMIN"),
     createTrainingClearance
 );
 
@@ -50,7 +50,6 @@ router.get(
     "/:id",
     requireAuth,
     requireRole(
-        "MEDICAL_OFFICER",
         "STATION_COMMANDER",
         "HQ_COMMAND",
         "HQ_ADMIN"
@@ -61,21 +60,21 @@ router.get(
 router.post(
     "/:id/records",
     requireAuth,
-    requireRole("MEDICAL_OFFICER", "STATION_COMMANDER", "HQ_COMMAND", "HQ_ADMIN"),
+    requireRole("STATION_COMMANDER", "HQ_COMMAND", "HQ_ADMIN"),
     addTrainingRecord
 );
 
 router.patch(
     "/:id/records/:index",
     requireAuth,
-    requireRole("MEDICAL_OFFICER", "STATION_COMMANDER", "HQ_COMMAND", "HQ_ADMIN"),
+    requireRole("STATION_COMMANDER", "HQ_COMMAND", "HQ_ADMIN"),
     updateTrainingRecord
 );
 
 router.delete(
     "/:id/records/:index",
     requireAuth,
-    requireRole("MEDICAL_OFFICER", "STATION_COMMANDER", "HQ_COMMAND", "HQ_ADMIN"),
+    requireRole("STATION_COMMANDER", "HQ_COMMAND", "HQ_ADMIN"),
     deleteTrainingRecord
 );
 
@@ -89,7 +88,7 @@ router.patch(
 router.patch(
     "/:id/complete",
     requireAuth,
-    requireRole("MEDICAL_OFFICER", "STATION_COMMANDER", "HQ_COMMAND", "HQ_ADMIN"),
+    requireRole("STATION_COMMANDER", "HQ_COMMAND", "HQ_ADMIN"),
     completeTrainingClearance
 );
 

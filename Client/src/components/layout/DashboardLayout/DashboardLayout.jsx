@@ -171,12 +171,6 @@ const MEDICAL_OFFICER_NAV = [
     section: 'CLEARANCE',
   },
   {
-    path: '/dashboard?tab=training',
-    icon: 'model_training',
-    label: 'Training Clearance',
-    section: 'CLEARANCE',
-  },
-  {
     path: '/dashboard?tab=reports',
     icon: 'summarize',
     label: 'Medical Reports',
