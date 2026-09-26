@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import TrainingClearance from "../models/approval-models/training.js";
 import Personnel from "../models/master-models/personnel.js";
 import Expedition from "../models/master-models/expedition.js";
+import ExpeditionPersonnel from "../models/master-models/expedition-personnel.js";
 
 const allowedCategories = [
     "SURVIVAL",
@@ -264,6 +265,25 @@ export const addTrainingRecord = async (req, res) => {
 
         await training.save();
 
+        // Sync ExpeditionPersonnel record
+        if (training.expeditionId && training.personnelId) {
+            const cand = await ExpeditionPersonnel.findOne({
+                expeditionId: training.expeditionId,
+                personnelId: training.personnelId
+            });
+            if (cand) {
+                cand.trainingStatus = training.overallStatus;
+                if (cand.status !== "CONFIRMED" && cand.status !== "REJECTED") {
+                    if ((cand.medicalStatus === "FIT" || cand.medicalStatus === "FIT_WITH_RESTRICTIONS") && training.overallStatus === "COMPLETED") {
+                        cand.status = "READY_FOR_CONFIRMATION";
+                    } else {
+                        cand.status = "NOMINATED";
+                    }
+                }
+                await cand.save();
+            }
+        }
+
         return res.status(201).json({
             success: true,
             message: "Training record added successfully",
@@ -502,6 +522,25 @@ export const completeTrainingClearance = async (req, res) => {
         training.clearanceDate = new Date();
 
         await training.save();
+
+        // Sync ExpeditionPersonnel record
+        if (training.expeditionId && training.personnelId) {
+            const cand = await ExpeditionPersonnel.findOne({
+                expeditionId: training.expeditionId,
+                personnelId: training.personnelId
+            });
+            if (cand) {
+                cand.trainingStatus = "COMPLETED";
+                if (cand.status !== "CONFIRMED" && cand.status !== "REJECTED") {
+                    if (cand.medicalStatus === "FIT" || cand.medicalStatus === "FIT_WITH_RESTRICTIONS") {
+                        cand.status = "READY_FOR_CONFIRMATION";
+                    } else {
+                        cand.status = "NOMINATED";
+                    }
+                }
+                await cand.save();
+            }
+        }
 
         return res.status(200).json({
             success: true,

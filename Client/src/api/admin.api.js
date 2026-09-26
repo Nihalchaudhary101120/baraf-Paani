@@ -57,6 +57,22 @@ export const assignPersonnelToExpeditionApi = (expeditionId, data) => {
   return axiosInstance.post(ENDPOINTS.ADMIN.EXPEDITION_ASSIGN(expeditionId), data);
 };
 
+export const nominatePersonnelApi = (expeditionId, data) => {
+  return axiosInstance.post(ENDPOINTS.ADMIN.EXPEDITION_NOMINATE(expeditionId), data);
+};
+
+export const getExpeditionCandidatesApi = (expeditionId) => {
+  return axiosInstance.get(ENDPOINTS.ADMIN.EXPEDITION_CANDIDATES(expeditionId));
+};
+
+export const confirmExpeditionCandidateApi = (expeditionId, candidateId, data = {}) => {
+  return axiosInstance.post(ENDPOINTS.ADMIN.EXPEDITION_CONFIRM_CANDIDATE(expeditionId, candidateId), data);
+};
+
+export const removeExpeditionCandidateApi = (expeditionId, candidateId) => {
+  return axiosInstance.delete(ENDPOINTS.ADMIN.EXPEDITION_REMOVE_CANDIDATE(expeditionId, candidateId));
+};
+
 // HQ_ADMIN read-only operational views
 export const getAdminMedicalRecordsApi = (params) => {
   return axiosInstance.get(ENDPOINTS.ADMIN.MEDICAL_RECORDS, { params });

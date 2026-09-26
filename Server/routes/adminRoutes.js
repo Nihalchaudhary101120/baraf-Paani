@@ -16,7 +16,11 @@ import {
     getAllExpeditions,
     createExpedition,
     updateExpedition,
+    nominatePersonnelToExpedition,
     assignPersonnelToExpedition,
+    getExpeditionCandidates,
+    confirmExpeditionCandidate,
+    removeExpeditionCandidate,
     getAdminMedicalRecords,
     getAdminCargoData,
     getAdminFieldOpsData,
@@ -47,11 +51,15 @@ router.patch("/devices/:id/status", requireRole("HQ_ADMIN"), toggleDeviceStatus)
 router.get("/command-overview", requireRole("HQ_COMMAND", "HQ_ADMIN", "STATION_COMMANDER"), getCommandOverview);
 router.get("/personnel-readiness", requireRole("HQ_COMMAND", "HQ_ADMIN", "STATION_COMMANDER", "MEDICAL_OFFICER"), getPersonnelReadiness);
 
-// Expedition Management — Read allowed for all operational roles; Write HQ_ADMIN & HQ_COMMAND
+// Expedition Management & Candidate Lifecycle — Read allowed for operational roles; Write HQ_ADMIN & HQ_COMMAND
 router.get("/expeditions", requireRole("HQ_ADMIN", "HQ_COMMAND", "MEDICAL_OFFICER", "STATION_COMMANDER", "LOGISTICS_OFFICER"), getAllExpeditions);
 router.post("/expeditions", requireRole("HQ_ADMIN", "HQ_COMMAND"), createExpedition);
 router.patch("/expeditions/:id", requireRole("HQ_ADMIN", "HQ_COMMAND"), updateExpedition);
 router.post("/expeditions/:id/assign-personnel", requireRole("HQ_ADMIN", "HQ_COMMAND"), assignPersonnelToExpedition);
+router.post("/expeditions/:id/nominate-personnel", requireRole("HQ_ADMIN", "HQ_COMMAND"), nominatePersonnelToExpedition);
+router.get("/expeditions/:id/candidates", requireRole("HQ_ADMIN", "HQ_COMMAND", "MEDICAL_OFFICER", "STATION_COMMANDER", "LOGISTICS_OFFICER"), getExpeditionCandidates);
+router.post("/expeditions/:id/confirm-candidate/:candidateId", requireRole("HQ_ADMIN", "HQ_COMMAND"), confirmExpeditionCandidate);
+router.delete("/expeditions/:id/candidates/:candidateId", requireRole("HQ_ADMIN", "HQ_COMMAND"), removeExpeditionCandidate);
 
 // Operational views
 router.get("/medical-records", requireRole("HQ_ADMIN", "HQ_COMMAND", "MEDICAL_OFFICER"), getAdminMedicalRecords);

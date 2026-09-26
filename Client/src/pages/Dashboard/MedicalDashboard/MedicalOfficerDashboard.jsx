@@ -19,6 +19,7 @@ export default function MedicalOfficerDashboard() {
     setSelectedExpedition,
     expeditions,
     roster,
+    nominatedCandidates,
     overviewStats,
     stationStats,
     alerts,
@@ -28,6 +29,7 @@ export default function MedicalOfficerDashboard() {
     addTraining,
     completeTraining,
     fetchPersonnelHistory,
+    fetchNominatedCandidates,
     fetchAllMedicalData
   } = useMedicalData();
 
@@ -2009,18 +2011,25 @@ export default function MedicalOfficerDashboard() {
             </p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-              <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#334155' }}>Select Enrolled Candidate *</label>
-              <select
-                value={createCandidateId}
-                onChange={e => setCreateCandidateId(e.target.value)}
-                style={{ padding: '0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.88rem', fontWeight: 600, backgroundColor: '#fff' }}
-              >
-                {roster.map(p => (
-                  <option key={p.personnelId} value={p.personnelId}>
-                    {p.user?.name} ({p.user?.employeeId || 'NCP'}) - {p.expedition?.assignedStation?.name || 'Maitri'} [{p.medicalStatus}]
-                  </option>
-                ))}
-              </select>
+              <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#334155' }}>Select Nominated Candidate *</label>
+              {nominatedCandidates.length === 0 ? (
+                <div style={{ padding: '0.75rem', background: '#fef3c7', borderRadius: '6px', fontSize: '0.82rem', color: '#92400e', border: '1px solid #fcd34d' }}>
+                  ⚠️ No nominated candidates found for this expedition. HQ Command must nominate personnel first before assessments can be created.
+                </div>
+              ) : (
+                <select
+                  value={createCandidateId}
+                  onChange={e => setCreateCandidateId(e.target.value)}
+                  style={{ padding: '0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.88rem', fontWeight: 600, backgroundColor: '#fff' }}
+                >
+                  <option value="">— Select a candidate —</option>
+                  {nominatedCandidates.map(c => (
+                    <option key={c.personnelId} value={c.personnelId}>
+                      {c.user?.name} ({c.user?.employeeId || 'NCP'}) - {c.station?.name || c.expedition?.expeditionCode || 'N/A'} [{c.medicalStatus}]
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', borderTop: '1px solid #e2e8f0', paddingTop: '1rem' }}>

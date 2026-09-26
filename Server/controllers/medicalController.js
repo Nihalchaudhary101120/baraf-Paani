@@ -5,6 +5,7 @@ import Personnel from "../models/master-models/personnel.js";
 import Expedition from "../models/master-models/expedition.js";
 import User from "../models/master-models/user.js";
 import Station from "../models/master-models/station.js";
+import ExpeditionPersonnel from "../models/master-models/expedition-personnel.js";
 
 // Helper to resolve expeditionId or expeditionCode to ObjectId
 const resolveExpeditionId = async (expId) => {
@@ -293,54 +294,91 @@ export const getPersonnelMedicalRoster = async (req, res) => {
 
         const resolvedExpId = await resolveExpeditionId(expeditionId);
 
-        const personnelList = await Personnel.find()
-            .populate("userId", "name employeeId email phone role designation organization stationId isActive")
-            .populate("expedition.expeditionId", "expeditionCode missionTitle season year")
-            .populate("expedition.assignedStation", "name code")
-            .populate("previousExpeditions", "expeditionCode missionTitle year")
+        // Source of truth: only personnel nominated to this expedition
+        const candidateQuery = resolvedExpId ? { expeditionId: resolvedExpId } : {};
+        const candidates = await ExpeditionPersonnel.find(candidateQuery)
+            .populate({
+                path: "personnelId",
+                populate: [
+                    { path: "userId", select: "name employeeId email phone role designation organization stationId isActive" },
+                    { path: "expedition.assignedStation", select: "name code" }
+                ]
+            })
+            .populate("expeditionId", "expeditionCode missionTitle season year")
+            .populate("assignedStation", "name code")
             .lean();
 
-        const assessments = await MedicalAssessment.find()
+        const personnelIds = candidates.map(c =>
+            c.personnelId?._id || c.personnelId
+        ).filter(Boolean);
+
+        const assessments = await MedicalAssessment.find(
+            resolvedExpId
+                ? { expeditionId: resolvedExpId }
+                : { personnelId: { $in: personnelIds } }
+        )
             .populate("expeditionId", "expeditionCode")
             .populate("examiningOfficer", "name employeeId")
             .lean();
 
-        const trainings = await TrainingClearance.find().lean();
+        const trainings = await TrainingClearance.find(
+            resolvedExpId
+                ? { expeditionId: resolvedExpId }
+                : { personnelId: { $in: personnelIds } }
+        ).lean();
 
-        // Build composite records
-        const roster = personnelList.map(p => {
-            const pId = p._id.toString();
-            const pAssessments = assessments.filter(a => (a.personnelId?._id || a.personnelId)?.toString() === pId);
+        // Build composite records from nominated candidates
+        const roster = candidates.map(cand => {
+            const p = cand.personnelId || {};
+            const pId = (p._id || cand.personnelId)?.toString();
+
+            const pAssessments = assessments.filter(a =>
+                (a.personnelId?._id || a.personnelId)?.toString() === pId
+            );
             const currentAssessment = resolvedExpId
                 ? pAssessments.find(a => (a.expeditionId?._id || a.expeditionId)?.toString() === resolvedExpId.toString()) || pAssessments[0]
                 : pAssessments[0];
 
-            const pTrainings = trainings.filter(t => (t.personnelId?._id || t.personnelId)?.toString() === pId);
+            const pTrainings = trainings.filter(t =>
+                (t.personnelId?._id || t.personnelId)?.toString() === pId
+            );
             const currentTraining = resolvedExpId
                 ? pTrainings.find(t => (t.expeditionId?._id || t.expeditionId)?.toString() === resolvedExpId.toString()) || pTrainings[0]
                 : pTrainings[0];
 
+            const userInfo = p.userId || {};
+
             return {
-                personnelId: p._id,
-                user: p.userId || {
-                    _id: `u-${pId.slice(-6)}`,
-                    name: "Unassigned Personnel",
-                    employeeId: `NCP-${pId.slice(-4).toUpperCase()}`,
-                    email: `personnel_${pId.slice(-4)}@ncpor.res.in`,
-                    role: "SCIENTIST"
+                candidateId: cand._id,
+                personnelId: p._id || cand.personnelId,
+                nominationStatus: cand.status,
+                participationType: cand.participationType,
+                user: {
+                    _id: userInfo._id,
+                    name: userInfo.name || "Unknown",
+                    employeeId: userInfo.employeeId || "—",
+                    email: userInfo.email || "",
+                    phone: userInfo.phone || "",
+                    role: userInfo.role || "PERSONNEL",
+                    designation: userInfo.designation || "",
+                    organization: userInfo.organization || "",
+                    stationId: userInfo.stationId
                 },
-                passport: p.passport || { passportNumber: `P${pId.slice(-7).toUpperCase()}` },
-                expedition: p.expedition || { participationType: "WINTER", assignedStation: { name: "Maitri", code: "MAI" } },
+                passport: p.passport || {},
+                expedition: {
+                    ...(p.expedition || {}),
+                    assignedStation: cand.assignedStation || p.expedition?.assignedStation || null
+                },
                 previousExpeditions: p.previousExpeditions || [],
                 medicalAssessment: currentAssessment || null,
-                medicalStatus: currentAssessment?.clearance?.status || "PENDING",
+                medicalStatus: currentAssessment?.clearance?.status || cand.medicalStatus || "PENDING",
                 trainingClearance: currentTraining || null,
-                trainingStatus: currentTraining?.overallStatus || "PENDING",
+                trainingStatus: currentTraining?.overallStatus || cand.trainingStatus || "PENDING",
                 lastExaminationDate: currentAssessment?.examinationDate || null
             };
         });
 
-        // Filter roster
+        // Filter
         let filtered = roster;
         if (status && status !== "ALL" && status !== "All") {
             filtered = filtered.filter(item => item.medicalStatus === status);
@@ -365,6 +403,63 @@ export const getPersonnelMedicalRoster = async (req, res) => {
         return res.status(500).json({
             success: false,
             message: "Failed to fetch personnel medical roster"
+        });
+    }
+};
+
+// =====================================================
+// GET NOMINATED CANDIDATES FOR MEDICAL OFFICER DROPDOWN
+// Returns nominees for an expedition so the Medical
+// Officer can select who to create an assessment for
+// =====================================================
+export const getNominatedCandidates = async (req, res) => {
+    try {
+        const { expeditionId } = req.query;
+        const resolvedExpId = await resolveExpeditionId(expeditionId);
+
+        const query = resolvedExpId
+            ? { expeditionId: resolvedExpId, status: { $in: ["NOMINATED", "READY_FOR_CONFIRMATION"] } }
+            : { status: { $in: ["NOMINATED", "READY_FOR_CONFIRMATION"] } };
+
+        const candidates = await ExpeditionPersonnel.find(query)
+            .populate({
+                path: "personnelId",
+                populate: { path: "userId", select: "name employeeId email role designation stationId" }
+            })
+            .populate("expeditionId", "expeditionCode missionTitle season year")
+            .populate("assignedStation", "name code")
+            .lean();
+
+        const result = candidates.map(cand => {
+            const p = cand.personnelId || {};
+            const user = p.userId || {};
+            return {
+                candidateId: cand._id,
+                personnelId: p._id || cand.personnelId,
+                nominationStatus: cand.status,
+                medicalStatus: cand.medicalStatus,
+                expedition: cand.expeditionId,
+                station: cand.assignedStation,
+                user: {
+                    name: user.name || "Unknown",
+                    employeeId: user.employeeId || "—",
+                    email: user.email || "",
+                    role: user.role || "PERSONNEL",
+                    designation: user.designation || ""
+                }
+            };
+        });
+
+        return res.status(200).json({
+            success: true,
+            count: result.length,
+            candidates: result
+        });
+    } catch (error) {
+        console.error("Get nominated candidates error:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Failed to fetch nominated candidates"
         });
     }
 };
@@ -457,6 +552,27 @@ export const createMedicalAssessment = async (req, res) => {
             if (officerId) assessment.examiningOfficer = officerId;
             await assessment.save();
 
+            // Sync ExpeditionPersonnel
+            if (targetExpId) {
+                const medStatus = clearance?.status || assessment.clearance?.status || "PENDING";
+                const medRestrictions = clearance?.restrictions || assessment.clearance?.restrictions || [];
+                const medRemarks = clearance?.remarks || assessment.clearance?.remarks || "";
+                const cand = await ExpeditionPersonnel.findOne({ expeditionId: targetExpId, personnelId });
+                if (cand) {
+                    cand.medicalStatus = medStatus;
+                    cand.medicalRestrictions = medRestrictions;
+                    cand.medicalRemarks = medRemarks;
+                    if (cand.status !== "CONFIRMED" && cand.status !== "REJECTED") {
+                        if ((medStatus === "FIT" || medStatus === "FIT_WITH_RESTRICTIONS") && cand.trainingStatus === "COMPLETED") {
+                            cand.status = "READY_FOR_CONFIRMATION";
+                        } else {
+                            cand.status = "NOMINATED";
+                        }
+                    }
+                    await cand.save();
+                }
+            }
+
             return res.status(200).json({
                 success: true,
                 message: "Medical assessment updated successfully",
@@ -476,6 +592,27 @@ export const createMedicalAssessment = async (req, res) => {
             psychologicalAssessment: psychologicalAssessment || {},
             clearance: clearance || { status: "PENDING" }
         });
+
+        // Sync ExpeditionPersonnel
+        if (targetExpId) {
+            const medStatus = clearance?.status || "PENDING";
+            const medRestrictions = clearance?.restrictions || [];
+            const medRemarks = clearance?.remarks || "";
+            const cand = await ExpeditionPersonnel.findOne({ expeditionId: targetExpId, personnelId });
+            if (cand) {
+                cand.medicalStatus = medStatus;
+                cand.medicalRestrictions = medRestrictions;
+                cand.medicalRemarks = medRemarks;
+                if (cand.status !== "CONFIRMED" && cand.status !== "REJECTED") {
+                    if ((medStatus === "FIT" || medStatus === "FIT_WITH_RESTRICTIONS") && cand.trainingStatus === "COMPLETED") {
+                        cand.status = "READY_FOR_CONFIRMATION";
+                    } else {
+                        cand.status = "NOMINATED";
+                    }
+                }
+                await cand.save();
+            }
+        }
 
         return res.status(201).json({
             success: true,
@@ -631,6 +768,27 @@ export const updateClearance = async (req, res) => {
         }
 
         await assessment.save();
+
+        // Sync ExpeditionPersonnel
+        if (assessment.expeditionId && assessment.personnelId) {
+            const cand = await ExpeditionPersonnel.findOne({
+                expeditionId: assessment.expeditionId,
+                personnelId: assessment.personnelId
+            });
+            if (cand) {
+                cand.medicalStatus = status;
+                cand.medicalRestrictions = restrictions || [];
+                cand.medicalRemarks = remarks || "";
+                if (cand.status !== "CONFIRMED" && cand.status !== "REJECTED") {
+                    if ((status === "FIT" || status === "FIT_WITH_RESTRICTIONS") && cand.trainingStatus === "COMPLETED") {
+                        cand.status = "READY_FOR_CONFIRMATION";
+                    } else {
+                        cand.status = "NOMINATED";
+                    }
+                }
+                await cand.save();
+            }
+        }
 
         return res.status(200).json({
             success: true,

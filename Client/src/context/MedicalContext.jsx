@@ -9,7 +9,8 @@ import {
   getPersonnelMedicalHistoryApi,
   getTrainingClearancesApi,
   addTrainingRecordApi,
-  completeTrainingClearanceApi
+  completeTrainingClearanceApi,
+  getNominatedCandidatesApi
 } from '@/api/medical.api';
 import { useAuth } from './AuthContext';
 
@@ -24,6 +25,7 @@ export const MedicalProvider = ({ children }) => {
   const [roster, setRoster] = useState([]);
   const [assessments, setAssessments] = useState([]);
   const [trainings, setTrainings] = useState([]);
+  const [nominatedCandidates, setNominatedCandidates] = useState([]);
   const [overviewStats, setOverviewStats] = useState({
     totalPersonnel: 0,
     pendingMedical: 0,
@@ -140,6 +142,22 @@ export const MedicalProvider = ({ children }) => {
     return [];
   }, [selectedExpedition]);
 
+  // ── 4b. Fetch Nominated Candidates (for Medical Officer Create Assessment) ─
+  const fetchNominatedCandidates = useCallback(async (expeditionId = selectedExpedition, silent = false) => {
+    try {
+      const rawRes = await getNominatedCandidatesApi({ expeditionId });
+      const res = extractData(rawRes);
+      if (res && (res.success || Array.isArray(res.candidates))) {
+        const list = res.candidates || [];
+        setNominatedCandidates(list);
+        return list;
+      }
+    } catch (err) {
+      console.warn('MedicalContext: fetchNominatedCandidates notice:', err.message);
+    }
+    return [];
+  }, [selectedExpedition]);
+
   // ── 5. Fetch Historical Records for a Single Personnel ───────────────────
   const fetchPersonnelHistory = useCallback(async (personnelId, silent = false) => {
     if (historyCache[personnelId]) {
@@ -173,13 +191,14 @@ export const MedicalProvider = ({ children }) => {
         fetchOverview(expId, true),
         fetchRoster(expId, true),
         fetchAssessments({ expeditionId: expId }, true),
-        fetchTrainings({ expeditionId: expId }, true)
+        fetchTrainings({ expeditionId: expId }, true),
+        fetchNominatedCandidates(expId, true)
       ]);
       isInitialized.current = true;
     } finally {
       setLoading(l => ({ ...l, initial: false }));
     }
-  }, [fetchOverview, fetchRoster, fetchAssessments, fetchTrainings, selectedExpedition]);
+  }, [fetchOverview, fetchRoster, fetchAssessments, fetchTrainings, fetchNominatedCandidates, selectedExpedition]);
 
   // Auto pre-fetch on mount / auth change
   useEffect(() => {
@@ -350,6 +369,7 @@ export const MedicalProvider = ({ children }) => {
     roster,
     assessments,
     trainings,
+    nominatedCandidates,
     overviewStats,
     stationStats,
     alerts,
@@ -362,6 +382,7 @@ export const MedicalProvider = ({ children }) => {
     fetchRoster,
     fetchAssessments,
     fetchTrainings,
+    fetchNominatedCandidates,
     fetchPersonnelHistory,
     fetchAllMedicalData,
 

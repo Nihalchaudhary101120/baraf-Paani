@@ -10,9 +10,14 @@ export const getMedicalOverviewApi = (params = {}) => {
   return axiosInstance.get(ENDPOINTS.MEDICAL.OVERVIEW, { params });
 };
 
-// Composite roster of personnel + medical + training
+// Composite roster of personnel + medical + training (nominees only)
 export const getPersonnelMedicalRosterApi = (params = {}) => {
   return axiosInstance.get(ENDPOINTS.MEDICAL.ROSTER, { params });
+};
+
+// Nominated candidates for a specific expedition (for Medical Officer dropdown)
+export const getNominatedCandidatesApi = (params = {}) => {
+  return axiosInstance.get(ENDPOINTS.MEDICAL.NOMINATED_CANDIDATES, { params });
 };
 
 // List assessments with filters

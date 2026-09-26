@@ -5,6 +5,10 @@ import {
   updateExpeditionApi,
   assignPersonnelToExpeditionApi,
   getPersonnelReadinessApi,
+  nominatePersonnelApi,
+  getExpeditionCandidatesApi,
+  confirmExpeditionCandidateApi,
+  removeExpeditionCandidateApi,
 } from '@/api/admin.api';
 import { getManifests, createManifest } from '@/api/cargo.api';
 import axiosInstance from '@/api/axiosInstance';
@@ -238,98 +242,120 @@ const CreateCargoManifestModal = ({ expedition, stations, onClose, onCreated }) 
   );
 };
 
-// ─── Personnel Roster Panel ──────────────────────────────────────────────────
+// ─── Nominate Personnel Modal ────────────────────────────────────────────────
 
-const PersonnelRosterPanel = ({ expedition, allPersonnel, stations, onClose, onAssign }) => {
+const NominatePersonnelModal = ({ expedition, allPersonnel, stations, existingCandidateIds = [], onClose, onNominated }) => {
   const [search, setSearch] = useState('');
+  const [roleFilter, setRoleFilter] = useState('ALL');
   const [selectedStation, setSelectedStation] = useState(expedition.stations?.[0]?.stationId?._id || '');
   const [participationType, setParticipationType] = useState(expedition.season || 'WINTER');
-  const [saving, setSaving] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState(null);
 
-  // Pre-select personnel who already belong to this expedition
-  const [selected, setSelected] = useState(() => {
-    return (allPersonnel || [])
-      .filter(p => (
-        p.expeditionId === expedition._id ||
-        p.expeditionId?._id === expedition._id ||
-        p.expedition?.expeditionId === expedition._id ||
-        p.expedition?.expeditionId?._id === expedition._id
-      ))
-      .map(p => p._id);
-  });
+  // Selected candidate IDs for new nomination
+  const [selected, setSelected] = useState([]);
 
+  // Filter available personnel pool
   const filtered = (allPersonnel || []).filter(p => {
     const name = p.name || p.userId?.name || '';
     const id = p.employeeId || p.userId?.employeeId || '';
     const role = p.role || p.userId?.role || '';
+    const org = p.userId?.organization || p.organization || '';
     const q = search.toLowerCase();
-    return name.toLowerCase().includes(q) || id.toLowerCase().includes(q) || role.toLowerCase().includes(q);
+
+    const matchSearch = !q || name.toLowerCase().includes(q) || id.toLowerCase().includes(q) || role.toLowerCase().includes(q) || org.toLowerCase().includes(q);
+    const matchRole = roleFilter === 'ALL' || role.toUpperCase() === roleFilter.toUpperCase();
+
+    return matchSearch && matchRole;
   });
 
-  const toggle = (id) => setSelected(prev =>
-    prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-  );
+  const toggle = (id) => {
+    setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
 
   const handleSelectAll = () => {
-    if (selected.length === filtered.length) {
+    const unselectedFiltered = filtered.filter(p => !existingCandidateIds.includes(p._id.toString())).map(p => p._id);
+    if (selected.length === unselectedFiltered.length) {
       setSelected([]);
     } else {
-      setSelected(filtered.map(p => p._id));
+      setSelected(unselectedFiltered);
     }
   };
 
-  const handleAssign = async () => {
+  const handleNominateSubmit = async () => {
     if (!selected.length) {
-      alert('Please select at least one personnel candidate.');
+      setError('Please select at least one person to nominate for this expedition.');
       return;
     }
-    setSaving(true);
+    setSubmitting(true);
+    setError(null);
     try {
-      await onAssign(expedition._id, {
+      const res = await nominatePersonnelApi(expedition._id, {
         personnelIds: selected,
         participationType,
-        stationId: selectedStation || undefined
+        stationId: selectedStation || undefined,
       });
-      onClose();
-    } catch (e) {
-      console.error('Assign error', e);
+
+      if (res?.data?.success || res?.success || res?.nominatedCount) {
+        onNominated && onNominated(res?.data || res);
+        onClose();
+      } else {
+        setError(res?.data?.message || res?.message || 'Failed to nominate personnel.');
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || 'Error nominating personnel.');
     } finally {
-      setSaving(false);
+      setSubmitting(false);
     }
   };
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 3000, backgroundColor: 'rgba(15,23,42,0.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-      <div style={{ backgroundColor: '#fff', borderRadius: '10px', width: '100%', maxWidth: '850px', maxHeight: '88vh', display: 'flex', flexDirection: 'column', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)', border: '1px solid #E2E8F0' }}>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 3200, backgroundColor: 'rgba(15,23,42,0.7)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+      <div style={{ backgroundColor: '#fff', borderRadius: '12px', width: '100%', maxWidth: '900px', maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.3)', border: '1px solid #E2E8F0' }}>
         
         {/* Header */}
-        <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0, backgroundColor: '#f8fafc' }}>
+        <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0, backgroundColor: '#0f2744', color: '#fff', borderTopLeftRadius: '12px', borderTopRightRadius: '12px' }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <span className="material-symbols-outlined" style={{ fontSize: '24px', color: '#005B7F' }}>group_add</span>
-              <h2 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#005B7F', margin: 0 }}>
-                {expedition.expeditionCode} — Personnel Roster Nomination & Assignment
+              <span className="material-symbols-outlined" style={{ fontSize: '24px', color: '#38bdf8' }}>person_add</span>
+              <h2 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0, color: '#fff' }}>
+                NOMINATE PERSONNEL FOR EXPEDITION: {expedition.expeditionCode}
               </h2>
             </div>
-            <p style={{ fontSize: '0.8rem', color: '#64748B', margin: '0.2rem 0 0' }}>
-              Nominate personnel from the pool to this expedition. Assigned candidates automatically get pending baseline medical & polar training workflows initialized.
+            <p style={{ fontSize: '0.78rem', color: '#93c5fd', margin: '0.2rem 0 0' }}>
+              Select personnel from the organization pool. Nominated candidates will immediately enter the clearance pipeline and become visible to the Medical and Training Officers for assessments.
             </p>
           </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '1.25rem', cursor: 'pointer', color: '#64748B' }}>✕</button>
+          <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', fontSize: '1.1rem', cursor: 'pointer', color: '#fff', padding: '0.35rem 0.55rem', borderRadius: '6px' }}>✕</button>
         </div>
 
-        {/* Controls */}
-        <div style={{ padding: '0.85rem 1.5rem', borderBottom: '1px solid #F1F5F9', display: 'flex', gap: '0.75rem', alignItems: 'center', flexShrink: 0, flexWrap: 'wrap' }}>
-          <input
-            type="text" placeholder="Search by name, employee ID, role..."
-            value={search} onChange={e => setSearch(e.target.value)}
-            style={{ ...INPUT_STYLE, flex: 1, minWidth: '200px' }}
-          />
+        {/* Filters */}
+        <div style={{ padding: '0.85rem 1.5rem', borderBottom: '1px solid #F1F5F9', display: 'flex', gap: '0.75rem', alignItems: 'center', flexShrink: 0, flexWrap: 'wrap', backgroundColor: '#f8fafc' }}>
+          <div style={{ flex: 1, minWidth: '220px', position: 'relative' }}>
+            <input
+              type="text" placeholder="Search by name, employee ID, role..."
+              value={search} onChange={e => setSearch(e.target.value)}
+              style={INPUT_STYLE}
+            />
+          </div>
+
+          <select value={roleFilter} onChange={e => setRoleFilter(e.target.value)}
+            style={{ padding: '0.55rem 0.75rem', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '0.82rem', backgroundColor: '#fff', fontWeight: 600 }}>
+            <option value="ALL">All Roles</option>
+            <option value="SCIENTIST">Scientist</option>
+            <option value="STATION_COMMANDER">Station Commander</option>
+            <option value="MEDICAL_OFFICER">Medical Officer</option>
+            <option value="LOGISTICS_OFFICER">Logistics Officer</option>
+            <option value="FIELD_ENGINEER">Field Engineer</option>
+            <option value="TECHNICAL_SPECIALIST">Technical Specialist</option>
+          </select>
+
           <select value={participationType} onChange={e => setParticipationType(e.target.value)}
             style={{ padding: '0.55rem 0.75rem', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '0.82rem', backgroundColor: '#fff', fontWeight: 600 }}>
-            <option value="SUMMER">SUMMER Participant</option>
-            <option value="WINTER">WINTER Participant</option>
+            <option value="WINTER">WINTER Overwintering</option>
+            <option value="SUMMER">SUMMER Season</option>
           </select>
+
           {stations && stations.length > 0 && (
             <select value={selectedStation} onChange={e => setSelectedStation(e.target.value)}
               style={{ padding: '0.55rem 0.75rem', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '0.82rem', backgroundColor: '#fff', fontWeight: 600 }}>
@@ -339,30 +365,30 @@ const PersonnelRosterPanel = ({ expedition, allPersonnel, stations, onClose, onA
               ))}
             </select>
           )}
+
           <button
             type="button"
             onClick={handleSelectAll}
-            style={{ padding: '0.55rem 0.85rem', borderRadius: '6px', border: '1px solid #cbd5e1', backgroundColor: '#f1f5f9', color: '#334155', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer' }}
+            style={{ padding: '0.55rem 0.85rem', borderRadius: '6px', border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer' }}
           >
-            {selected.length === filtered.length ? 'Deselect All' : 'Select All Filtered'}
+            Select All Available
           </button>
         </div>
 
-        {/* Table */}
-        <div style={{ overflowY: 'auto', flex: 1 }}>
+        {error && (
+          <div style={{ margin: '0.75rem 1.5rem 0', padding: '0.65rem 1rem', borderRadius: '6px', backgroundColor: '#FEF2F2', color: '#991B1B', border: '1px solid #FCA5A5', fontSize: '0.82rem' }}>
+            {error}
+          </div>
+        )}
+
+        {/* Table of Personnel Pool */}
+        <div style={{ overflowY: 'auto', flex: 1, padding: '0.5rem 1.5rem' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
-            <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
+            <thead style={{ position: 'sticky', top: 0, zIndex: 1, backgroundColor: '#fff' }}>
               <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #E2E8F0' }}>
-                <th style={{ padding: '0.65rem 1rem', width: '40px', textAlign: 'center' }}>
-                  <input
-                    type="checkbox"
-                    checked={filtered.length > 0 && selected.length === filtered.length}
-                    onChange={handleSelectAll}
-                    style={{ cursor: 'pointer', accentColor: '#005B7F' }}
-                  />
-                </th>
-                {['Candidate Name', 'Employee ID', 'Role', 'Assigned Station', 'Medical Status', 'Expedition Status'].map(h => (
-                  <th key={h} style={{ padding: '0.65rem 1rem', textAlign: 'left', fontWeight: 700, color: '#475569', fontSize: '0.72rem', textTransform: 'uppercase' }}>{h}</th>
+                <th style={{ padding: '0.65rem 0.75rem', width: '36px', textAlign: 'center' }}></th>
+                {['Personnel Candidate', 'Employee ID', 'Designation / Role', 'Organization', 'Current Station', 'Status'].map(h => (
+                  <th key={h} style={{ padding: '0.65rem 0.75rem', textAlign: 'left', fontWeight: 700, color: '#475569', fontSize: '0.72rem', textTransform: 'uppercase' }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -371,59 +397,57 @@ const PersonnelRosterPanel = ({ expedition, allPersonnel, stations, onClose, onA
                 <tr>
                   <td colSpan={7} style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>
                     <span className="material-symbols-outlined" style={{ fontSize: '32px', display: 'block', marginBottom: '0.35rem' }}>person_search</span>
-                    No personnel found matching search criteria.
+                    No personnel found matching the specified filters.
                   </td>
                 </tr>
               ) : filtered.map((p, i) => {
-                const id = p._id;
+                const id = p._id.toString();
                 const name = p.name || p.userId?.name || '—';
                 const empId = p.employeeId || p.userId?.employeeId || '—';
                 const role = p.role || p.userId?.role || '—';
-                const station = p.station || p.stationCode || '—';
-                const isCurrentlyAssigned = (
-                  p.expeditionId === expedition._id ||
-                  p.expeditionId?._id === expedition._id ||
-                  p.expedition?.expeditionId === expedition._id ||
-                  p.expedition?.expeditionId?._id === expedition._id
-                );
+                const org = p.userId?.organization || p.organization || 'NCPOR';
+                const station = p.station || p.stationCode || p.expedition?.assignedStation?.name || '—';
+                const isAlreadyCandidate = existingCandidateIds.includes(id);
                 const isSelected = selected.includes(id);
 
                 return (
                   <tr key={id || i}
-                    onClick={() => toggle(id)}
-                    style={{ borderBottom: '1px solid #F1F5F9', backgroundColor: isSelected ? '#f0f9ff' : i % 2 === 0 ? '#fff' : '#fafafa', cursor: 'pointer' }}
+                    onClick={() => !isAlreadyCandidate && toggle(id)}
+                    style={{
+                      borderBottom: '1px solid #F1F5F9',
+                      backgroundColor: isAlreadyCandidate ? '#f8fafc' : isSelected ? '#eff6ff' : i % 2 === 0 ? '#fff' : '#fafafa',
+                      cursor: isAlreadyCandidate ? 'not-allowed' : 'pointer',
+                      opacity: isAlreadyCandidate ? 0.65 : 1,
+                    }}
                   >
-                    <td style={{ padding: '0.6rem 1rem', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
-                      <input type="checkbox" checked={isSelected} onChange={() => toggle(id)}
-                        style={{ cursor: 'pointer', accentColor: '#005B7F' }} />
+                    <td style={{ padding: '0.6rem 0.75rem', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={isSelected || isAlreadyCandidate}
+                        disabled={isAlreadyCandidate}
+                        onChange={() => toggle(id)}
+                        style={{ cursor: isAlreadyCandidate ? 'not-allowed' : 'pointer', accentColor: '#005B7F' }}
+                      />
                     </td>
-                    <td style={{ padding: '0.6rem 1rem', fontWeight: 700, color: '#0F172A' }}>
+                    <td style={{ padding: '0.6rem 0.75rem', fontWeight: 700, color: '#0F172A' }}>
                       {name}
-                      {isCurrentlyAssigned && (
-                        <span style={{ marginLeft: '0.4rem', fontSize: '0.65rem', backgroundColor: '#e0f2fe', color: '#0369a1', padding: '0.1rem 0.4rem', borderRadius: '4px', fontWeight: 800 }}>
-                          CURRENT
+                      {isAlreadyCandidate && (
+                        <span style={{ marginLeft: '0.4rem', fontSize: '0.65rem', backgroundColor: '#e2e8f0', color: '#475569', padding: '0.1rem 0.4rem', borderRadius: '4px', fontWeight: 700 }}>
+                          ALREADY NOMINATED
                         </span>
                       )}
                     </td>
-                    <td style={{ padding: '0.6rem 1rem', color: '#475569', fontFamily: 'monospace', fontSize: '0.78rem' }}>{empId}</td>
-                    <td style={{ padding: '0.6rem 1rem', color: '#475569' }}>{role}</td>
-                    <td style={{ padding: '0.6rem 1rem', color: '#64748B' }}>{station}</td>
-                    <td style={{ padding: '0.6rem 1rem' }}>
+                    <td style={{ padding: '0.6rem 0.75rem', color: '#475569', fontFamily: 'monospace', fontSize: '0.78rem' }}>{empId}</td>
+                    <td style={{ padding: '0.6rem 0.75rem', color: '#334155' }}>{role}</td>
+                    <td style={{ padding: '0.6rem 0.75rem', color: '#64748B' }}>{org}</td>
+                    <td style={{ padding: '0.6rem 0.75rem', color: '#64748B' }}>{station}</td>
+                    <td style={{ padding: '0.6rem 0.75rem' }}>
                       <span style={{
                         padding: '0.18rem 0.5rem', borderRadius: '99px', fontSize: '0.68rem', fontWeight: 700,
-                        backgroundColor: p.medicalClearance === 'FIT' ? '#dcfce7' : '#fef3c7',
-                        color: p.medicalClearance === 'FIT' ? '#15803d' : '#b45309'
+                        backgroundColor: isAlreadyCandidate ? '#f1f5f9' : '#dcfce7',
+                        color: isAlreadyCandidate ? '#64748B' : '#15803d'
                       }}>
-                        {p.medicalClearance || 'PENDING'}
-                      </span>
-                    </td>
-                    <td style={{ padding: '0.6rem 1rem' }}>
-                      <span style={{
-                        padding: '0.18rem 0.5rem', borderRadius: '99px', fontSize: '0.68rem', fontWeight: 700,
-                        backgroundColor: isCurrentlyAssigned ? '#dcfce7' : '#f1f5f9',
-                        color: isCurrentlyAssigned ? '#15803d' : '#64748B'
-                      }}>
-                        {isCurrentlyAssigned ? 'ASSIGNED' : 'UNASSIGNED'}
+                        {isAlreadyCandidate ? 'IN PIPELINE' : 'AVAILABLE'}
                       </span>
                     </td>
                   </tr>
@@ -434,18 +458,24 @@ const PersonnelRosterPanel = ({ expedition, allPersonnel, stations, onClose, onA
         </div>
 
         {/* Footer */}
-        <div style={{ padding: '1rem 1.5rem', borderTop: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0, backgroundColor: '#f8fafc' }}>
-          <span style={{ fontSize: '0.82rem', color: '#64748B' }}>
-            <strong>{selected.length}</strong> of {allPersonnel?.length || 0} candidates selected for assignment
+        <div style={{ padding: '1rem 1.5rem', borderTop: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0, backgroundColor: '#f8fafc', borderBottomLeftRadius: '12px', borderBottomRightRadius: '12px' }}>
+          <span style={{ fontSize: '0.85rem', color: '#0F172A', fontWeight: 600 }}>
+            Selected: <strong style={{ color: '#005B7F' }}>{selected.length}</strong> personnel to nominate
           </span>
           <div style={{ display: 'flex', gap: '0.75rem' }}>
             <button onClick={onClose} style={{ padding: '0.55rem 1.1rem', borderRadius: '6px', border: '1px solid #CBD5E1', backgroundColor: '#fff', color: '#475569', fontWeight: 600, fontSize: '0.82rem', cursor: 'pointer' }}>
               Cancel
             </button>
-            <button onClick={handleAssign} disabled={!selected.length || saving}
-              style={{ padding: '0.55rem 1.35rem', borderRadius: '6px', border: 'none', backgroundColor: selected.length ? '#005B7F' : '#94a3b8', color: '#fff', fontWeight: 700, fontSize: '0.82rem', cursor: selected.length ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>check_circle</span>
-              {saving ? 'Assigning Candidates...' : `Confirm Assignment (${selected.length})`}
+            <button onClick={handleNominateSubmit} disabled={!selected.length || submitting}
+              style={{
+                padding: '0.55rem 1.35rem', borderRadius: '6px', border: 'none',
+                backgroundColor: selected.length ? '#005B7F' : '#94a3b8',
+                color: '#fff', fontWeight: 700, fontSize: '0.82rem',
+                cursor: selected.length && !submitting ? 'pointer' : 'not-allowed',
+                display: 'flex', alignItems: 'center', gap: '0.4rem'
+              }}>
+              <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>check_circle</span>
+              {submitting ? 'Nominating Candidates...' : `Nominate Selected (${selected.length})`}
             </button>
           </div>
         </div>
@@ -454,17 +484,151 @@ const PersonnelRosterPanel = ({ expedition, allPersonnel, stations, onClose, onA
   );
 };
 
+// ─── Restriction Review Modal ────────────────────────────────────────────────
+
+const RestrictionReviewModal = ({ candidate, onClose, onConfirm, confirming }) => {
+  const [remarks, setRemarks] = useState('');
+  const [acknowledged, setAcknowledged] = useState(false);
+
+  const p = candidate?.personnelId || {};
+  const name = p.name || p.userId?.name || 'Candidate';
+  const empId = p.employeeId || p.userId?.employeeId || '—';
+  const role = p.role || p.userId?.role || '—';
+  const restrictions = candidate.medicalRestrictions || [];
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 3600, backgroundColor: 'rgba(15,23,42,0.75)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+      <div style={{ backgroundColor: '#fff', borderRadius: '12px', width: '100%', maxWidth: '580px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.3)', border: '1px solid #E2E8F0', overflow: 'hidden' }}>
+        
+        {/* Header */}
+        <div style={{ padding: '1.25rem 1.5rem', backgroundColor: '#fffbeb', borderBottom: '1px solid #fde68a', display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+          <span className="material-symbols-outlined" style={{ fontSize: '26px', color: '#d97706' }}>warning</span>
+          <div>
+            <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#92400e', margin: 0 }}>Review Medical Restrictions</h3>
+            <div style={{ fontSize: '0.75rem', color: '#b45309', marginTop: '0.15rem' }}>HQ Assignment Review for Cleared Candidate with Limitations</div>
+          </div>
+        </div>
+
+        <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div style={{ backgroundColor: '#f8fafc', padding: '0.85rem 1rem', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
+            <div style={{ fontWeight: 800, color: '#0F172A', fontSize: '0.95rem' }}>{name}</div>
+            <div style={{ fontSize: '0.78rem', color: '#64748B', marginTop: '0.2rem' }}>
+              Employee ID: <strong style={{ fontFamily: 'monospace', color: '#334155' }}>{empId}</strong> · Role: <strong>{role}</strong>
+            </div>
+          </div>
+
+          <div style={{ backgroundColor: '#fff7ed', padding: '1rem', borderRadius: '8px', border: '1px solid #ffedd5' }}>
+            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#c2410c', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '0.4rem' }}>
+              Medical Officer Restrictions & Notes:
+            </div>
+            {restrictions.length > 0 ? (
+              <ul style={{ margin: '0.3rem 0 0.5rem 1.25rem', padding: 0, fontSize: '0.82rem', color: '#9a3412', fontWeight: 600 }}>
+                {restrictions.map((r, i) => (
+                  <li key={i} style={{ marginBottom: '0.25rem' }}>{r}</li>
+                ))}
+              </ul>
+            ) : (
+              <div style={{ fontSize: '0.82rem', color: '#9a3412', fontStyle: 'italic' }}>
+                {candidate.medicalRemarks || 'Restricted field duty / Station indoor duties only'}
+              </div>
+            )}
+            {candidate.medicalRemarks && restrictions.length > 0 && (
+              <div style={{ fontSize: '0.75rem', color: '#7c2d12', marginTop: '0.5rem', borderTop: '1px dashed #fed7aa', paddingTop: '0.4rem' }}>
+                <strong>Medical Remarks:</strong> {candidate.medicalRemarks}
+              </div>
+            )}
+          </div>
+
+          <div>
+            <label style={LABEL_STYLE}>HQ Confirmation Remarks (Optional)</label>
+            <input
+              type="text"
+              placeholder="e.g. Cleared for indoor laboratory work at Maitri Station."
+              value={remarks}
+              onChange={e => setRemarks(e.target.value)}
+              style={INPUT_STYLE}
+            />
+          </div>
+
+          <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', cursor: 'pointer', fontSize: '0.8rem', color: '#334155', backgroundColor: '#f8fafc', padding: '0.75rem', borderRadius: '6px', border: '1px solid #E2E8F0' }}>
+            <input
+              type="checkbox"
+              checked={acknowledged}
+              onChange={e => setAcknowledged(e.target.checked)}
+              style={{ marginTop: '0.15rem', accentColor: '#005B7F' }}
+            />
+            <span>I have reviewed the medical restrictions and confirm that this individual is authorized for deployment within these designated operational limits.</span>
+          </label>
+        </div>
+
+        {/* Footer */}
+        <div style={{ padding: '1rem 1.5rem', borderTop: '1px solid #E2E8F0', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', backgroundColor: '#f8fafc' }}>
+          <button onClick={onClose} style={{ padding: '0.55rem 1.1rem', borderRadius: '6px', border: '1px solid #CBD5E1', backgroundColor: '#fff', color: '#475569', fontWeight: 600, fontSize: '0.82rem', cursor: 'pointer' }}>
+            Cancel
+          </button>
+          <button
+            onClick={() => onConfirm(candidate._id, { remarks })}
+            disabled={!acknowledged || confirming}
+            style={{
+              padding: '0.55rem 1.3rem', borderRadius: '6px', border: 'none',
+              backgroundColor: acknowledged && !confirming ? '#005B7F' : '#94a3b8',
+              color: '#fff', fontWeight: 700, fontSize: '0.82rem',
+              cursor: acknowledged && !confirming ? 'pointer' : 'not-allowed',
+              display: 'flex', alignItems: 'center', gap: '0.4rem'
+            }}
+          >
+            {confirming ? 'Confirming...' : 'Confirm Assignment with Restrictions'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ─── Expedition Detail Panel ─────────────────────────────────────────────────
 
-const ExpeditionDetailPanel = ({ expedition, allPersonnel, stations, onClose, onAssignPersonnel, onRefresh }) => {
+const ExpeditionDetailPanel = ({ expedition, allPersonnel, stations, onClose, onRefresh }) => {
   const [tab, setTab] = useState('overview');
-  const [showRoster, setShowRoster] = useState(false);
+  const [showNominateModal, setShowNominateModal] = useState(false);
   const [showCreateManifest, setShowCreateManifest] = useState(false);
   const [manifests, setManifests] = useState([]);
   const [loadingManifests, setLoadingManifests] = useState(false);
 
+  // Candidates & Readiness State
+  const [candidates, setCandidates] = useState([]);
+  const [candidateMetrics, setCandidateMetrics] = useState({
+    totalNominated: 0,
+    confirmed: 0,
+    readyForConfirmation: 0,
+    medicalPending: 0,
+    trainingPending: 0,
+    blocked: 0,
+  });
+  const [loadingCandidates, setLoadingCandidates] = useState(false);
+  const [confirmingId, setConfirmingId] = useState(null);
+  const [removingId, setRemovingId] = useState(null);
+  const [reviewCandidate, setReviewCandidate] = useState(null);
+
   const statusCfg = STATUS_CONFIG[expedition.status] || STATUS_CONFIG.PLANNING;
   const stationNames = expedition.stations?.map(s => s.stationId?.name || s.stationId?.code || '—').join(', ') || 'Not configured';
+
+  // Fetch live candidates for this expedition
+  const fetchCandidates = useCallback(async () => {
+    if (!expedition?._id) return;
+    setLoadingCandidates(true);
+    try {
+      const res = await getExpeditionCandidatesApi(expedition._id);
+      const data = res?.data !== undefined ? res.data : res;
+      if (data && (data.success || Array.isArray(data.candidates))) {
+        setCandidates(data.candidates || []);
+        if (data.metrics) setCandidateMetrics(data.metrics);
+      }
+    } catch (e) {
+      console.error('Fetch candidates error:', e);
+    } finally {
+      setLoadingCandidates(false);
+    }
+  }, [expedition._id]);
 
   const fetchExpeditionManifests = useCallback(async () => {
     if (!expedition?._id) return;
@@ -481,6 +645,10 @@ const ExpeditionDetailPanel = ({ expedition, allPersonnel, stations, onClose, on
   }, [expedition._id]);
 
   useEffect(() => {
+    fetchCandidates();
+  }, [fetchCandidates]);
+
+  useEffect(() => {
     if (tab === 'logistics' || tab === 'manifests') {
       fetchExpeditionManifests();
     }
@@ -491,10 +659,59 @@ const ExpeditionDetailPanel = ({ expedition, allPersonnel, stations, onClose, on
     onRefresh && onRefresh();
   };
 
+  const handleCandidateConfirmed = async (candidateId, payload = {}) => {
+    setConfirmingId(candidateId);
+    try {
+      const res = await confirmExpeditionCandidateApi(expedition._id, candidateId, payload);
+      const data = res?.data !== undefined ? res.data : res;
+      if (data?.success || data?.candidate) {
+        setReviewCandidate(null);
+        await fetchCandidates();
+        onRefresh && onRefresh();
+        alert(data?.message || 'Candidate assignment confirmed to official expedition roster!');
+      } else {
+        alert(data?.message || 'Failed to confirm assignment.');
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || err.message || 'Error confirming assignment.');
+    } finally {
+      setConfirmingId(null);
+    }
+  };
+
+  const handleRemoveCandidate = async (candidateId) => {
+    if (!window.confirm('Are you sure you want to remove this nominated candidate from the expedition?')) return;
+    setRemovingId(candidateId);
+    try {
+      const res = await removeExpeditionCandidateApi(expedition._id, candidateId);
+      const data = res?.data !== undefined ? res.data : res;
+      if (data?.success) {
+        await fetchCandidates();
+        onRefresh && onRefresh();
+      } else {
+        alert(data?.message || 'Failed to remove candidate.');
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || err.message || 'Error removing candidate.');
+    } finally {
+      setRemovingId(null);
+    }
+  };
+
+  const handleNominationSuccess = async () => {
+    await fetchCandidates();
+    onRefresh && onRefresh();
+  };
+
+  // Split candidates into Nominated/In Pipeline vs Confirmed Roster
+  const nominatedPipeline = candidates.filter(c => c.status !== 'CONFIRMED');
+  const confirmedRoster = candidates.filter(c => c.status === 'CONFIRMED');
+  const existingCandidatePersonnelIds = candidates.map(c => c.personnelId?._id?.toString() || c.personnelId?.toString()).filter(Boolean);
+
   return (
     <>
       <div style={{ position: 'fixed', inset: 0, zIndex: 2500, backgroundColor: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(3px)', display: 'flex', alignItems: 'flex-start', justifyContent: 'flex-end' }}>
-        <div style={{ backgroundColor: '#fff', width: '100%', maxWidth: '720px', height: '100%', display: 'flex', flexDirection: 'column', boxShadow: '-20px 0 50px -12px rgba(0,0,0,0.25)', borderLeft: '1px solid #E2E8F0', overflowY: 'auto' }}>
+        <div style={{ backgroundColor: '#fff', width: '100%', maxWidth: '820px', height: '100%', display: 'flex', flexDirection: 'column', boxShadow: '-20px 0 50px -12px rgba(0,0,0,0.25)', borderLeft: '1px solid #E2E8F0', overflowY: 'auto' }}>
 
           {/* Panel Header */}
           <div style={{ padding: '1.5rem', borderBottom: '1px solid #E2E8F0', backgroundColor: '#0f2744', color: '#fff', flexShrink: 0 }}>
@@ -515,7 +732,7 @@ const ExpeditionDetailPanel = ({ expedition, allPersonnel, stations, onClose, on
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem', marginTop: '1rem' }}>
               {[
                 { label: 'Bases', value: stationNames },
-                { label: 'Personnel', value: expedition.summary?.personnelCount ?? 0 },
+                { label: 'Confirmed Roster', value: candidateMetrics.confirmed || expedition.summary?.personnelCount || 0 },
                 { label: 'Cargo Manifests', value: expedition.summary?.cargoManifestCount ?? manifests.length },
               ].map(s => (
                 <div key={s.label} style={{ backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: '6px', padding: '0.6rem 0.85rem' }}>
@@ -527,10 +744,10 @@ const ExpeditionDetailPanel = ({ expedition, allPersonnel, stations, onClose, on
           </div>
 
           {/* Tabs */}
-          <div style={{ display: 'flex', borderBottom: '2px solid #E2E8F0', flexShrink: 0 }}>
+          <div style={{ display: 'flex', borderBottom: '2px solid #E2E8F0', flexShrink: 0, backgroundColor: '#f8fafc' }}>
             {[
               ['overview', 'Overview'],
-              ['personnel', 'Personnel'],
+              ['personnel', `Personnel (${candidates.length})`],
               ['manifests', 'Cargo Manifests'],
               ['projects', 'Scientific Projects'],
               ['logistics', 'Transport Plan']
@@ -545,14 +762,14 @@ const ExpeditionDetailPanel = ({ expedition, allPersonnel, stations, onClose, on
           </div>
 
           {/* Tab Content */}
-          <div style={{ flex: 1, padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div style={{ flex: 1, padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
 
             {/* OVERVIEW */}
             {tab === 'overview' && (
               <>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                   <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Mission Components</div>
-                  <ManageLink icon="badge" label="Personnel Roster" count={expedition.summary?.personnelCount ?? 0} note="assigned" onClick={() => setShowRoster(true)} />
+                  <ManageLink icon="badge" label="Personnel Roster & Clearances" count={candidateMetrics.confirmed} note={`confirmed · ${candidateMetrics.totalNominated} nominated`} onClick={() => setTab('personnel')} />
                   <ManageLink icon="description" label="Cargo Manifests" count={expedition.summary?.cargoManifestCount ?? manifests.length} note="manifests" onClick={() => setTab('manifests')} />
                   <ManageLink icon="science" label="Scientific Projects" count={expedition.scientificProjects?.length ?? 0} note="projects" onClick={() => setTab('projects')} />
                   <ManageLink icon="local_shipping" label="Transport Plan" note={expedition.summary?.transportConfigured ? 'Configured' : 'Not configured'} onClick={() => setTab('logistics')} />
@@ -599,67 +816,210 @@ const ExpeditionDetailPanel = ({ expedition, allPersonnel, stations, onClose, on
               </>
             )}
 
-            {/* PERSONNEL TAB */}
-            {tab === 'personnel' && (() => {
-              const assignedPersonnel = (allPersonnel || []).filter(p => (
-                p.expeditionId === expedition._id ||
-                p.expeditionId?._id === expedition._id ||
-                p.expedition?.expeditionId === expedition._id ||
-                p.expedition?.expeditionId?._id === expedition._id
-              ));
+            {/* PERSONNEL TAB — 2-STAGE NOMINATION & READINESS PIPELINE */}
+            {tab === 'personnel' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
 
-              return (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.82rem', color: '#64748B' }}>
-                      <strong>{assignedPersonnel.length}</strong> candidate(s) currently nominated & assigned to {expedition.expeditionCode}.
-                    </span>
-                    <button onClick={() => setShowRoster(true)} style={{ padding: '0.45rem 1rem', backgroundColor: '#005B7F', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                      <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>group_add</span>
-                      + Nominate / Assign Personnel
+                {/* TOP METRICS STRIP */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '0.5rem' }}>
+                  {[
+                    { label: 'Nominated', value: candidateMetrics.totalNominated, color: '#0369a1', bg: '#eff6ff', border: '#bfdbfe' },
+                    { label: 'Confirmed', value: candidateMetrics.confirmed, color: '#15803d', bg: '#f0fdf4', border: '#86efac' },
+                    { label: 'Ready', value: candidateMetrics.readyForConfirmation, color: '#059669', bg: '#ecfdf5', border: '#a7f3d0' },
+                    { label: 'Med Pending', value: candidateMetrics.medicalPending, color: '#d97706', bg: '#fffbeb', border: '#fde68a' },
+                    { label: 'Trn Pending', value: candidateMetrics.trainingPending, color: '#d97706', bg: '#fffbeb', border: '#fde68a' },
+                    { label: 'Blocked', value: candidateMetrics.blocked, color: '#dc2626', bg: '#fef2f2', border: '#fca5a5' },
+                  ].map(m => (
+                    <div key={m.label} style={{ backgroundColor: m.bg, border: `1px solid ${m.border}`, borderRadius: '6px', padding: '0.45rem 0.5rem', textAlign: 'center' }}>
+                      <div style={{ fontSize: '0.62rem', fontWeight: 700, color: m.color, textTransform: 'uppercase', letterSpacing: '0.02em', whiteSpace: 'nowrap' }}>{m.label}</div>
+                      <div style={{ fontSize: '1.1rem', fontWeight: 800, color: m.color, marginTop: '0.1rem' }}>{m.value}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* ACTION BAR */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#f8fafc', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
+                  <div style={{ fontSize: '0.8rem', color: '#475569' }}>
+                    <strong>{candidateMetrics.totalNominated}</strong> total candidate(s) in expedition workflow.
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <button
+                      onClick={fetchCandidates}
+                      title="Refresh readiness data"
+                      style={{ padding: '0.45rem 0.65rem', backgroundColor: '#fff', color: '#475569', border: '1px solid #CBD5E1', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>refresh</span>
+                    </button>
+                    <button
+                      onClick={() => setShowNominateModal(true)}
+                      style={{ padding: '0.45rem 1rem', backgroundColor: '#005B7F', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>person_add</span>
+                      + Nominate Personnel
                     </button>
                   </div>
+                </div>
 
-                  {assignedPersonnel.length === 0 ? (
-                    <div style={{ padding: '2.5rem', textAlign: 'center', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px dashed #CBD5E1', color: '#94a3b8' }}>
-                      <span className="material-symbols-outlined" style={{ fontSize: '36px', display: 'block', marginBottom: '0.5rem' }}>badge</span>
-                      <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>No Personnel Nominated Yet</div>
-                      <div style={{ fontSize: '0.78rem' }}>Click "+ Nominate / Assign Personnel" to assign candidates from the pool to this expedition.</div>
+                {/* SECTION 1: NOMINATED CANDIDATES (CLEARANCE & READINESS PIPELINE) */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#0369a1' }}>clinical_notes</span>
+                      <h4 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 800, color: '#0F172A', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                        1. Nominated Candidates (Readiness Pipeline)
+                      </h4>
+                    </div>
+                    <span style={{ fontSize: '0.72rem', color: '#64748B' }}>
+                      Medical & Training clearances update in parallel. HQ confirms when ready.
+                    </span>
+                  </div>
+
+                  {loadingCandidates ? (
+                    <div style={{ padding: '2rem', textAlign: 'center', color: '#64748B' }}>Loading nominated candidates...</div>
+                  ) : nominatedPipeline.length === 0 ? (
+                    <div style={{ padding: '2rem', textAlign: 'center', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px dashed #CBD5E1', color: '#94a3b8' }}>
+                      <span className="material-symbols-outlined" style={{ fontSize: '32px', display: 'block', marginBottom: '0.35rem' }}>how_to_reg</span>
+                      <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>No Active Candidate Nominations Pending</div>
+                      <div style={{ fontSize: '0.75rem', marginTop: '0.2rem' }}>Click "+ Nominate Personnel" to add candidate scientists and engineers for clearance.</div>
                     </div>
                   ) : (
                     <div style={{ border: '1px solid #E2E8F0', borderRadius: '8px', overflow: 'hidden' }}>
-                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem' }}>
                         <thead style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #E2E8F0' }}>
                           <tr>
-                            {['Candidate', 'Employee ID', 'Role', 'Station', 'Medical Status', 'Participation'].map(h => (
-                              <th key={h} style={{ padding: '0.6rem 0.85rem', textAlign: 'left', fontWeight: 700, color: '#475569', fontSize: '0.7rem', textTransform: 'uppercase' }}>{h}</th>
+                            {['Candidate', 'Role / Station', 'Medical Clearance', 'Polar Training', 'Readiness', 'HQ Action'].map(h => (
+                              <th key={h} style={{ padding: '0.55rem 0.75rem', textAlign: 'left', fontWeight: 700, color: '#475569', fontSize: '0.68rem', textTransform: 'uppercase' }}>{h}</th>
                             ))}
                           </tr>
                         </thead>
                         <tbody>
-                          {assignedPersonnel.map((p, i) => {
+                          {nominatedPipeline.map((c, i) => {
+                            const p = c.personnelId || {};
                             const name = p.name || p.userId?.name || '—';
                             const empId = p.employeeId || p.userId?.employeeId || '—';
                             const role = p.role || p.userId?.role || '—';
-                            const station = p.station || p.stationCode || '—';
-                            const medStatus = p.medicalClearance || 'PENDING';
-                            const partType = p.participationType || expedition.season || 'WINTER';
+                            const stationName = c.assignedStation?.name || p.expedition?.assignedStation?.name || p.station || 'Maitri';
+                            
+                            const med = c.medicalStatus || 'PENDING';
+                            const trn = c.trainingStatus || 'PENDING';
+                            const isReady = c.status === 'READY_FOR_CONFIRMATION' || (
+                              (med === 'FIT' || med === 'FIT_WITH_RESTRICTIONS') && trn === 'COMPLETED'
+                            );
+                            const isRestricted = med === 'FIT_WITH_RESTRICTIONS';
+                            const isNotFit = med === 'NOT_FIT';
+                            const isPending = med === 'PENDING' || trn === 'PENDING' || trn === 'PARTIAL';
+
                             return (
-                              <tr key={p._id || i} style={{ borderBottom: '1px solid #F1F5F9', backgroundColor: i % 2 === 0 ? '#fff' : '#fafafa' }}>
-                                <td style={{ padding: '0.6rem 0.85rem', fontWeight: 700, color: '#0F172A' }}>{name}</td>
-                                <td style={{ padding: '0.6rem 0.85rem', color: '#475569', fontFamily: 'monospace' }}>{empId}</td>
-                                <td style={{ padding: '0.6rem 0.85rem', color: '#475569' }}>{role}</td>
-                                <td style={{ padding: '0.6rem 0.85rem', color: '#64748B' }}>{station}</td>
-                                <td style={{ padding: '0.6rem 0.85rem' }}>
+                              <tr key={c._id || i} style={{ borderBottom: '1px solid #F1F5F9', backgroundColor: isReady ? '#f0fdf4' : isNotFit ? '#fef2f2' : i % 2 === 0 ? '#fff' : '#fafafa' }}>
+                                {/* Candidate */}
+                                <td style={{ padding: '0.55rem 0.75rem' }}>
+                                  <div style={{ fontWeight: 700, color: '#0F172A' }}>{name}</div>
+                                  <div style={{ fontSize: '0.7rem', color: '#64748B', fontFamily: 'monospace' }}>{empId}</div>
+                                </td>
+
+                                {/* Role / Station */}
+                                <td style={{ padding: '0.55rem 0.75rem' }}>
+                                  <div style={{ color: '#334155', fontWeight: 600 }}>{role}</div>
+                                  <div style={{ fontSize: '0.7rem', color: '#64748B' }}>{stationName} · {c.participationType || 'WINTER'}</div>
+                                </td>
+
+                                {/* Medical Clearance */}
+                                <td style={{ padding: '0.55rem 0.75rem' }}>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                                    <span style={{
+                                      display: 'inline-block', padding: '0.12rem 0.45rem', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 700,
+                                      backgroundColor: med === 'FIT' ? '#dcfce7' : isRestricted ? '#fef3c7' : isNotFit ? '#fee2e2' : '#f1f5f9',
+                                      color: med === 'FIT' ? '#15803d' : isRestricted ? '#b45309' : isNotFit ? '#dc2626' : '#64748B',
+                                      width: 'fit-content'
+                                    }}>
+                                      {med === 'FIT' ? '✔ FIT' : isRestricted ? '⚠ RESTRICTED' : isNotFit ? '✖ NOT FIT' : '⏳ PENDING'}
+                                    </span>
+                                    {isRestricted && (
+                                      <div style={{ fontSize: '0.65rem', color: '#b45309', maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={(c.medicalRestrictions || []).join(', ') || c.medicalRemarks}>
+                                        {(c.medicalRestrictions || []).join(', ') || 'Special duty limitations'}
+                                      </div>
+                                    )}
+                                  </div>
+                                </td>
+
+                                {/* Training Status */}
+                                <td style={{ padding: '0.55rem 0.75rem' }}>
                                   <span style={{
-                                    padding: '0.15rem 0.5rem', borderRadius: '99px', fontSize: '0.68rem', fontWeight: 700,
-                                    backgroundColor: medStatus === 'FIT' ? '#dcfce7' : '#fef3c7',
-                                    color: medStatus === 'FIT' ? '#15803d' : '#b45309'
+                                    display: 'inline-block', padding: '0.12rem 0.45rem', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 700,
+                                    backgroundColor: trn === 'COMPLETED' ? '#dcfce7' : trn === 'PARTIAL' ? '#fef3c7' : '#f1f5f9',
+                                    color: trn === 'COMPLETED' ? '#15803d' : trn === 'PARTIAL' ? '#b45309' : '#64748B'
                                   }}>
-                                    {medStatus}
+                                    {trn === 'COMPLETED' ? '✔ COMPLETED' : trn === 'PARTIAL' ? '◐ PARTIAL' : '⏳ PENDING'}
                                   </span>
                                 </td>
-                                <td style={{ padding: '0.6rem 0.85rem', fontWeight: 600, color: '#005B7F' }}>{partType}</td>
+
+                                {/* Overall Readiness Status */}
+                                <td style={{ padding: '0.55rem 0.75rem' }}>
+                                  {isReady ? (
+                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem', padding: '0.15rem 0.5rem', borderRadius: '99px', fontSize: '0.68rem', fontWeight: 800, backgroundColor: '#dcfce7', color: '#15803d', border: '1px solid #86efac' }}>
+                                      ★ READY
+                                    </span>
+                                  ) : isNotFit ? (
+                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem', padding: '0.15rem 0.5rem', borderRadius: '99px', fontSize: '0.68rem', fontWeight: 800, backgroundColor: '#fee2e2', color: '#dc2626', border: '1px solid #fca5a5' }} title="Declared NOT FIT by Medical Officer">
+                                      🔒 BLOCKED (UNFIT)
+                                    </span>
+                                  ) : (
+                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem', padding: '0.15rem 0.5rem', borderRadius: '99px', fontSize: '0.68rem', fontWeight: 700, backgroundColor: '#fffbeb', color: '#b45309', border: '1px solid #fde68a' }} title="Pending medical exam or polar training completion">
+                                      🔒 BLOCKED
+                                    </span>
+                                  )}
+                                </td>
+
+                                {/* Actions */}
+                                <td style={{ padding: '0.55rem 0.75rem' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                    {isReady ? (
+                                      <button
+                                        onClick={() => {
+                                          if (isRestricted) {
+                                            setReviewCandidate(c);
+                                          } else {
+                                            handleCandidateConfirmed(c._id);
+                                          }
+                                        }}
+                                        disabled={confirmingId === c._id}
+                                        style={{
+                                          padding: '0.3rem 0.65rem', backgroundColor: '#005B7F', color: '#fff',
+                                          border: 'none', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 700,
+                                          cursor: confirmingId === c._id ? 'not-allowed' : 'pointer',
+                                          display: 'flex', alignItems: 'center', gap: '0.25rem'
+                                        }}
+                                      >
+                                        <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>how_to_reg</span>
+                                        {confirmingId === c._id ? 'Confirming...' : 'Confirm'}
+                                      </button>
+                                    ) : (
+                                      <button
+                                        disabled
+                                        title={isNotFit ? 'Declared NOT FIT for deployment' : 'Medical or training checks are still pending'}
+                                        style={{
+                                          padding: '0.3rem 0.55rem', backgroundColor: '#f1f5f9', color: '#94a3b8',
+                                          border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 600,
+                                          cursor: 'not-allowed'
+                                        }}
+                                      >
+                                        Blocked
+                                      </button>
+                                    )}
+
+                                    <button
+                                      onClick={() => handleRemoveCandidate(c._id)}
+                                      disabled={removingId === c._id}
+                                      title="Remove nomination"
+                                      style={{
+                                        padding: '0.25rem 0.4rem', backgroundColor: '#fff', color: '#ef4444',
+                                        border: '1px solid #fecaca', borderRadius: '4px', fontSize: '0.7rem', cursor: 'pointer'
+                                      }}
+                                    >
+                                      ✕
+                                    </button>
+                                  </div>
+                                </td>
                               </tr>
                             );
                           })}
@@ -668,8 +1028,87 @@ const ExpeditionDetailPanel = ({ expedition, allPersonnel, stations, onClose, on
                     </div>
                   )}
                 </div>
-              );
-            })()}
+
+                {/* SECTION 2: CONFIRMED EXPEDITION ROSTER */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#15803d' }}>verified</span>
+                      <h4 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 800, color: '#0F172A', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                        2. Confirmed Expedition Roster ({confirmedRoster.length})
+                      </h4>
+                    </div>
+                    <span style={{ fontSize: '0.72rem', color: '#64748B' }}>
+                      Official team roster cleared & approved by HQ Command.
+                    </span>
+                  </div>
+
+                  {confirmedRoster.length === 0 ? (
+                    <div style={{ padding: '2rem', textAlign: 'center', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px dashed #CBD5E1', color: '#94a3b8' }}>
+                      <span className="material-symbols-outlined" style={{ fontSize: '32px', display: 'block', marginBottom: '0.35rem' }}>badge</span>
+                      <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>No Personnel Confirmed Yet</div>
+                      <div style={{ fontSize: '0.75rem', marginTop: '0.2rem' }}>Candidates who pass medical & training clearance can be confirmed above.</div>
+                    </div>
+                  ) : (
+                    <div style={{ border: '1px solid #86efac', borderRadius: '8px', overflow: 'hidden' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem' }}>
+                        <thead style={{ backgroundColor: '#f0fdf4', borderBottom: '1px solid #86efac' }}>
+                          <tr>
+                            {['Member Name', 'Role', 'Assigned Station', 'Medical Clearance', 'Training', 'Confirmed Date', 'Status'].map(h => (
+                              <th key={h} style={{ padding: '0.55rem 0.75rem', textAlign: 'left', fontWeight: 700, color: '#15803d', fontSize: '0.68rem', textTransform: 'uppercase' }}>{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {confirmedRoster.map((c, i) => {
+                            const p = c.personnelId || {};
+                            const name = p.name || p.userId?.name || '—';
+                            const empId = p.employeeId || p.userId?.employeeId || '—';
+                            const role = p.role || p.userId?.role || '—';
+                            const stationName = c.assignedStation?.name || p.expedition?.assignedStation?.name || p.station || 'Maitri';
+                            const confirmedDate = c.confirmedAt ? new Date(c.confirmedAt).toLocaleDateString() : 'Confirmed';
+
+                            return (
+                              <tr key={c._id || i} style={{ borderBottom: '1px solid #F1F5F9', backgroundColor: i % 2 === 0 ? '#fff' : '#fcfdfc' }}>
+                                <td style={{ padding: '0.55rem 0.75rem' }}>
+                                  <div style={{ fontWeight: 700, color: '#0F172A' }}>{name}</div>
+                                  <div style={{ fontSize: '0.7rem', color: '#64748B', fontFamily: 'monospace' }}>{empId}</div>
+                                </td>
+                                <td style={{ padding: '0.55rem 0.75rem', color: '#334155', fontWeight: 600 }}>{role}</td>
+                                <td style={{ padding: '0.55rem 0.75rem', color: '#64748B' }}>{stationName} ({c.participationType || 'WINTER'})</td>
+                                <td style={{ padding: '0.55rem 0.75rem' }}>
+                                  <span style={{
+                                    display: 'inline-block', padding: '0.12rem 0.45rem', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 700,
+                                    backgroundColor: c.medicalStatus === 'FIT' ? '#dcfce7' : '#fef3c7',
+                                    color: c.medicalStatus === 'FIT' ? '#15803d' : '#b45309'
+                                  }}>
+                                    {c.medicalStatus === 'FIT' ? '✔ FIT' : '⚠ RESTRICTED'}
+                                  </span>
+                                </td>
+                                <td style={{ padding: '0.55rem 0.75rem' }}>
+                                  <span style={{
+                                    display: 'inline-block', padding: '0.12rem 0.45rem', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 700,
+                                    backgroundColor: '#dcfce7', color: '#15803d'
+                                  }}>
+                                    ✔ COMPLETED
+                                  </span>
+                                </td>
+                                <td style={{ padding: '0.55rem 0.75rem', color: '#64748B', fontSize: '0.72rem' }}>{confirmedDate}</td>
+                                <td style={{ padding: '0.55rem 0.75rem' }}>
+                                  <span style={{ padding: '0.15rem 0.5rem', borderRadius: '99px', fontSize: '0.68rem', fontWeight: 800, backgroundColor: '#dcfce7', color: '#15803d' }}>
+                                    OFFICIAL ROSTER
+                                  </span>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* CARGO MANIFESTS TAB */}
             {tab === 'manifests' && (
@@ -742,14 +1181,25 @@ const ExpeditionDetailPanel = ({ expedition, allPersonnel, stations, onClose, on
         </div>
       </div>
 
-      {/* Personnel Roster Modal */}
-      {showRoster && (
-        <PersonnelRosterPanel
+      {/* Nominate Personnel Modal */}
+      {showNominateModal && (
+        <NominatePersonnelModal
           expedition={expedition}
           allPersonnel={allPersonnel}
           stations={stations}
-          onClose={() => setShowRoster(false)}
-          onAssign={onAssignPersonnel}
+          existingCandidateIds={existingCandidatePersonnelIds}
+          onClose={() => setShowNominateModal(false)}
+          onNominated={handleNominationSuccess}
+        />
+      )}
+
+      {/* Restriction Review Modal */}
+      {reviewCandidate && (
+        <RestrictionReviewModal
+          candidate={reviewCandidate}
+          confirming={confirmingId === reviewCandidate._id}
+          onClose={() => setReviewCandidate(null)}
+          onConfirm={(candId, payload) => handleCandidateConfirmed(candId, payload)}
         />
       )}
 

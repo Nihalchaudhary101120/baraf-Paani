@@ -4,6 +4,7 @@ import {
     getAllMedicalAssessments,
     getMedicalOverviewStats,
     getPersonnelMedicalRoster,
+    getNominatedCandidates,
     getPersonnelMedicalHistory,
     createMedicalAssessment,
     getMedicalAssessment,
@@ -25,11 +26,18 @@ router.get(
     getMedicalOverviewStats
 );
 
-// Combined personnel medical roster
+// Combined personnel medical roster (nominees only for the expedition)
 router.get(
     "/roster",
     requireRole("MEDICAL_OFFICER", "HQ_ADMIN", "HQ_COMMAND", "STATION_COMMANDER"),
     getPersonnelMedicalRoster
+);
+
+// Nominated candidates list for Medical Officer dropdown
+router.get(
+    "/nominated-candidates",
+    requireRole("MEDICAL_OFFICER", "HQ_ADMIN", "HQ_COMMAND"),
+    getNominatedCandidates
 );
 
 // Historical assessments for a personnel across expeditions

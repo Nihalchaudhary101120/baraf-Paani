@@ -20,12 +20,12 @@ const createAdmin = async () => {
             process.exit(0);
         }
 
-        const passwordHash = await bcrypt.hash("Admin@12345", 12);
+        const passwordHash = await bcrypt.hash("123456", 12);
 
         await User.create({
             employeeId: "AEMS-ADMIN-001",
-            name: "System Administrator",
-            email: "admin@aems.gov.in",
+            name: "Ayush dada",
+            email: "vashisthayush099@gmail.com",
             password: passwordHash,
             designation: "System Administrator",
             organization: "NCPOR",

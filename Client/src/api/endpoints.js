@@ -27,6 +27,10 @@ export const ENDPOINTS = {
     EXPEDITIONS: '/admin/expeditions',
     EXPEDITION_BY_ID: (id) => `/admin/expeditions/${id}`,
     EXPEDITION_ASSIGN: (id) => `/admin/expeditions/${id}/assign-personnel`,
+    EXPEDITION_NOMINATE: (id) => `/admin/expeditions/${id}/nominate-personnel`,
+    EXPEDITION_CANDIDATES: (id) => `/admin/expeditions/${id}/candidates`,
+    EXPEDITION_CONFIRM_CANDIDATE: (id, candidateId) => `/admin/expeditions/${id}/confirm-candidate/${candidateId}`,
+    EXPEDITION_REMOVE_CANDIDATE: (id, candidateId) => `/admin/expeditions/${id}/candidates/${candidateId}`,
     MEDICAL_RECORDS: '/admin/medical-records',
     CARGO_DATA: '/admin/cargo-data',
     FIELD_OPS: '/admin/field-ops',
@@ -47,6 +51,7 @@ export const ENDPOINTS = {
   MEDICAL: {
     OVERVIEW: '/medical/overview',
     ROSTER: '/medical/roster',
+    NOMINATED_CANDIDATES: '/medical/nominated-candidates',
     ASSESSMENTS: '/medical',
     ASSESSMENT_BY_ID: (id) => `/medical/${id}`,
     CLEARANCE: (id) => `/medical/${id}/clearance`,
