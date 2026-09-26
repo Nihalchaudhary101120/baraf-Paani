@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { useToast } from '@/context/ToastContext';
 import { isValidEmail, isRequired } from '@/utils/validators';
 import { ROUTES } from '@/utils/constants';
 
@@ -8,6 +9,7 @@ const LoginPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { login, isLoading, error, clearError } = useAuth();
+  const toast = useToast();
 
   const [formData, setFormData] = useState({
     email: '',
@@ -77,14 +79,16 @@ const LoginPage = () => {
   };
 
   const handleForgotNotice = () => {
-    alert(
-      'Security Notice: Credentials recovery requires cryptographic verification via the Polar Operations Security Administrator (MoES / NCPOR HQ). Contact: sec-ops@ncpor.res.in'
+    toast.info(
+      'Security Notice: Credentials recovery requires cryptographic verification via the Polar Operations Security Administrator (MoES / NCPOR HQ). Contact: sec-ops@ncpor.res.in',
+      { duration: 4500 }
     );
   };
 
   const handleActivationNotice = () => {
-    alert(
-      'Station / Vessel Device Enrollment: Please ensure your security token or hardware key is plugged into this terminal. Dispatching to enrollment gateway.'
+    toast.info(
+      'Station / Vessel Device Enrollment: Please ensure your security token or hardware key is plugged into this terminal. Dispatching to enrollment gateway.',
+      { duration: 4500 }
     );
   };
 

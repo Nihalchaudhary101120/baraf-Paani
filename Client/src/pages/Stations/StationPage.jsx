@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { useToast } from '@/context/ToastContext';
 import { ROUTES } from '@/utils/constants';
 
 const StationPage = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  const toast = useToast();
 
   const [currentStation, setCurrentStation] = useState({
     code: 'STN-01',
@@ -722,7 +724,7 @@ const StationPage = () => {
                 </div>
                 <button
                   type="button"
-                  onClick={() => alert('Dispense / Transaction modal initialized.')}
+                  onClick={() => toast.info('Dispense / Transaction modal initialized.')}
                   style={{ backgroundColor: '#005B7F', color: '#ffffff', border: 'none', padding: '0.5rem 1rem', borderRadius: '6px', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
                 >
                   <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>add_circle</span>
@@ -748,7 +750,7 @@ const StationPage = () => {
                 </div>
                 <button
                   type="button"
-                  onClick={() => alert('Item Food-23 detailed specification log opened.')}
+                  onClick={() => toast.info('Item Food-23 detailed specification log opened.')}
                   style={{ backgroundColor: '#E65A28', color: '#ffffff', border: 'none', padding: '0.5rem 1rem', borderRadius: '6px', fontFamily: "'JetBrains Mono', monospace", fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
                 >
                   VIEW ITEM DETAIL
@@ -788,7 +790,7 @@ const StationPage = () => {
                         </td>
                         <td style={{ padding: '0.85rem 1.25rem', textAlign: 'right' }}>
                           <button
-                            onClick={() => alert(`Dispense action logged for SKU ${item.code}`)}
+                            onClick={() => toast.success(`Dispense action logged for SKU ${item.code}`)}
                             style={{ backgroundColor: item.isAlert ? '#E65A28' : '#ffffff', color: item.isAlert ? '#ffffff' : '#005B7F', border: item.isAlert ? 'none' : '1px solid #005B7F', padding: '0.25rem 0.65rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}
                           >
                             {item.isAlert ? 'Dispense / FIFO' : 'Log Dispense'}

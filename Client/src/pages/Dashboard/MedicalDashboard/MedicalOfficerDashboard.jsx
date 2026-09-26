@@ -2,9 +2,11 @@ import React, { useState, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useMedicalData } from '@/context/MedicalContext';
+import { useToast } from '@/context/ToastContext';
 
 export default function MedicalOfficerDashboard() {
   const { user } = useAuth();
+  const toast = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Active Tab from URL query parameter or default 'overview'
@@ -103,7 +105,7 @@ export default function MedicalOfficerDashboard() {
       handleOpenExamination(candidate);
       setIsCreateModalOpen(false);
     } else {
-      alert('No enrolled personnel found in current expedition.');
+      toast.warning('No enrolled personnel found in current expedition.');
     }
   };
 
@@ -173,11 +175,11 @@ export default function MedicalOfficerDashboard() {
     try {
       await saveAssessment(assessmentForm);
       setIsExamModalOpen(false);
-      alert('Medical Assessment & Clearance recorded successfully in database!');
+      toast.success('Medical Assessment & Clearance recorded successfully in database!');
     } catch (err) {
       console.error('Failed to save assessment:', err);
       setIsExamModalOpen(false);
-      alert('Assessment update recorded: ' + (err.response?.data?.message || err.message));
+      toast.error('Assessment update error: ' + (err.response?.data?.message || err.message));
     } finally {
       setSavingAssessment(false);
     }
@@ -189,8 +191,10 @@ export default function MedicalOfficerDashboard() {
       const assessmentId = personnelItem.medicalAssessment?._id;
       const restrictions = newStatus === 'FIT_WITH_RESTRICTIONS' ? ['Standard winter cold restrictions', 'Medication check'] : [];
       await quickUpdateClearance(personnelItem.personnelId, assessmentId, newStatus, restrictions, reason);
+      toast.success(`Clearance updated to ${newStatus}`);
     } catch (err) {
       console.warn('Quick clearance update error:', err);
+      toast.error('Failed to update clearance');
     }
   };
 
@@ -831,7 +835,7 @@ export default function MedicalOfficerDashboard() {
                 Print / Export PDF
               </button>
               <button
-                onClick={() => alert('Exporting Medical Clearance Registry CSV...')}
+                onClick={() => toast.info('Exporting Medical Clearance Registry CSV...')}
                 style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.45rem 0.85rem', backgroundColor: '#f1f5f9', color: '#334155', border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}
               >
                 <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>download</span>

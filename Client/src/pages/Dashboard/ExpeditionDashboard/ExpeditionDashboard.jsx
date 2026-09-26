@@ -13,6 +13,7 @@ import {
 import { getManifests, createManifest } from '@/api/cargo.api';
 import axiosInstance from '@/api/axiosInstance';
 import { useAdminData } from '@/context/AdminContext';
+import { useToast } from '@/context/ToastContext';
 import { TrainingWorkflowModal } from './TrainingWorkflowModal';
 
 // ─── Helpers & Styles ────────────────────────────────────────────────────────
@@ -611,6 +612,8 @@ const ExpeditionDetailPanel = ({ expedition, allPersonnel, stations, onClose, on
   const [reviewCandidate, setReviewCandidate] = useState(null);
   const [selectedTrainingCandidate, setSelectedTrainingCandidate] = useState(null);
 
+  const toast = useToast();
+
   // Leader Appointment State
   const [currentLeaderId, setCurrentLeaderId] = useState(
     expedition.leadership?.expeditionLeader?._id || expedition.leadership?.expeditionLeader || null
@@ -632,9 +635,10 @@ const ExpeditionDetailPanel = ({ expedition, allPersonnel, stations, onClose, on
       });
       setCurrentLeaderId(personnelId);
       if (onRefresh) onRefresh();
+      toast.success('Expedition Leader designated successfully!');
     } catch (err) {
       console.error('Failed to set expedition leader:', err);
-      alert('Failed to set expedition leader: ' + (err.response?.data?.message || err.message));
+      toast.error('Failed to set expedition leader: ' + (err.response?.data?.message || err.message));
     } finally {
       setSettingLeaderId(null);
     }
@@ -699,19 +703,18 @@ const ExpeditionDetailPanel = ({ expedition, allPersonnel, stations, onClose, on
         setReviewCandidate(null);
         await fetchCandidates();
         onRefresh && onRefresh();
-        alert(data?.message || 'Candidate assignment confirmed to official expedition roster!');
+        toast.success(data?.message || 'Candidate confirmed to official expedition roster!');
       } else {
-        alert(data?.message || 'Failed to confirm assignment.');
+        toast.error(data?.message || 'Failed to confirm assignment.');
       }
     } catch (err) {
-      alert(err.response?.data?.message || err.message || 'Error confirming assignment.');
+      toast.error(err.response?.data?.message || err.message || 'Error confirming assignment.');
     } finally {
       setConfirmingId(null);
     }
   };
 
   const handleRemoveCandidate = async (candidateId) => {
-    if (!window.confirm('Are you sure you want to remove this nominated candidate from the expedition?')) return;
     setRemovingId(candidateId);
     try {
       const res = await removeExpeditionCandidateApi(expedition._id, candidateId);
@@ -719,11 +722,12 @@ const ExpeditionDetailPanel = ({ expedition, allPersonnel, stations, onClose, on
       if (data?.success) {
         await fetchCandidates();
         onRefresh && onRefresh();
+        toast.info(data?.message || 'Candidate nomination removed.');
       } else {
-        alert(data?.message || 'Failed to remove candidate.');
+        toast.error(data?.message || 'Failed to remove candidate.');
       }
     } catch (err) {
-      alert(err.response?.data?.message || err.message || 'Error removing candidate.');
+      toast.error(err.response?.data?.message || err.message || 'Error removing candidate.');
     } finally {
       setRemovingId(null);
     }
@@ -732,6 +736,7 @@ const ExpeditionDetailPanel = ({ expedition, allPersonnel, stations, onClose, on
   const handleNominationSuccess = async () => {
     await fetchCandidates();
     onRefresh && onRefresh();
+    toast.success('Candidate(s) nominated successfully!');
   };
 
   // Split candidates into Nominated/In Pipeline vs Confirmed Roster
@@ -1679,8 +1684,11 @@ const ExpeditionDashboard = () => {
 
   const loading = !isInitialized && expeditions.length === 0 && contextLoading.expeditions;
 
+  const toast = useToast();
+
   const handleCreated = (exp) => {
     addExpedition(exp);
+    toast.success(`Expedition ${exp?.expeditionCode || ''} created successfully!`);
   };
 
   const handleAssignPersonnel = async (expId, data) => {
@@ -1700,10 +1708,10 @@ const ExpeditionDashboard = () => {
           }
         };
       });
-      alert(res?.message || `Personnel roster updated successfully! Baseline medical and training clearances initialized.`);
+      toast.success(res?.message || `Personnel roster updated successfully! Baseline medical and training clearances initialized.`);
     } catch (e) {
       console.error('Assign error', e);
-      alert('Failed to assign personnel: ' + (e.response?.data?.message || e.message));
+      toast.error('Failed to assign personnel: ' + (e.response?.data?.message || e.message));
     }
   };
 

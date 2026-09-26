@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getCommandOverviewApi, getPersonnelReadinessApi, getExpeditionsApi } from '@/api/admin.api';
+import { useToast } from '@/context/ToastContext';
 
 const HQCommandDashboard = () => {
   const navigate = useNavigate();
+  const toast = useToast();
   const [activeTab, setActiveTab] = useState('overview');
   const [overview, setOverview] = useState({
     activeExpeditions: 3,
@@ -298,7 +300,10 @@ const HQCommandDashboard = () => {
             <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#005B7F', margin: 0 }}>Indian Scientific Expeditions</h3>
             <button
               type="button"
-              onClick={() => alert('New Expedition Wizard will open')}
+              onClick={() => {
+                navigate('/dashboard/expeditions');
+                toast.info('Opening Expedition Control Hub...');
+              }}
               style={{ backgroundColor: '#005B7F', color: '#fff', border: 'none', padding: '0.4rem 0.85rem', borderRadius: '4px', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer' }}
             >
               + Create Expedition

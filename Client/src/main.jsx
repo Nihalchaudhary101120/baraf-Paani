@@ -7,6 +7,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { AuthProvider } from '@/context/AuthContext';
 import { AdminProvider } from '@/context/AdminContext';
 import { MedicalProvider } from '@/context/MedicalContext';
+import { ToastProvider } from '@/context/ToastContext';
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
@@ -14,7 +15,9 @@ createRoot(document.getElementById('root')).render(
       <AuthProvider>
         <AdminProvider>
           <MedicalProvider>
-            <App />
+            <ToastProvider>
+              <App />
+            </ToastProvider>
           </MedicalProvider>
         </AdminProvider>
       </AuthProvider>

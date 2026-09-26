@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createUserApi, toggleUserStatusApi } from '@/api/admin.api';
 import { useAdminData } from '@/context/AdminContext';
+import { useToast } from '@/context/ToastContext';
 
 // Supported polar roles with human labels and badge styling
 const ROLES = [
@@ -18,6 +19,7 @@ const ROLES = [
 
 const UserManagementDashboard = () => {
   const { users, stations, addUser, toggleUserStatus, fetchUsers, fetchStations, loading: contextLoading, isInitialized } = useAdminData();
+  const toast = useToast();
   const [errorMsg, setErrorMsg] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('ALL');
@@ -869,9 +871,10 @@ const UserManagementDashboard = () => {
             <button
               type="button"
               onClick={() => {
+                if (!createdCredentialsModal) return;
                 const text = `NCPOR NIRANTRA Portal Credentials:\nEmail: ${createdCredentialsModal.email}\nPassword: ${createdCredentialsModal.password}\nEmployee ID: ${createdCredentialsModal.employeeId}\nRole: ${createdCredentialsModal.role}`;
                 navigator.clipboard.writeText(text);
-                alert('Credentials copied to clipboard!');
+                toast.success('Credentials copied to clipboard!');
               }}
               style={{
                 width: '100%', marginTop: '1.25rem', padding: '0.65rem',
