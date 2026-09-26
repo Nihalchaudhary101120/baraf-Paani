@@ -57,6 +57,10 @@ const ShipmentSchema = new mongoose.Schema(
       default: 0
     },
 
+    description: String,
+
+    vesselName: String,
+
     status: {
       type: String,
       enum: [

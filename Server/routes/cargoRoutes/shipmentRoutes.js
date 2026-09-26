@@ -16,7 +16,7 @@ const router = express.Router();
 router.post(
     "/",
     requireAuth,
-    requireRole("LOGISTICS_OFFICER", "HQ_COMMAND"),
+    requireRole("LOGISTICS_OFFICER", "HQ_COMMAND", "CARGO_OFFICER"),
     createShipment
 );
 
@@ -35,7 +35,7 @@ router.get(
 router.post(
     "/:shipmentId/manifests/:manifestId",
     requireAuth,
-    requireRole("LOGISTICS_OFFICER", "HQ_COMMAND"),
+    requireRole("LOGISTICS_OFFICER", "HQ_COMMAND", "CARGO_OFFICER"),
     assignManifestToShipment
 );
 
@@ -45,7 +45,8 @@ router.patch(
     requireRole(
         "LOGISTICS_OFFICER",
         "SHIP_OFFICER",
-        "FLIGHT_OFFICER"
+        "FLIGHT_OFFICER",
+        "CARGO_OFFICER"
     ),
     updateShipmentStatus
 );

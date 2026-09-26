@@ -77,7 +77,7 @@ export const createManifest = async (req, res) => {
         }
         if (!station) {
             station = await Station.findOne({ code: String(destination).toUpperCase() }) ||
-                      await Station.findOne({ name: new RegExp(`^${destination}$`, "i") });
+                await Station.findOne({ name: new RegExp(`^${destination}$`, "i") });
         }
 
         if (!station) {
@@ -114,7 +114,7 @@ export const createManifest = async (req, res) => {
         // Update expedition summary counter
         await Expedition.findByIdAndUpdate(expedition._id, {
             $inc: { "summary.cargoManifestCount": 1 }
-        }).catch(() => {});
+        }).catch(() => { });
 
         return res.status(201).json({
             success: true,

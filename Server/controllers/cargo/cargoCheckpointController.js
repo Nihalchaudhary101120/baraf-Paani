@@ -1,6 +1,34 @@
 import CargoCheckpoint from "../../models/cargo-models/cargo-checkpoint.js";
 import CargoManifest from "../../models/cargo-models/cargo-menifest.js";
 
+export const getAllCheckpoints = async (req, res) => {
+    try {
+        const { shipmentId, manifestId, limit = 100 } = req.query;
+        const filter = {};
+        if (shipmentId) filter.shipmentId = shipmentId;
+        if (manifestId) filter.manifestId = manifestId;
+
+        const checkpoints = await CargoCheckpoint.find(filter)
+            .populate("scannedBy", "name employeeId role")
+            .populate("manifestId", "manifestNumber")
+            .populate("shipmentId", "shipmentNumber")
+            .sort({ createdAt: -1 })
+            .limit(Number(limit));
+
+        return res.status(200).json({
+            success: true,
+            count: checkpoints.length,
+            checkpoints
+        });
+    } catch (error) {
+        console.error("Get all checkpoints error:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Failed to fetch checkpoints"
+        });
+    }
+};
+
 export const createCheckpoint = async (req, res) => {
     try {
         const {

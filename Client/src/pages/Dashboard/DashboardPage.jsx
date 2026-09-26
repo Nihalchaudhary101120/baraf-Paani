@@ -3,6 +3,7 @@ import { useAuth } from '@/hooks/useAuth';
 import HQAdminDashboard from './HQAdmin/HQAdminDashboard';
 import HQCommandDashboard from './HQCommand/HQCommandDashboard';
 import MedicalOfficerDashboard from './MedicalDashboard/MedicalOfficerDashboard';
+import CargoOfficerDashboard from './CargoDashboard/CargoOfficerDashboard';
 
 /**
  * Main Centralized Dashboard Router
@@ -22,6 +23,10 @@ const DashboardPage = () => {
 
   if (role === 'MEDICAL_OFFICER') {
     return <MedicalOfficerDashboard />;
+  }
+
+  if (role === 'CARGO_OFFICER') {
+    return <CargoOfficerDashboard />;
   }
 
   // HQ_COMMAND and default operational view

@@ -12,6 +12,7 @@ const ROLES = [
   { value: 'STATION_OPERATOR', label: 'Station Operator', bg: '#ecfeff', color: '#0e7490', border: '#cffafe' },
   { value: 'INVENTORY_MANAGER', label: 'Inventory Manager', bg: '#fefce8', color: '#a16207', border: '#fef08a' },
   { value: 'MEDICAL_OFFICER', label: 'Medical Officer', bg: '#fef2f2', color: '#b91c1c', border: '#fecaca' },
+  { value: 'CARGO_OFFICER', label: 'Cargo Logistics Officer', bg: '#f5f3ff', color: '#7c3aed', border: '#ddd6fe' },
   { value: 'SHIP_OFFICER', label: 'Ship Operations Officer', bg: '#f0f9ff', color: '#0369a1', border: '#bae6fd' },
   { value: 'FLIGHT_OFFICER', label: 'Flight Operations Officer', bg: '#f5f3ff', color: '#6d28d9', border: '#ddd6fe' },
   { value: 'SCIENTIST', label: 'Field Scientist', bg: '#f0fdfa', color: '#0f766e', border: '#ccfbf1' },

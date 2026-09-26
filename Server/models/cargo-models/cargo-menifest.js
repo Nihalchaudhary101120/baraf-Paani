@@ -134,6 +134,8 @@ const CargoManifestSchema = new mongoose.Schema(
       totalDeclaredValue: Number
     },
 
+    description: String,
+
     status: {
       type: String,
       enum: [

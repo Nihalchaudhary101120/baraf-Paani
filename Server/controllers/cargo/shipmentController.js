@@ -1,7 +1,9 @@
+import mongoose from "mongoose";
 import Shipment from "../../models/cargo-models/shipment.js";
 import CargoManifest from "../../models/cargo-models/cargo-menifest.js";
 import Expedition from "../../models/master-models/expedition.js";
 import Transport from "../../models/master-models/transport.js";
+import Station from "../../models/master-models/station.js";
 
 const generateShipmentNumber = async () => {
     const year = new Date().getFullYear();
@@ -19,7 +21,7 @@ const generateShipmentNumber = async () => {
             Number(lastShipment.shipmentNumber.split("-").pop()) + 1;
     }
 
-    return `SHP-${year}-${String(sequence).padStart(5, "0")}`;
+    return `SHP-${year}-${String(sequence).padStart(3, "0")}`;
 };
 
 export const createShipment = async (req, res) => {
@@ -28,57 +30,122 @@ export const createShipment = async (req, res) => {
             expeditionId,
             transportId,
             route,
+            origin,
+            destination,
+            vessel,
+            vesselName,
             departureDate,
-            estimatedArrival
+            estimatedArrival,
+            eta,
+            description,
+            shipmentNumber: customShipmentNumber
         } = req.body;
 
-        if (!expeditionId || !transportId) {
-            return res.status(400).json({
-                success: false,
-                message: "Expedition and transport are required"
-            });
+        // Resolve Expedition
+        let expedition = null;
+        if (expeditionId && mongoose.Types.ObjectId.isValid(expeditionId)) {
+            expedition = await Expedition.findById(expeditionId);
         }
-
-        const expedition = await Expedition.findById(expeditionId);
-
         if (!expedition) {
-            return res.status(404).json({
-                success: false,
-                message: "Expedition not found"
+            expedition = await Expedition.findOne().sort({ createdAt: -1 });
+        }
+        if (!expedition) {
+            expedition = await Expedition.create({
+                expeditionCode: "EXP-2026-01",
+                name: "45th Indian Scientific Expedition to Antarctica",
+                year: new Date().getFullYear(),
+                season: "SUMMER",
+                startDate: new Date()
             });
         }
 
-        const transport = await Transport.findById(transportId);
-
+        // Resolve Transport
+        const shipName = vessel || vesselName || "MV Bharati Express";
+        let transport = null;
+        if (transportId && mongoose.Types.ObjectId.isValid(transportId)) {
+            transport = await Transport.findById(transportId);
+        }
         if (!transport) {
-            return res.status(404).json({
-                success: false,
-                message: "Transport not found"
+            transport = await Transport.findOne({ name: shipName });
+        }
+        if (!transport) {
+            transport = await Transport.findOne({ type: "SHIP" });
+        }
+        if (!transport) {
+            transport = await Transport.create({
+                name: shipName,
+                code: "VESSEL-" + Date.now().toString().slice(-4),
+                type: "SHIP",
+                capacityKg: 50000,
+                status: "AVAILABLE"
             });
         }
 
-        const shipmentNumber = await generateShipmentNumber();
+        // Resolve Route & Destination Station
+        let destStation = null;
+        const destInput = destination || route?.destination;
+        if (destInput && mongoose.Types.ObjectId.isValid(destInput)) {
+            destStation = await Station.findById(destInput);
+        }
+        if (!destStation && destInput) {
+            destStation = await Station.findOne({
+                $or: [
+                    { code: String(destInput).toUpperCase() },
+                    { name: new RegExp(`^${destInput}`, "i") }
+                ]
+            });
+        }
+        if (!destStation) {
+            destStation = await Station.findOne({ code: "BHARATI" }) || await Station.findOne();
+        }
+        if (!destStation) {
+            destStation = await Station.create({
+                name: "Bharati Station (Larsemann Hills)",
+                code: "BHARATI",
+                stationType: "COASTAL",
+                operationalStatus: "ACTIVE"
+            });
+        }
+
+        const resolvedRoute = {
+            origin: origin || route?.origin || "Goa",
+            transitPoints: route?.transitPoints || [],
+            destination: destStation._id
+        };
+
+        const finalShipmentNumber = customShipmentNumber?.trim() || (await generateShipmentNumber());
+
+        const departure = departureDate ? new Date(departureDate) : new Date();
+        const arrival = estimatedArrival || eta ? new Date(estimatedArrival || eta) : new Date(departure.getTime() + 65 * 24 * 60 * 60 * 1000);
 
         const shipment = await Shipment.create({
-            shipmentNumber,
-            expeditionId,
-            transportId,
-            route,
-            departureDate,
-            estimatedArrival
+            shipmentNumber: finalShipmentNumber,
+            expeditionId: expedition._id,
+            transportId: transport._id,
+            route: resolvedRoute,
+            departureDate: departure,
+            estimatedArrival: arrival,
+            description: description || "Antarctic Expedition Supplies",
+            vesselName: transport.name,
+            status: "SCHEDULED"
         });
+
+        const populated = await Shipment.findById(shipment._id)
+            .populate("transportId")
+            .populate("route.destination")
+            .populate("expeditionId");
 
         return res.status(201).json({
             success: true,
             message: "Shipment created successfully",
-            shipment
+            shipment: populated
         });
     } catch (error) {
         console.error("Create shipment error:", error);
 
         return res.status(500).json({
             success: false,
-            message: "Failed to create shipment"
+            message: error.message || "Failed to create shipment"
         });
     }
 };
@@ -100,7 +167,7 @@ export const getShipment = async (req, res) => {
         const manifests = await CargoManifest.find({
             shipmentId: shipment._id
         }).select(
-            "manifestNumber declarationType totals status destination"
+            "manifestNumber declarationType items totals status destination description"
         );
 
         return res.status(200).json({
@@ -125,18 +192,40 @@ export const getShipments = async (req, res) => {
         const filter = {};
 
         if (expeditionId) filter.expeditionId = expeditionId;
-        if (status) filter.status = status;
+        if (status && status !== 'ALL') filter.status = status;
         if (transportId) filter.transportId = transportId;
 
         const shipments = await Shipment.find(filter)
             .populate("transportId")
             .populate("route.destination")
-            .sort({ createdAt: -1 });
+            .populate("expeditionId")
+            .sort({ createdAt: -1 })
+            .lean();
+
+        // Dynamically compute manifest count and boxes from live manifests
+        const shipmentIds = shipments.map(s => s._id);
+        const manifests = await CargoManifest.find({ shipmentId: { $in: shipmentIds } }).select("shipmentId items totals status").lean();
+
+        const enrichedShipments = shipments.map(s => {
+            const relManifests = manifests.filter(m => m.shipmentId && m.shipmentId.toString() === s._id.toString());
+            const totalBoxes = relManifests.reduce((sum, m) => sum + (m.items?.length || 0), 0);
+            const totalWeight = relManifests.reduce((sum, m) => sum + (m.totals?.totalWeightKg || 0), 0);
+
+            return {
+                ...s,
+                manifestCount: relManifests.length,
+                totalBoxes: totalBoxes || s.cargoCount || 0,
+                totalWeightKg: totalWeight || s.totalWeightKg || 0,
+                vessel: s.vesselName || s.transportId?.name || "MV Bharati Express",
+                origin: s.route?.origin || "Goa",
+                destination: s.route?.destination?.name || s.route?.destination?.code || "Bharati"
+            };
+        });
 
         return res.status(200).json({
             success: true,
-            count: shipments.length,
-            shipments
+            count: enrichedShipments.length,
+            shipments: enrichedShipments
         });
     } catch (error) {
         console.error("Get shipments error:", error);
