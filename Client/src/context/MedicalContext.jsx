@@ -20,7 +20,7 @@ export const MedicalProvider = ({ children }) => {
   const { user, isAuthenticated } = useAuth();
 
   // ── State Stores ─────────────────────────────────────────────────────────
-  const [selectedExpedition, setSelectedExpedition] = useState('EXP-47');
+  const [selectedExpedition, _setSelectedExpedition] = useState('');
   const [expeditions, setExpeditions] = useState([]);
   const [roster, setRoster] = useState([]);
   const [assessments, setAssessments] = useState([]);
@@ -62,6 +62,11 @@ export const MedicalProvider = ({ children }) => {
     return res.data !== undefined ? res.data : res;
   };
 
+  // Expose a setter that falls back to first expedition if none selected
+  const setSelectedExpedition = useCallback((val) => {
+    _setSelectedExpedition(val);
+  }, []);
+
   // ── 1. Fetch Medical Overview & Stats ────────────────────────────────────
   const fetchOverview = useCallback(async (expeditionId = selectedExpedition, silent = false) => {
     if (!silent) setLoading(l => ({ ...l, overview: true }));
@@ -74,6 +79,14 @@ export const MedicalProvider = ({ children }) => {
         if (Array.isArray(res.alerts)) setAlerts(res.alerts);
         if (Array.isArray(res.expeditions) && res.expeditions.length > 0) {
           setExpeditions(res.expeditions);
+          // Auto-select the first (most recent) expedition if nothing selected yet
+          _setSelectedExpedition(prev => {
+            if (!prev || prev === '') {
+              const active = res.expeditions.find(e => e.status === 'ACTIVE') || res.expeditions[0];
+              return active?.expeditionCode || prev;
+            }
+            return prev;
+          });
         }
         return res;
       }

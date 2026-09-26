@@ -242,8 +242,14 @@ export const getAllExpeditions = async (req, res) => {
     try {
         let expeditions = await Expedition.find()
             .populate("stations.stationId", "name code stationType")
-            .populate("leadership.expeditionLeader", "userId")
-            .populate("leadership.deputyLeader", "userId")
+            .populate({
+                path: "leadership.expeditionLeader",
+                populate: { path: "userId", select: "name employeeId email role designation" }
+            })
+            .populate({
+                path: "leadership.deputyLeader",
+                populate: { path: "userId", select: "name employeeId email role designation" }
+            })
             .populate("leadership.logisticsLead", "userId")
             .populate("leadership.medicalOfficer", "userId")
             .sort({ createdAt: -1 });
@@ -317,7 +323,10 @@ export const createExpedition = async (req, res) => {
 
         const populated = await Expedition.findById(exp._id)
             .populate("stations.stationId", "name code")
-            .populate("leadership.expeditionLeader", "userId");
+            .populate({
+                path: "leadership.expeditionLeader",
+                populate: { path: "userId", select: "name employeeId email role designation" }
+            });
 
         return res.status(201).json({ success: true, message: "Expedition created successfully", expedition: populated });
     } catch (error) {
@@ -331,9 +340,18 @@ export const updateExpedition = async (req, res) => {
         const { id } = req.params;
         const updates = req.body;
 
-        const exp = await Expedition.findByIdAndUpdate(id, updates, { new: true, runValidators: true })
+        const exp = await Expedition.findByIdAndUpdate(id, updates, { returnDocument: 'after', runValidators: true })
             .populate("stations.stationId", "name code stationType")
-            .populate("personnel.personnelId", "userId")
+            .populate({
+                path: "leadership.expeditionLeader",
+                populate: { path: "userId", select: "name employeeId email role designation" }
+            })
+            .populate({
+                path: "leadership.deputyLeader",
+                populate: { path: "userId", select: "name employeeId email role designation" }
+            })
+            .populate("leadership.logisticsLead", "userId")
+            .populate("leadership.medicalOfficer", "userId");
         if (!exp) return res.status(404).json({ success: false, message: "Expedition not found" });
 
         return res.status(200).json({ success: true, message: "Expedition updated", expedition: exp });
@@ -386,14 +404,8 @@ export const nominatePersonnelToExpedition = async (req, res) => {
 
         const results = [];
         for (const p of resolvedPersonnel) {
-            // Nomination only registers the candidate — no medical/training records are force-created here.
+            // Nomination only registers the candidate — medical and training records must always start as PENDING for this expedition.
             // Medical assessments and training clearances are initiated later by the respective officers.
-            const existingMed = await MedicalAssessment.findOne({ personnelId: p._id, expeditionId: exp._id });
-            const existingTrain = await Training.findOne({ personnelId: p._id, expeditionId: exp._id });
-
-            const medStatus = existingMed?.clearance?.status || "PENDING";
-            const trainStatus = existingTrain?.overallStatus || "PENDING";
-
             const candidateDoc = await ExpeditionPersonnel.findOneAndUpdate(
                 { expeditionId: exp._id, personnelId: p._id },
                 {
@@ -402,15 +414,15 @@ export const nominatePersonnelToExpedition = async (req, res) => {
                         assignedStation: defaultStationId || p.expedition?.assignedStation || null,
                         nominatedBy: req.user?._id || null,
                         nominatedAt: new Date(),
-                        medicalStatus: medStatus,
-                        medicalRestrictions: existingMed?.clearance?.restrictions || [],
-                        medicalRemarks: existingMed?.clearance?.remarks || "",
-                        trainingStatus: trainStatus,
+                        medicalStatus: "PENDING",
+                        medicalRestrictions: [],
+                        medicalRemarks: "",
+                        trainingStatus: "PENDING",
                         status: "NOMINATED",
                         remarks: remarks || "Candidate nominated for expedition"
                     }
                 },
-                { upsert: true, new: true, setDefaultsOnInsert: true }
+                { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true }
             );
 
             results.push(candidateDoc);
@@ -457,21 +469,22 @@ export const getExpeditionCandidates = async (req, res) => {
             .sort({ createdAt: -1 });
 
         const pIds = rawCandidates.map(c => c.personnelId?._id).filter(Boolean);
+        // Strictly query assessments and trainings for THIS expedition
         const [assessments, trainings] = await Promise.all([
-            MedicalAssessment.find({ expeditionId: exp._id, personnelId: { $in: pIds } }).lean(),
-            Training.find({ expeditionId: exp._id, personnelId: { $in: pIds } }).lean()
+            MedicalAssessment.find({ expeditionId: exp._id, personnelId: { $in: pIds } }).sort({ updatedAt: -1 }).lean(),
+            Training.find({ expeditionId: exp._id, personnelId: { $in: pIds } }).sort({ updatedAt: -1 }).lean()
         ]);
 
         const assessmentMap = new Map();
         assessments.forEach(a => {
             const pid = a.personnelId?.toString();
-            if (pid) assessmentMap.set(pid, a);
+            if (pid && !assessmentMap.has(pid)) assessmentMap.set(pid, a);
         });
 
         const trainingMap = new Map();
         trainings.forEach(t => {
             const pid = t.personnelId?.toString();
-            if (pid) trainingMap.set(pid, t);
+            if (pid && !trainingMap.has(pid)) trainingMap.set(pid, t);
         });
 
         const candidates = [];
@@ -486,10 +499,13 @@ export const getExpeditionCandidates = async (req, res) => {
             const med = pid ? assessmentMap.get(pid) : null;
             const trn = pid ? trainingMap.get(pid) : null;
 
-            const liveMedStatus = med?.clearance?.status || c.medicalStatus || "PENDING";
+            // Strict per-expedition clearance status:
+            // Medical is only FIT/RESTRICTED/NOT_FIT if an explicit MedicalAssessment exists for this expedition
+            const liveMedStatus = med?.clearance?.status || (c.medicalStatus === "NOT_FIT" ? "NOT_FIT" : "PENDING");
             const liveMedRestrictions = med?.clearance?.restrictions || c.medicalRestrictions || [];
             const liveMedRemarks = med?.clearance?.remarks || c.medicalRemarks || "";
-            const liveTrainStatus = trn?.overallStatus || c.trainingStatus || "PENDING";
+            // Training is only COMPLETED if TrainingClearance exists for this expedition and is COMPLETED
+            const liveTrainStatus = trn?.overallStatus || "PENDING";
 
             let derivedStatus = c.status;
             if (c.status !== "CONFIRMED" && c.status !== "REJECTED") {
@@ -584,12 +600,12 @@ export const confirmExpeditionCandidate = async (req, res) => {
         }
 
         const [medDoc, trainDoc] = await Promise.all([
-            MedicalAssessment.findOne({ expeditionId: exp._id, personnelId: candidate.personnelId._id }),
-            Training.findOne({ expeditionId: exp._id, personnelId: candidate.personnelId._id })
+            MedicalAssessment.findOne({ expeditionId: exp._id, personnelId: candidate.personnelId._id }).sort({ updatedAt: -1 }),
+            Training.findOne({ expeditionId: exp._id, personnelId: candidate.personnelId._id }).sort({ updatedAt: -1 })
         ]);
 
-        const medicalStatus = medDoc?.clearance?.status || candidate.medicalStatus;
-        const trainingStatus = trainDoc?.overallStatus || candidate.trainingStatus;
+        const medicalStatus = medDoc?.clearance?.status || "PENDING";
+        const trainingStatus = trainDoc?.overallStatus || "PENDING";
 
         // Rule 1: NOT_FIT prevents final assignment
         if (medicalStatus === "NOT_FIT") {

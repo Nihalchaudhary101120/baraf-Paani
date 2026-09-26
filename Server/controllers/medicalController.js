@@ -304,7 +304,7 @@ export const getPersonnelMedicalRoster = async (req, res) => {
                     { path: "expedition.assignedStation", select: "name code" }
                 ]
             })
-            .populate("expeditionId", "expeditionCode missionTitle season year")
+            .populate("expeditionId", "expeditionCode missionTitle season year status")
             .populate("assignedStation", "name code")
             .lean();
 
@@ -312,41 +312,48 @@ export const getPersonnelMedicalRoster = async (req, res) => {
             c.personnelId?._id || c.personnelId
         ).filter(Boolean);
 
-        const assessments = await MedicalAssessment.find(
-            resolvedExpId
-                ? { expeditionId: resolvedExpId }
-                : { personnelId: { $in: personnelIds } }
-        )
+        // Always query by personnelId so we find assessments even when expeditionId differs
+        const assessments = await MedicalAssessment.find({
+            personnelId: { $in: personnelIds }
+        })
             .populate("expeditionId", "expeditionCode")
             .populate("examiningOfficer", "name employeeId")
+            .sort({ updatedAt: -1 })
             .lean();
 
-        const trainings = await TrainingClearance.find(
-            resolvedExpId
-                ? { expeditionId: resolvedExpId }
-                : { personnelId: { $in: personnelIds } }
-        ).lean();
+        const trainings = await TrainingClearance.find({
+            personnelId: { $in: personnelIds }
+        })
+            .sort({ updatedAt: -1 })
+            .lean();
 
         // Build composite records from nominated candidates
         const roster = candidates.map(cand => {
             const p = cand.personnelId || {};
             const pId = (p._id || cand.personnelId)?.toString();
+            const expDoc = cand.expeditionId || {};
 
             const pAssessments = assessments.filter(a =>
                 (a.personnelId?._id || a.personnelId)?.toString() === pId
             );
+            // Strictly match assessment for this expedition
             const currentAssessment = resolvedExpId
-                ? pAssessments.find(a => (a.expeditionId?._id || a.expeditionId)?.toString() === resolvedExpId.toString()) || pAssessments[0]
-                : pAssessments[0];
+                ? pAssessments.find(a => (a.expeditionId?._id || a.expeditionId)?.toString() === resolvedExpId.toString()) || null
+                : pAssessments[0] || null;
 
             const pTrainings = trainings.filter(t =>
                 (t.personnelId?._id || t.personnelId)?.toString() === pId
             );
+            // Strictly match training for this expedition
             const currentTraining = resolvedExpId
-                ? pTrainings.find(t => (t.expeditionId?._id || t.expeditionId)?.toString() === resolvedExpId.toString()) || pTrainings[0]
-                : pTrainings[0];
+                ? pTrainings.find(t => (t.expeditionId?._id || t.expeditionId)?.toString() === resolvedExpId.toString()) || null
+                : pTrainings[0] || null;
 
             const userInfo = p.userId || {};
+
+            // Accurate per-expedition statuses
+            const medStatus = currentAssessment?.clearance?.status || (cand.medicalStatus === "NOT_FIT" ? "NOT_FIT" : "PENDING");
+            const trainStatus = currentTraining?.overallStatus || "PENDING";
 
             return {
                 candidateId: cand._id,
@@ -366,14 +373,16 @@ export const getPersonnelMedicalRoster = async (req, res) => {
                 },
                 passport: p.passport || {},
                 expedition: {
-                    ...(p.expedition || {}),
+                    expeditionId: expDoc,
+                    expeditionCode: expDoc.expeditionCode || "",
+                    season: expDoc.season || cand.participationType || "",
                     assignedStation: cand.assignedStation || p.expedition?.assignedStation || null
                 },
                 previousExpeditions: p.previousExpeditions || [],
                 medicalAssessment: currentAssessment || null,
-                medicalStatus: currentAssessment?.clearance?.status || cand.medicalStatus || "PENDING",
+                medicalStatus: medStatus,
                 trainingClearance: currentTraining || null,
-                trainingStatus: currentTraining?.overallStatus || cand.trainingStatus || "PENDING",
+                trainingStatus: trainStatus,
                 lastExaminationDate: currentAssessment?.examinationDate || null
             };
         });
@@ -497,6 +506,40 @@ export const getPersonnelMedicalHistory = async (req, res) => {
 
 // =====================================================
 // CREATE MEDICAL ASSESSMENT
+// Helper to sync ExpeditionPersonnel medical status
+const syncExpeditionPersonnelMedicalStatus = async (personnelId, clearance, targetExpId = null) => {
+    try {
+        if (!personnelId) return;
+        const medStatus = clearance?.status || "PENDING";
+        const medRestrictions = clearance?.restrictions || [];
+        const medRemarks = clearance?.remarks || "";
+
+        const query = { personnelId };
+        if (targetExpId) {
+            query.expeditionId = targetExpId;
+        }
+
+        const candidates = await ExpeditionPersonnel.find(query);
+        for (const cand of candidates) {
+            cand.medicalStatus = medStatus;
+            cand.medicalRestrictions = medRestrictions;
+            cand.medicalRemarks = medRemarks;
+            if (cand.status !== "CONFIRMED" && cand.status !== "REJECTED") {
+                if ((medStatus === "FIT" || medStatus === "FIT_WITH_RESTRICTIONS") && cand.trainingStatus === "COMPLETED") {
+                    cand.status = "READY_FOR_CONFIRMATION";
+                } else {
+                    cand.status = "NOMINATED";
+                }
+            }
+            await cand.save();
+        }
+    } catch (err) {
+        console.error("Error syncing ExpeditionPersonnel medical status:", err);
+    }
+};
+
+// =====================================================
+// CREATE MEDICAL ASSESSMENT
 // =====================================================
 export const createMedicalAssessment = async (req, res) => {
     try {
@@ -541,7 +584,7 @@ export const createMedicalAssessment = async (req, res) => {
         const officerId = req.user?.userId || req.user?._id || personnel.userId;
 
         if (assessment) {
-            // Update existing
+            // Update existing assessment for this expedition
             if (examinationDate) assessment.examinationDate = examinationDate;
             if (physical) assessment.physical = physical;
             if (medicalHistory) assessment.medicalHistory = medicalHistory;
@@ -552,26 +595,8 @@ export const createMedicalAssessment = async (req, res) => {
             if (officerId) assessment.examiningOfficer = officerId;
             await assessment.save();
 
-            // Sync ExpeditionPersonnel
-            if (targetExpId) {
-                const medStatus = clearance?.status || assessment.clearance?.status || "PENDING";
-                const medRestrictions = clearance?.restrictions || assessment.clearance?.restrictions || [];
-                const medRemarks = clearance?.remarks || assessment.clearance?.remarks || "";
-                const cand = await ExpeditionPersonnel.findOne({ expeditionId: targetExpId, personnelId });
-                if (cand) {
-                    cand.medicalStatus = medStatus;
-                    cand.medicalRestrictions = medRestrictions;
-                    cand.medicalRemarks = medRemarks;
-                    if (cand.status !== "CONFIRMED" && cand.status !== "REJECTED") {
-                        if ((medStatus === "FIT" || medStatus === "FIT_WITH_RESTRICTIONS") && cand.trainingStatus === "COMPLETED") {
-                            cand.status = "READY_FOR_CONFIRMATION";
-                        } else {
-                            cand.status = "NOMINATED";
-                        }
-                    }
-                    await cand.save();
-                }
-            }
+            // Sync ExpeditionPersonnel for this expedition
+            await syncExpeditionPersonnelMedicalStatus(personnelId, assessment.clearance, targetExpId);
 
             return res.status(200).json({
                 success: true,
@@ -593,26 +618,8 @@ export const createMedicalAssessment = async (req, res) => {
             clearance: clearance || { status: "PENDING" }
         });
 
-        // Sync ExpeditionPersonnel
-        if (targetExpId) {
-            const medStatus = clearance?.status || "PENDING";
-            const medRestrictions = clearance?.restrictions || [];
-            const medRemarks = clearance?.remarks || "";
-            const cand = await ExpeditionPersonnel.findOne({ expeditionId: targetExpId, personnelId });
-            if (cand) {
-                cand.medicalStatus = medStatus;
-                cand.medicalRestrictions = medRestrictions;
-                cand.medicalRemarks = medRemarks;
-                if (cand.status !== "CONFIRMED" && cand.status !== "REJECTED") {
-                    if ((medStatus === "FIT" || medStatus === "FIT_WITH_RESTRICTIONS") && cand.trainingStatus === "COMPLETED") {
-                        cand.status = "READY_FOR_CONFIRMATION";
-                    } else {
-                        cand.status = "NOMINATED";
-                    }
-                }
-                await cand.save();
-            }
-        }
+        // Sync ExpeditionPersonnel for this expedition
+        await syncExpeditionPersonnelMedicalStatus(personnelId, assessment.clearance, targetExpId);
 
         return res.status(201).json({
             success: true,
@@ -704,6 +711,9 @@ export const updateMedicalAssessment = async (req, res) => {
         }
         await assessment.save();
 
+        // Sync ExpeditionPersonnel
+        await syncExpeditionPersonnelMedicalStatus(assessment.personnelId, assessment.clearance, assessment.expeditionId);
+
         return res.status(200).json({
             success: true,
             message: "Medical assessment updated successfully",
@@ -770,25 +780,7 @@ export const updateClearance = async (req, res) => {
         await assessment.save();
 
         // Sync ExpeditionPersonnel
-        if (assessment.expeditionId && assessment.personnelId) {
-            const cand = await ExpeditionPersonnel.findOne({
-                expeditionId: assessment.expeditionId,
-                personnelId: assessment.personnelId
-            });
-            if (cand) {
-                cand.medicalStatus = status;
-                cand.medicalRestrictions = restrictions || [];
-                cand.medicalRemarks = remarks || "";
-                if (cand.status !== "CONFIRMED" && cand.status !== "REJECTED") {
-                    if ((status === "FIT" || status === "FIT_WITH_RESTRICTIONS") && cand.trainingStatus === "COMPLETED") {
-                        cand.status = "READY_FOR_CONFIRMATION";
-                    } else {
-                        cand.status = "NOMINATED";
-                    }
-                }
-                await cand.save();
-            }
-        }
+        await syncExpeditionPersonnelMedicalStatus(assessment.personnelId, assessment.clearance, assessment.expeditionId);
 
         return res.status(200).json({
             success: true,

@@ -412,7 +412,7 @@ const NominatePersonnelModal = ({ expedition, allPersonnel, stations, existingCa
                 const isSelected = selected.includes(id);
 
                 return (
-                  <tr key={id || i}
+                  <tr key={id ? `nom-pool-${id}-${i}` : `nom-pool-${i}`}
                     onClick={() => !isAlreadyCandidate && toggle(id)}
                     style={{
                       borderBottom: '1px solid #F1F5F9',
@@ -610,6 +610,35 @@ const ExpeditionDetailPanel = ({ expedition, allPersonnel, stations, onClose, on
   const [removingId, setRemovingId] = useState(null);
   const [reviewCandidate, setReviewCandidate] = useState(null);
   const [selectedTrainingCandidate, setSelectedTrainingCandidate] = useState(null);
+
+  // Leader Appointment State
+  const [currentLeaderId, setCurrentLeaderId] = useState(
+    expedition.leadership?.expeditionLeader?._id || expedition.leadership?.expeditionLeader || null
+  );
+  const [settingLeaderId, setSettingLeaderId] = useState(null);
+
+  useEffect(() => {
+    setCurrentLeaderId(
+      expedition.leadership?.expeditionLeader?._id || expedition.leadership?.expeditionLeader || null
+    );
+  }, [expedition]);
+
+  const handleSetExpeditionLeader = async (personnelId) => {
+    if (!personnelId || !expedition?._id) return;
+    setSettingLeaderId(personnelId);
+    try {
+      await updateExpeditionApi(expedition._id, {
+        "leadership.expeditionLeader": personnelId
+      });
+      setCurrentLeaderId(personnelId);
+      if (onRefresh) onRefresh();
+    } catch (err) {
+      console.error('Failed to set expedition leader:', err);
+      alert('Failed to set expedition leader: ' + (err.response?.data?.message || err.message));
+    } finally {
+      setSettingLeaderId(null);
+    }
+  };
 
   const statusCfg = STATUS_CONFIG[expedition.status] || STATUS_CONFIG.PLANNING;
   const stationNames = expedition.stations?.map(s => s.stationId?.name || s.stationId?.code || '—').join(', ') || 'Not configured';
@@ -915,7 +944,7 @@ const ExpeditionDetailPanel = ({ expedition, allPersonnel, stations, onClose, on
                             const isPending = med === 'PENDING' || trn === 'PENDING' || trn === 'PARTIAL';
 
                             return (
-                              <tr key={c._id || i} style={{ borderBottom: '1px solid #F1F5F9', backgroundColor: isReady ? '#f0fdf4' : isNotFit ? '#fef2f2' : i % 2 === 0 ? '#fff' : '#fafafa' }}>
+                              <tr key={c._id ? `nom-${c._id}-${i}` : `nom-${i}`} style={{ borderBottom: '1px solid #F1F5F9', backgroundColor: isReady ? '#f0fdf4' : isNotFit ? '#fef2f2' : i % 2 === 0 ? '#fff' : '#fafafa' }}>
                                 {/* Candidate */}
                                 <td style={{ padding: '0.55rem 0.75rem' }}>
                                   <div style={{ fontWeight: 700, color: '#0F172A' }}>{name}</div>
@@ -1056,32 +1085,55 @@ const ExpeditionDetailPanel = ({ expedition, allPersonnel, stations, onClose, on
                   )}
                 </div>
 
-                {/* SECTION 2: CONFIRMED EXPEDITION ROSTER */}
+                {/* SECTION 2: CONFIRMED EXPEDITION ROSTER & LEADER APPOINTMENT */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                       <span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#15803d' }}>verified</span>
                       <h4 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 800, color: '#0F172A', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                         2. Confirmed Expedition Roster ({confirmedRoster.length})
                       </h4>
                     </div>
-                    <span style={{ fontSize: '0.72rem', color: '#64748B' }}>
-                      Official team roster cleared & approved by HQ Command.
-                    </span>
+
+                    {/* Appointed Leader Banner Indicator */}
+                    {(() => {
+                      const leaderMember = confirmedRoster.find(c => {
+                        const pid = c.personnelId?._id || c.personnelId;
+                        return currentLeaderId && (currentLeaderId.toString() === pid?.toString());
+                      });
+                      const leaderName = leaderMember
+                        ? (leaderMember.personnelId?.name || leaderMember.personnelId?.userId?.name || 'Assigned Leader')
+                        : (expedition.leadership?.expeditionLeader?.userId?.name || expedition.leadership?.expeditionLeader?.name || null);
+
+                      return leaderName ? (
+                        <div style={{
+                          display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
+                          backgroundColor: '#fef3c7', border: '1px solid #fde68a', borderRadius: '6px',
+                          padding: '0.25rem 0.65rem', fontSize: '0.72rem', fontWeight: 800, color: '#b45309'
+                        }}>
+                          <span className="material-symbols-outlined" style={{ fontSize: '16px', color: '#d97706' }}>military_tech</span>
+                          Appointed Leader: <strong style={{ color: '#78350f' }}>{leaderName}</strong>
+                        </div>
+                      ) : (
+                        <span style={{ fontSize: '0.72rem', color: '#64748B' }}>
+                          Select an official Expedition Leader from confirmed members below.
+                        </span>
+                      );
+                    })()}
                   </div>
 
                   {confirmedRoster.length === 0 ? (
                     <div style={{ padding: '2rem', textAlign: 'center', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px dashed #CBD5E1', color: '#94a3b8' }}>
                       <span className="material-symbols-outlined" style={{ fontSize: '32px', display: 'block', marginBottom: '0.35rem' }}>badge</span>
                       <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>No Personnel Confirmed Yet</div>
-                      <div style={{ fontSize: '0.75rem', marginTop: '0.2rem' }}>Candidates who pass medical & training clearance can be confirmed above.</div>
+                      <div style={{ fontSize: '0.75rem', marginTop: '0.2rem' }}>Candidates who pass both medical & polar training clearance can be confirmed above.</div>
                     </div>
                   ) : (
                     <div style={{ border: '1px solid #86efac', borderRadius: '8px', overflow: 'hidden' }}>
                       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem' }}>
                         <thead style={{ backgroundColor: '#f0fdf4', borderBottom: '1px solid #86efac' }}>
                           <tr>
-                            {['Member Name', 'Role', 'Assigned Station', 'Medical Clearance', 'Training', 'Confirmed Date', 'Status'].map(h => (
+                            {['Member Name', 'Role', 'Assigned Station', 'Medical Clearance', 'Training', 'Confirmed Date', 'Expedition Designation', 'Leader Appoint'].map(h => (
                               <th key={h} style={{ padding: '0.55rem 0.75rem', textAlign: 'left', fontWeight: 700, color: '#15803d', fontSize: '0.68rem', textTransform: 'uppercase' }}>{h}</th>
                             ))}
                           </tr>
@@ -1089,20 +1141,32 @@ const ExpeditionDetailPanel = ({ expedition, allPersonnel, stations, onClose, on
                         <tbody>
                           {confirmedRoster.map((c, i) => {
                             const p = c.personnelId || {};
+                            const pId = p._id || c.personnelId?._id || c.personnelId;
                             const name = p.name || p.userId?.name || '—';
                             const empId = p.employeeId || p.userId?.employeeId || '—';
                             const role = p.role || p.userId?.role || '—';
                             const stationName = c.assignedStation?.name || p.expedition?.assignedStation?.name || p.station || 'Maitri';
                             const confirmedDate = c.confirmedAt ? new Date(c.confirmedAt).toLocaleDateString() : 'Confirmed';
+                            const isLeader = currentLeaderId && (currentLeaderId.toString() === pId?.toString());
 
                             return (
-                              <tr key={c._id || i} style={{ borderBottom: '1px solid #F1F5F9', backgroundColor: i % 2 === 0 ? '#fff' : '#fcfdfc' }}>
+                              <tr key={c._id ? `conf-${c._id}-${i}` : `conf-${i}`} style={{ borderBottom: '1px solid #F1F5F9', backgroundColor: isLeader ? '#fefce8' : i % 2 === 0 ? '#fff' : '#fcfdfc' }}>
+                                {/* Member Name */}
                                 <td style={{ padding: '0.55rem 0.75rem' }}>
-                                  <div style={{ fontWeight: 700, color: '#0F172A' }}>{name}</div>
+                                  <div style={{ fontWeight: 700, color: '#0F172A', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                                    {isLeader && <span className="material-symbols-outlined" style={{ fontSize: '16px', color: '#d97706' }}>star</span>}
+                                    {name}
+                                  </div>
                                   <div style={{ fontSize: '0.7rem', color: '#64748B', fontFamily: 'monospace' }}>{empId}</div>
                                 </td>
+
+                                {/* Role */}
                                 <td style={{ padding: '0.55rem 0.75rem', color: '#334155', fontWeight: 600 }}>{role}</td>
+
+                                {/* Station */}
                                 <td style={{ padding: '0.55rem 0.75rem', color: '#64748B' }}>{stationName} ({c.participationType || 'WINTER'})</td>
+
+                                {/* Medical Status */}
                                 <td style={{ padding: '0.55rem 0.75rem' }}>
                                   <span style={{
                                     display: 'inline-block', padding: '0.12rem 0.45rem', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 700,
@@ -1112,6 +1176,8 @@ const ExpeditionDetailPanel = ({ expedition, allPersonnel, stations, onClose, on
                                     {c.medicalStatus === 'FIT' ? '✔ FIT' : '⚠ RESTRICTED'}
                                   </span>
                                 </td>
+
+                                {/* Training Status */}
                                 <td style={{ padding: '0.55rem 0.75rem' }}>
                                   <span style={{
                                     display: 'inline-block', padding: '0.12rem 0.45rem', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 700,
@@ -1120,11 +1186,50 @@ const ExpeditionDetailPanel = ({ expedition, allPersonnel, stations, onClose, on
                                     ✔ COMPLETED
                                   </span>
                                 </td>
+
+                                {/* Confirmed Date */}
                                 <td style={{ padding: '0.55rem 0.75rem', color: '#64748B', fontSize: '0.72rem' }}>{confirmedDate}</td>
+
+                                {/* Expedition Role / Leader Badge */}
                                 <td style={{ padding: '0.55rem 0.75rem' }}>
-                                  <span style={{ padding: '0.15rem 0.5rem', borderRadius: '99px', fontSize: '0.68rem', fontWeight: 800, backgroundColor: '#dcfce7', color: '#15803d' }}>
-                                    OFFICIAL ROSTER
-                                  </span>
+                                  {isLeader ? (
+                                    <span style={{
+                                      display: 'inline-flex', alignItems: 'center', gap: '0.25rem',
+                                      padding: '0.2rem 0.55rem', borderRadius: '99px', fontSize: '0.68rem', fontWeight: 800,
+                                      backgroundColor: '#fef3c7', color: '#b45309', border: '1px solid #fde68a'
+                                    }}>
+                                      👑 EXPEDITION LEADER
+                                    </span>
+                                  ) : (
+                                    <span style={{ padding: '0.15rem 0.5rem', borderRadius: '99px', fontSize: '0.68rem', fontWeight: 700, backgroundColor: '#dcfce7', color: '#15803d' }}>
+                                      EXPEDITION MEMBER
+                                    </span>
+                                  )}
+                                </td>
+
+                                {/* Leader Selection Action */}
+                                <td style={{ padding: '0.55rem 0.75rem' }}>
+                                  {isLeader ? (
+                                    <span style={{ fontSize: '0.72rem', color: '#059669', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>
+                                      <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>verified</span> Appointed
+                                    </span>
+                                  ) : (
+                                    <button
+                                      onClick={() => handleSetExpeditionLeader(pId)}
+                                      disabled={settingLeaderId === pId}
+                                      title="Designate this confirmed personnel as Expedition Leader"
+                                      style={{
+                                        display: 'inline-flex', alignItems: 'center', gap: '0.25rem',
+                                        padding: '0.25rem 0.55rem', backgroundColor: '#005B7F', color: '#fff',
+                                        border: 'none', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 700,
+                                        cursor: settingLeaderId === pId ? 'not-allowed' : 'pointer',
+                                        boxShadow: '0 1px 2px rgba(0,91,127,0.2)'
+                                      }}
+                                    >
+                                      <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>military_tech</span>
+                                      {settingLeaderId === pId ? 'Appointing...' : 'Appoint as Leader'}
+                                    </button>
+                                  )}
                                 </td>
                               </tr>
                             );
@@ -1186,7 +1291,7 @@ const ExpeditionDetailPanel = ({ expedition, allPersonnel, stations, onClose, on
                           const med = c.medicalStatus || 'PENDING';
 
                           return (
-                            <tr key={c._id || i} style={{ borderBottom: '1px solid #F1F5F9', backgroundColor: trn === 'COMPLETED' ? '#f0fdf4' : i % 2 === 0 ? '#fff' : '#fafafa' }}>
+                            <tr key={c._id ? `clr-${c._id}-${i}` : `clr-${i}`} style={{ borderBottom: '1px solid #F1F5F9', backgroundColor: trn === 'COMPLETED' ? '#f0fdf4' : i % 2 === 0 ? '#fff' : '#fafafa' }}>
                               <td style={{ padding: '0.65rem 0.85rem' }}>
                                 <div style={{ fontWeight: 700, color: '#0F172A' }}>{name}</div>
                                 <div style={{ fontSize: '0.7rem', color: '#64748B', fontFamily: 'monospace' }}>{empId}</div>
@@ -1371,7 +1476,6 @@ const CreateExpeditionModal = ({ onClose, onCreated, stations, personnel }) => {
     startDate: '',
     endDate: '',
     stationIds: [],
-    expeditionLeaderId: '',
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
@@ -1528,22 +1632,6 @@ const CreateExpeditionModal = ({ onClose, onCreated, stations, personnel }) => {
                 })}
               </div>
             )}
-          </div>
-
-          <SectionDivider label="Expedition Leadership" />
-
-          {/* Expedition Leader */}
-          <div>
-            <label style={LABEL_STYLE}>Expedition Leader</label>
-            <select value={form.expeditionLeaderId} onChange={e => set('expeditionLeaderId', e.target.value)}
-              style={{ ...INPUT_STYLE, backgroundColor: '#fff', cursor: 'pointer' }}>
-              <option value="">— Select Personnel —</option>
-              {personnel.map(p => {
-                const name = p.name || p.userId?.name || 'Unknown';
-                const empId = p.employeeId || p.userId?.employeeId || '';
-                return <option key={p._id} value={p._id}>{name} {empId ? `(${empId})` : ''}</option>;
-              })}
-            </select>
           </div>
 
           {/* Actions */}

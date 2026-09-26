@@ -110,56 +110,56 @@ export default function MedicalOfficerDashboard() {
   // Open Examination / Assessment Modal
   const handleOpenExamination = (personnelItem) => {
     setSelectedPersonnel(personnelItem);
-    const existing = personnelItem.medicalAssessment || {};
+    const existing = personnelItem.medicalAssessment || null;
 
     setAssessmentForm({
-      personnelId: personnelItem.personnelId,
+      personnelId: personnelItem.personnelId?._id || personnelItem.personnelId,
       expeditionId: personnelItem.expedition?.expeditionId?._id || selectedExpedition,
-      formCode: existing.formCode || 'AL-2205',
-      examinationDate: existing.examinationDate ? new Date(existing.examinationDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+      formCode: existing?.formCode || 'AL-2205',
+      examinationDate: existing?.examinationDate ? new Date(existing.examinationDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
       physical: {
-        heightCm: existing.physical?.heightCm || 175,
-        weightKg: existing.physical?.weightKg || 70,
-        bloodPressure: existing.physical?.bloodPressure || '120/80',
-        pulseRate: existing.physical?.pulseRate || 72,
-        oxygenSaturation: existing.physical?.oxygenSaturation || 99,
-        chestMeasurementCm: existing.physical?.chestMeasurementCm || 95,
+        heightCm: existing?.physical?.heightCm || 176,
+        weightKg: existing?.physical?.weightKg || 74,
+        bloodPressure: existing?.physical?.bloodPressure || '120/80',
+        pulseRate: existing?.physical?.pulseRate || 72,
+        oxygenSaturation: existing?.physical?.oxygenSaturation || 98,
+        chestMeasurementCm: existing?.physical?.chestMeasurementCm || 96,
         vision: {
-          leftEye: existing.physical?.vision?.leftEye || '6/6',
-          rightEye: existing.physical?.vision?.rightEye || '6/6'
+          leftEye: existing?.physical?.vision?.leftEye || '6/6',
+          rightEye: existing?.physical?.vision?.rightEye || '6/6'
         },
-        hearing: existing.physical?.hearing || 'Normal bilaterally'
+        hearing: existing?.physical?.hearing || 'Normal (Audiometry Cleared)'
       },
       medicalHistory: {
-        allergies: existing.medicalHistory?.allergies?.join(', ') || 'None',
-        chronicDiseases: existing.medicalHistory?.chronicDiseases?.join(', ') || 'None',
-        previousSurgeries: existing.medicalHistory?.previousSurgeries?.join(', ') || 'None',
-        currentMedications: existing.medicalHistory?.currentMedications?.join(', ') || 'None'
+        allergies: existing?.medicalHistory?.allergies?.length ? (Array.isArray(existing.medicalHistory.allergies) ? existing.medicalHistory.allergies.join(', ') : existing.medicalHistory.allergies) : 'None',
+        chronicDiseases: existing?.medicalHistory?.chronicDiseases?.length ? (Array.isArray(existing.medicalHistory.chronicDiseases) ? existing.medicalHistory.chronicDiseases.join(', ') : existing.medicalHistory.chronicDiseases) : 'None',
+        previousSurgeries: existing?.medicalHistory?.previousSurgeries?.length ? (Array.isArray(existing.medicalHistory.previousSurgeries) ? existing.medicalHistory.previousSurgeries.join(', ') : existing.medicalHistory.previousSurgeries) : 'None',
+        currentMedications: existing?.medicalHistory?.currentMedications?.length ? (Array.isArray(existing.medicalHistory.currentMedications) ? existing.medicalHistory.currentMedications.join(', ') : existing.medicalHistory.currentMedications) : 'None'
       },
       vaccinations: {
-        tetanus: existing.vaccinations?.tetanus ?? true,
-        hepatitisA: existing.vaccinations?.hepatitisA ?? true,
-        hepatitisB: existing.vaccinations?.hepatitisB ?? true,
-        influenza: existing.vaccinations?.influenza ?? true,
-        covid19: existing.vaccinations?.covid19 ?? true,
-        others: existing.vaccinations?.others?.join(', ') || ''
+        tetanus: existing?.vaccinations?.tetanus ?? true,
+        hepatitisA: existing?.vaccinations?.hepatitisA ?? true,
+        hepatitisB: existing?.vaccinations?.hepatitisB ?? true,
+        influenza: existing?.vaccinations?.influenza ?? true,
+        covid19: existing?.vaccinations?.covid19 ?? true,
+        others: existing?.vaccinations?.others?.length ? (Array.isArray(existing.vaccinations.others) ? existing.vaccinations.others.join(', ') : existing.vaccinations.others) : 'Yellow Fever'
       },
       laboratoryTests: {
-        bloodGroup: existing.laboratoryTests?.bloodGroup || 'O+',
-        hemoglobin: existing.laboratoryTests?.hemoglobin || 14.5,
-        bloodSugar: existing.laboratoryTests?.bloodSugar || 90,
-        ecgStatus: existing.laboratoryTests?.ecgStatus || 'Normal Sinus Rhythm',
-        xrayStatus: existing.laboratoryTests?.xrayStatus || 'Clear chest radiograph'
+        bloodGroup: existing?.laboratoryTests?.bloodGroup || 'O+',
+        hemoglobin: existing?.laboratoryTests?.hemoglobin || 15.2,
+        bloodSugar: existing?.laboratoryTests?.bloodSugar || 92,
+        ecgStatus: existing?.laboratoryTests?.ecgStatus || 'Normal Sinus Rhythm',
+        xrayStatus: existing?.laboratoryTests?.xrayStatus || 'Normal (No active cardiopulmonary lesions)'
       },
       psychologicalAssessment: {
-        stressTolerance: existing.psychologicalAssessment?.stressTolerance || 'High',
-        isolationFitness: existing.psychologicalAssessment?.isolationFitness || 'Cleared for Antarctic isolation',
-        remarks: existing.psychologicalAssessment?.remarks || 'Good psychological fortitude'
+        stressTolerance: existing?.psychologicalAssessment?.stressTolerance || 'High',
+        isolationFitness: existing?.psychologicalAssessment?.isolationFitness || 'FIT for polar overwintering',
+        remarks: existing?.psychologicalAssessment?.remarks || 'Emotionally stable and cleared for Antarctic deployment.'
       },
       clearance: {
-        status: existing.clearance?.status || 'PENDING',
-        restrictions: existing.clearance?.restrictions || [],
-        remarks: existing.clearance?.remarks || 'Initial baseline examination in progress.'
+        status: existing?.clearance?.status || 'FIT',
+        restrictions: existing?.clearance?.restrictions || [],
+        remarks: existing?.clearance?.remarks || 'Medically fit for Polar deployment.'
       }
     });
 
@@ -338,7 +338,7 @@ export default function MedicalOfficerDashboard() {
             </select>
           </div>
 
-          <button
+          {/* <button
             onClick={() => {
               if (roster.length > 0) {
                 setCreateCandidateId(roster[0]?.personnelId || roster[0]?.personnelId?._id || '');
@@ -354,7 +354,7 @@ export default function MedicalOfficerDashboard() {
           >
             <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>add_circle</span>
             + Create Assessment Record
-          </button>
+          </button> */}
 
           <button
             onClick={handleRefresh}
@@ -372,39 +372,39 @@ export default function MedicalOfficerDashboard() {
       </div>
 
       {/* ── TOP-LEVEL STAT CARDS ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '0.9rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.9rem' }}>
         {/* Total Personnel */}
         <div style={{ backgroundColor: '#fff', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
           <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>Total Personnel</span>
-          <span style={{ fontSize: '1.8rem', fontWeight: 800, color: '#0F172A' }}>{overviewStats.totalPersonnel || 124}</span>
+          <span style={{ fontSize: '1.8rem', fontWeight: 800, color: '#0F172A' }}>{overviewStats.totalPersonnel ?? 0}</span>
           <span style={{ fontSize: '0.68rem', color: '#0284c7' }}>Roster enrolled</span>
         </div>
 
         {/* Pending Medical */}
         <div style={{ backgroundColor: '#fff', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.3rem', borderLeft: '4px solid #F59E0B' }}>
           <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#D97706', textTransform: 'uppercase' }}>Pending Medical</span>
-          <span style={{ fontSize: '1.8rem', fontWeight: 800, color: '#D97706' }}>{overviewStats.pendingMedical || 18}</span>
+          <span style={{ fontSize: '1.8rem', fontWeight: 800, color: '#D97706' }}>{overviewStats.pendingMedical ?? 0}</span>
           <span style={{ fontSize: '0.68rem', color: '#64748B' }}>Awaiting exam / review</span>
         </div>
 
         {/* Medically FIT */}
         <div style={{ backgroundColor: '#fff', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.3rem', borderLeft: '4px solid #10B981' }}>
           <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#059669', textTransform: 'uppercase' }}>Medically FIT</span>
-          <span style={{ fontSize: '1.8rem', fontWeight: 800, color: '#059669' }}>{overviewStats.medicallyFit || 96}</span>
+          <span style={{ fontSize: '1.8rem', fontWeight: 800, color: '#059669' }}>{overviewStats.medicallyFit ?? 0}</span>
           <span style={{ fontSize: '0.68rem', color: '#15803D' }}>Cleared for full duty</span>
         </div>
 
         {/* Restrictions */}
         <div style={{ backgroundColor: '#fff', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.3rem', borderLeft: '4px solid #E65A28' }}>
           <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#EA580C', textTransform: 'uppercase' }}>Restrictions</span>
-          <span style={{ fontSize: '1.8rem', fontWeight: 800, color: '#EA580C' }}>{overviewStats.restrictions || 7}</span>
+          <span style={{ fontSize: '1.8rem', fontWeight: 800, color: '#EA580C' }}>{overviewStats.restrictions ?? 0}</span>
           <span style={{ fontSize: '0.68rem', color: '#64748B' }}>Modified duty / inhaler</span>
         </div>
 
         {/* Not Fit */}
         <div style={{ backgroundColor: '#fff', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.3rem', borderLeft: '4px solid #EF4444' }}>
           <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#DC2626', textTransform: 'uppercase' }}>Not Fit</span>
-          <span style={{ fontSize: '1.8rem', fontWeight: 800, color: '#DC2626' }}>{overviewStats.notFit || 3}</span>
+          <span style={{ fontSize: '1.8rem', fontWeight: 800, color: '#DC2626' }}>{overviewStats.notFit ?? 0}</span>
           <span style={{ fontSize: '0.68rem', color: '#B91C1C' }}>Deployment contraindicated</span>
         </div>
       </div>
@@ -495,8 +495,10 @@ export default function MedicalOfficerDashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {roster.filter(p => p.medicalStatus === 'PENDING').slice(0, 4).map((p, i) => (
-                    <tr key={p.personnelId || i} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                  {roster.filter(p => p.medicalStatus === 'PENDING').slice(0, 4).map((p, i) => {
+                    const pKey = typeof p.personnelId === 'object' ? p.personnelId?._id : p.personnelId;
+                    return (
+                      <tr key={pKey ? `pend-${pKey}-${i}` : `pend-${i}`} style={{ borderBottom: '1px solid #f1f5f9' }}>
                       <td style={{ padding: '0.75rem 1rem', fontWeight: 600, color: '#0F172A' }}>{p.user?.name || 'Aman Verma'}</td>
                       <td style={{ padding: '0.75rem 1rem', color: '#64748B' }}>
                         <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#005B7F' }}>{p.user?.employeeId || 'NCP-1088'}</span> • {p.user?.role}
@@ -513,7 +515,8 @@ export default function MedicalOfficerDashboard() {
                         </button>
                       </td>
                     </tr>
-                  ))}
+                  );
+                })}
                   {roster.filter(p => p.medicalStatus === 'PENDING').length === 0 && (
                     <tr>
                       <td colSpan="6" style={{ padding: '2rem', textAlign: 'center', color: '#64748B' }}>
@@ -714,13 +717,15 @@ export default function MedicalOfficerDashboard() {
                 </tr>
               </thead>
               <tbody>
-                {filteredRoster.map((item, idx) => (
-                  <tr
-                    key={item.personnelId || idx}
-                    style={{ borderBottom: '1px solid #f1f5f9' }}
-                    onMouseEnter={e => e.currentTarget.style.backgroundColor = '#f8fafc'}
-                    onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
-                  >
+                {filteredRoster.map((item, idx) => {
+                  const pKey = typeof item.personnelId === 'object' ? item.personnelId?._id : item.personnelId;
+                  return (
+                    <tr
+                      key={pKey ? `rst-${pKey}-${idx}` : `rst-${idx}`}
+                      style={{ borderBottom: '1px solid #f1f5f9' }}
+                      onMouseEnter={e => e.currentTarget.style.backgroundColor = '#f8fafc'}
+                      onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                    >
                     {/* Name */}
                     <td style={{ padding: '0.85rem 1rem' }}>
                       <div style={{ fontWeight: 700, color: '#0F172A', fontSize: '0.85rem' }}>{item.user?.name || 'Rahul Sharma'}</div>
@@ -797,7 +802,8 @@ export default function MedicalOfficerDashboard() {
                       </div>
                     </td>
                   </tr>
-                ))}
+                );
+              })}
               </tbody>
             </table>
           </div>
@@ -1132,11 +1138,13 @@ export default function MedicalOfficerDashboard() {
                     </div>
                     <div>
                       <span style={{ fontSize: '0.72rem', color: '#64748B', fontWeight: 600 }}>EXPEDITION / SEASON</span>
-                      <div style={{ fontWeight: 700, color: '#0F172A' }}>EXP-47 ({selectedPersonnel.expedition?.participationType || 'WINTER'})</div>
+                      <div style={{ fontWeight: 700, color: '#0F172A' }}>
+                        {selectedPersonnel.expedition?.expeditionId?.expeditionCode || selectedExpedition} ({selectedPersonnel.participationType || selectedPersonnel.expedition?.participationType || 'WINTER'})
+                      </div>
                     </div>
                     <div>
                       <span style={{ fontSize: '0.72rem', color: '#64748B', fontWeight: 600 }}>ASSIGNED BASE</span>
-                      <div style={{ fontWeight: 700, color: '#005B7F' }}>{selectedPersonnel.expedition?.assignedStation?.name || 'Maitri'}</div>
+                      <div style={{ fontWeight: 700, color: '#005B7F' }}>{selectedPersonnel.expedition?.assignedStation?.name || '—'}</div>
                     </div>
                   </div>
 
@@ -1718,11 +1726,14 @@ export default function MedicalOfficerDashboard() {
                   style={{ padding: '0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.88rem', fontWeight: 600, backgroundColor: '#fff' }}
                 >
                   <option value="">— Select a candidate —</option>
-                  {nominatedCandidates.map(c => (
-                    <option key={c.personnelId} value={c.personnelId}>
-                      {c.user?.name} ({c.user?.employeeId || 'NCP'}) - {c.station?.name || c.expedition?.expeditionCode || 'N/A'} [{c.medicalStatus}]
-                    </option>
-                  ))}
+                  {nominatedCandidates.map((c, i) => {
+                    const pid = (typeof c.personnelId === 'object' ? c.personnelId?._id : c.personnelId) || c._id;
+                    return (
+                      <option key={pid ? `nom-opt-${pid}-${i}` : `nom-opt-${i}`} value={pid}>
+                        {c.user?.name || c.name || 'Candidate'} ({c.user?.employeeId || c.employeeId || 'NCP'}) - {c.station?.name || c.expedition?.expeditionCode || 'N/A'} [{c.medicalStatus}]
+                      </option>
+                    );
+                  })}
                 </select>
               )}
             </div>
