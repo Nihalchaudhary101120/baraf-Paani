@@ -139,9 +139,67 @@ const ALL_NAV_ITEMS = [
     path: '/dashboard/sos',
     icon: 'emergency',
     label: 'SOS / Emergency',
-    roles: ['HQ_COMMAND', 'STATION_COMMANDER', 'MEDICAL_OFFICER', 'SCIENTIST', 'STATION_OPERATOR'],
+    roles: ['HQ_COMMAND', 'STATION_COMMANDER', 'SCIENTIST', 'STATION_OPERATOR'],
     danger: true,
     section: 'Emergency',
+  },
+];
+
+const MEDICAL_OFFICER_NAV = [
+  {
+    path: '/dashboard',
+    icon: 'dashboard',
+    label: 'Dashboard',
+    section: 'MAIN',
+  },
+  {
+    path: '/dashboard?tab=personnel',
+    icon: 'group',
+    label: 'Personnel & Assessments',
+    section: 'PERSONNEL',
+  },
+  {
+    path: '/dashboard?tab=pending',
+    icon: 'pending_actions',
+    label: 'Pending Examinations',
+    section: 'PERSONNEL',
+  },
+  {
+    path: '/dashboard?tab=clearances',
+    icon: 'verified_user',
+    label: 'Medical Clearances',
+    section: 'CLEARANCE',
+  },
+  {
+    path: '/dashboard?tab=training',
+    icon: 'model_training',
+    label: 'Training Clearance',
+    section: 'CLEARANCE',
+  },
+  {
+    path: '/dashboard?tab=reports',
+    icon: 'summarize',
+    label: 'Medical Reports',
+    section: 'REPORTS',
+  },
+  {
+    path: '/dashboard?tab=history',
+    icon: 'history',
+    label: 'Medical History',
+    section: 'REPORTS',
+  },
+  {
+    path: '/dashboard?tab=alerts',
+    icon: 'crisis_alert',
+    label: 'Medical Alerts',
+    section: 'ALERTS',
+  },
+  {
+    path: '/dashboard/sos',
+    icon: 'emergency',
+    label: 'SOS / Emergency',
+    danger: true,
+    section: 'EMERGENCY',
   },
 ];
 
@@ -154,18 +212,25 @@ const DashboardLayout = () => {
 
   const userRole = user?.role || 'HQ_ADMIN';
 
-  // Filter navigation items specifically for the active user's role
-  const visibleNav = ALL_NAV_ITEMS.filter((item) =>
-    item.roles.includes(userRole)
-  );
+  // Dedicated navigation for Medical Officer vs Role-filtered for other roles
+  const visibleNav = userRole === 'MEDICAL_OFFICER'
+    ? MEDICAL_OFFICER_NAV
+    : ALL_NAV_ITEMS.filter((item) => item.roles.includes(userRole));
 
   const isActive = (path) => {
+    if (userRole === 'MEDICAL_OFFICER') {
+      const currentFull = location.pathname + location.search;
+      if (path === '/dashboard') {
+        return location.pathname === '/dashboard' && (!location.search || location.search === '?tab=overview');
+      }
+      return currentFull === path;
+    }
     if (path === '/dashboard') return location.pathname === '/dashboard';
     return location.pathname.startsWith(path);
   };
 
   const getUserInitials = () => {
-    if (!user?.name) return 'SA';
+    if (!user?.name) return 'MO';
     return user.name.split(' ').map((p) => p[0]).join('').substring(0, 2).toUpperCase();
   };
 

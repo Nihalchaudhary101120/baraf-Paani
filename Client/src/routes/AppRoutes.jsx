@@ -19,6 +19,7 @@ const PersonnelDashboard     = lazy(() => import('@/pages/Dashboard/PersonnelDas
 const UserManagementDashboard = lazy(() => import('@/pages/Dashboard/UserManagementDashboard/UserManagementDashboard'));
 const DeviceManagementDashboard = lazy(() => import('@/pages/Dashboard/DeviceManagement/DeviceManagementDashboard'));
 const ExpeditionDashboard    = lazy(() => import('@/pages/Dashboard/ExpeditionDashboard/ExpeditionDashboard'));
+const MedicalOfficerDashboard = lazy(() => import('@/pages/Dashboard/MedicalDashboard/MedicalOfficerDashboard'));
 const CompleteProfilePage    = lazy(() => import('@/pages/CompleteProfile/CompleteProfilePage'));
 
 // HQ_ADMIN Read-Only Operational Views
@@ -93,6 +94,9 @@ const AppRoutes = () => {
         } />
         <Route path="personnel" element={
           <Suspense fallback={<PageLoader />}><PersonnelDashboard /></Suspense>
+        } />
+        <Route path="medical" element={
+          <Suspense fallback={<PageLoader />}><MedicalOfficerDashboard /></Suspense>
         } />
         {/* HQ_ADMIN Read-Only Operational Views */}
         <Route path="admin-medical" element={

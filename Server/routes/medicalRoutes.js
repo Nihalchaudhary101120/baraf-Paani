@@ -1,6 +1,10 @@
 import express from "express";
 
 import {
+    getAllMedicalAssessments,
+    getMedicalOverviewStats,
+    getPersonnelMedicalRoster,
+    getPersonnelMedicalHistory,
     createMedicalAssessment,
     getMedicalAssessment,
     updateMedicalAssessment,
@@ -12,35 +16,61 @@ import requireRole from "../middleware/roleMiddleware.js";
 
 const router = express.Router();
 
+router.use(requireAuth);
+
+// Overview metrics & operational alerts
+router.get(
+    "/overview",
+    requireRole("MEDICAL_OFFICER", "HQ_ADMIN", "HQ_COMMAND", "STATION_COMMANDER"),
+    getMedicalOverviewStats
+);
+
+// Combined personnel medical roster
+router.get(
+    "/roster",
+    requireRole("MEDICAL_OFFICER", "HQ_ADMIN", "HQ_COMMAND", "STATION_COMMANDER"),
+    getPersonnelMedicalRoster
+);
+
+// Historical assessments for a personnel across expeditions
+router.get(
+    "/history/:personnelId",
+    requireRole("MEDICAL_OFFICER", "HQ_ADMIN", "HQ_COMMAND", "STATION_COMMANDER"),
+    getPersonnelMedicalHistory
+);
+
+// List all assessments (with filters & search)
+router.get(
+    "/",
+    requireRole("MEDICAL_OFFICER", "HQ_ADMIN", "HQ_COMMAND", "STATION_COMMANDER"),
+    getAllMedicalAssessments
+);
+
 // Create medical assessment
 router.post(
     "/",
-    requireAuth,
-    requireRole("MEDICAL_OFFICER"),
+    requireRole("MEDICAL_OFFICER", "HQ_ADMIN"),
     createMedicalAssessment
 );
 
-// Get medical assessment
+// Get medical assessment by ID
 router.get(
     "/:id",
-    requireAuth,
-    requireRole("MEDICAL_OFFICER"),
+    requireRole("MEDICAL_OFFICER", "HQ_ADMIN", "HQ_COMMAND", "STATION_COMMANDER"),
     getMedicalAssessment
 );
 
 // Update medical assessment
 router.put(
     "/:id",
-    requireAuth,
-    requireRole("MEDICAL_OFFICER"),
+    requireRole("MEDICAL_OFFICER", "HQ_ADMIN"),
     updateMedicalAssessment
 );
 
-// Update medical clearance
+// Update medical clearance decision
 router.patch(
     "/:id/clearance",
-    requireAuth,
-    requireRole("MEDICAL_OFFICER"),
+    requireRole("MEDICAL_OFFICER", "HQ_ADMIN"),
     updateClearance
 );
 

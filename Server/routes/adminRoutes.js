@@ -29,35 +29,34 @@ import requireRole from "../middleware/roleMiddleware.js";
 const router = express.Router();
 
 router.use(requireAuth);
-router.use(requireRole("HQ_ADMIN", "HQ_COMMAND"));
 
-// User Management
-router.post("/users", createUserByAdmin);
-router.get("/users", getAllUsers);
-router.patch("/users/:id/status", toggleUserStatus);
+// User Management — Read allowed for HQ, Medical, Commanders, Logistics; Write strictly HQ_ADMIN
+router.get("/users", requireRole("HQ_ADMIN", "HQ_COMMAND", "MEDICAL_OFFICER", "STATION_COMMANDER", "LOGISTICS_OFFICER"), getAllUsers);
+router.post("/users", requireRole("HQ_ADMIN"), createUserByAdmin);
+router.patch("/users/:id/status", requireRole("HQ_ADMIN"), toggleUserStatus);
 
 // System & Admin Overview
-router.get("/stats", getAdminStats);
+router.get("/stats", requireRole("HQ_ADMIN", "HQ_COMMAND"), getAdminStats);
 
-// Device Registry (HQ_ADMIN)
-router.get("/devices", getAllDevices);
-router.post("/devices", registerDevice);
-router.patch("/devices/:id/status", toggleDeviceStatus);
+// Device Registry
+router.get("/devices", requireRole("HQ_ADMIN", "HQ_COMMAND", "STATION_COMMANDER"), getAllDevices);
+router.post("/devices", requireRole("HQ_ADMIN"), registerDevice);
+router.patch("/devices/:id/status", requireRole("HQ_ADMIN"), toggleDeviceStatus);
 
-// Command Center (HQ_COMMAND & HQ_ADMIN)
-router.get("/command-overview", getCommandOverview);
-router.get("/personnel-readiness", getPersonnelReadiness);
+// Command Center & Personnel Readiness
+router.get("/command-overview", requireRole("HQ_COMMAND", "HQ_ADMIN", "STATION_COMMANDER"), getCommandOverview);
+router.get("/personnel-readiness", requireRole("HQ_COMMAND", "HQ_ADMIN", "STATION_COMMANDER", "MEDICAL_OFFICER"), getPersonnelReadiness);
 
-// Expedition Management — full CRUD for HQ_ADMIN
-router.get("/expeditions", getAllExpeditions);
-router.post("/expeditions", createExpedition);
-router.patch("/expeditions/:id", updateExpedition);
-router.post("/expeditions/:id/assign-personnel", assignPersonnelToExpedition);
+// Expedition Management — Read allowed for all operational roles; Write HQ_ADMIN & HQ_COMMAND
+router.get("/expeditions", requireRole("HQ_ADMIN", "HQ_COMMAND", "MEDICAL_OFFICER", "STATION_COMMANDER", "LOGISTICS_OFFICER"), getAllExpeditions);
+router.post("/expeditions", requireRole("HQ_ADMIN", "HQ_COMMAND"), createExpedition);
+router.patch("/expeditions/:id", requireRole("HQ_ADMIN", "HQ_COMMAND"), updateExpedition);
+router.post("/expeditions/:id/assign-personnel", requireRole("HQ_ADMIN", "HQ_COMMAND"), assignPersonnelToExpedition);
 
-// HQ_ADMIN Read-only operational views
-router.get("/medical-records", getAdminMedicalRecords);
-router.get("/cargo-data", getAdminCargoData);
-router.get("/field-ops", getAdminFieldOpsData);
-router.get("/inventory-status", getAdminInventoryStatus);
+// Operational views
+router.get("/medical-records", requireRole("HQ_ADMIN", "HQ_COMMAND", "MEDICAL_OFFICER"), getAdminMedicalRecords);
+router.get("/cargo-data", requireRole("HQ_ADMIN", "HQ_COMMAND", "LOGISTICS_OFFICER"), getAdminCargoData);
+router.get("/field-ops", requireRole("HQ_ADMIN", "HQ_COMMAND", "STATION_COMMANDER"), getAdminFieldOpsData);
+router.get("/inventory-status", requireRole("HQ_ADMIN", "HQ_COMMAND", "INVENTORY_MANAGER", "LOGISTICS_OFFICER"), getAdminInventoryStatus);
 
 export default router;

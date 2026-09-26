@@ -1,6 +1,7 @@
 import express from "express";
 
 import {
+    getAllTrainingClearances,
     createTrainingClearance,
     getTrainingClearance,
     addTrainingRecord,
@@ -13,6 +14,13 @@ import requireAuth from "../middleware/authMiddleware.js";
 import requireRole from "../middleware/roleMiddleware.js";
 
 const router = express.Router();
+
+router.get(
+    "/",
+    requireAuth,
+    requireRole("MEDICAL_OFFICER", "STATION_COMMANDER", "HQ_COMMAND", "HQ_ADMIN"),
+    getAllTrainingClearances
+);
 
 router.post(
     "/",

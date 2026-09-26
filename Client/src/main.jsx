@@ -6,13 +6,16 @@ import React from 'react';
 import { BrowserRouter } from 'react-router-dom';
 import { AuthProvider } from '@/context/AuthContext';
 import { AdminProvider } from '@/context/AdminContext';
+import { MedicalProvider } from '@/context/MedicalContext';
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <BrowserRouter>
       <AuthProvider>
         <AdminProvider>
-          <App />
+          <MedicalProvider>
+            <App />
+          </MedicalProvider>
         </AdminProvider>
       </AuthProvider>
     </BrowserRouter>

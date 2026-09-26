@@ -373,34 +373,114 @@ export const updateExpedition = async (req, res) => {
 export const assignPersonnelToExpedition = async (req, res) => {
     try {
         const { id } = req.params;
-        const { personnelIds, participationType } = req.body; // personnelIds: array of Personnel ObjectIds
+        const { personnelIds, participationType, stationId } = req.body;
 
         if (!personnelIds || !Array.isArray(personnelIds) || personnelIds.length === 0) {
             return res.status(400).json({ success: false, message: "personnelIds array is required" });
         }
 
-        const exp = await Expedition.findById(id);
+        let exp = null;
+        if (mongoose.Types.ObjectId.isValid(id)) {
+            exp = await Expedition.findById(id);
+        } else {
+            exp = await Expedition.findOne({ expeditionCode: id });
+        }
         if (!exp) return res.status(404).json({ success: false, message: "Expedition not found" });
 
-        // Validate all personnel exist
-        const personnel = await Personnel.find({ _id: { $in: personnelIds } })
-            .populate("userId", "name employeeId role");
-        if (personnel.length !== personnelIds.length) {
-            return res.status(404).json({ success: false, message: "One or more personnel records not found" });
+        // Resolve station for assigned personnel
+        const defaultStationId = stationId || exp.stations?.[0]?.stationId || null;
+
+        // Resolve each ID to a Personnel record (handling both Personnel._id and User._id)
+        const resolvedPersonnel = [];
+        for (const pid of personnelIds) {
+            if (!pid) continue;
+            let pDoc = null;
+            if (mongoose.Types.ObjectId.isValid(pid)) {
+                pDoc = await Personnel.findById(pid).populate("userId", "name employeeId email role stationId");
+                if (!pDoc) {
+                    pDoc = await Personnel.findOne({ userId: pid }).populate("userId", "name employeeId email role stationId");
+                }
+                if (!pDoc) {
+                    const u = await User.findById(pid);
+                    if (u) {
+                        pDoc = await Personnel.create({
+                            userId: u._id,
+                            expedition: {
+                                expeditionId: exp._id,
+                                participationType: participationType || exp.season || "WINTER",
+                                assignedStation: defaultStationId || u.stationId || null
+                            }
+                        });
+                        pDoc = await Personnel.findById(pDoc._id).populate("userId", "name employeeId email role stationId");
+                    }
+                }
+            }
+            if (pDoc) {
+                resolvedPersonnel.push(pDoc);
+            }
         }
 
-        // Update each personnel record to link to this expedition
-        await Promise.all(personnel.map(p =>
+        if (resolvedPersonnel.length === 0) {
+            return res.status(404).json({ success: false, message: "No valid personnel records identified for assignment" });
+        }
+
+        // Update each personnel's expedition and station assignment
+        await Promise.all(resolvedPersonnel.map(p =>
             Personnel.findByIdAndUpdate(p._id, {
                 "expedition.expeditionId": exp._id,
-                "expedition.participationType": participationType || exp.season
+                "expedition.participationType": participationType || exp.season || "WINTER",
+                ...(defaultStationId ? { "expedition.assignedStation": defaultStationId } : {})
             })
         ));
 
+        // Create or link baseline MedicalAssessment and TrainingClearance records for each candidate & expedition
+        await Promise.all(resolvedPersonnel.map(async (p) => {
+            // 1. Medical Assessment (PENDING)
+            const existingMed = await MedicalAssessment.findOne({
+                personnelId: p._id,
+                expeditionId: exp._id
+            });
+            if (!existingMed) {
+                await MedicalAssessment.create({
+                    personnelId: p._id,
+                    expeditionId: exp._id,
+                    formCode: "AL-2205",
+                    examinationDate: new Date(),
+                    clearance: {
+                        status: "PENDING",
+                        restrictions: [],
+                        remarks: "Candidate nominated by HQ Command for expedition. Baseline examination pending."
+                    }
+                });
+            }
+
+            // 2. Training Clearance (PENDING)
+            const existingTrain = await Training.findOne({
+                personnelId: p._id,
+                expeditionId: exp._id
+            });
+            if (!existingTrain) {
+                await Training.create({
+                    personnelId: p._id,
+                    expeditionId: exp._id,
+                    trainings: [],
+                    overallStatus: "PENDING"
+                });
+            }
+        }));
+
+        // Update summary count on expedition
+        const totalAssigned = await Personnel.countDocuments({ "expedition.expeditionId": exp._id });
+        await Expedition.findByIdAndUpdate(exp._id, {
+            "summary.personnelCount": totalAssigned
+        });
+
         return res.status(200).json({
             success: true,
-            message: `${personnel.length} personnel assigned to expedition ${exp.expeditionCode}`,
-            assigned: personnel.map(p => ({ _id: p._id, name: p.userId?.name, employeeId: p.userId?.employeeId }))
+            message: `${resolvedPersonnel.length} candidate(s) assigned to expedition ${exp.expeditionCode}`,
+            assignedCount: resolvedPersonnel.length,
+            totalAssigned,
+            assigned: resolvedPersonnel.map(p => ({ _id: p._id, name: p.userId?.name, employeeId: p.userId?.employeeId }))
         });
     } catch (error) {
         console.error("Assign personnel error:", error);

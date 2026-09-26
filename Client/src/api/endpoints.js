@@ -44,5 +44,20 @@ export const ENDPOINTS = {
     MANIFEST_BY_ID: (id) => `/cargo/manifests/${id}`,
     MANIFEST_STATUS: (id) => `/cargo/manifests/${id}/status`,
   },
+  MEDICAL: {
+    OVERVIEW: '/medical/overview',
+    ROSTER: '/medical/roster',
+    ASSESSMENTS: '/medical',
+    ASSESSMENT_BY_ID: (id) => `/medical/${id}`,
+    CLEARANCE: (id) => `/medical/${id}/clearance`,
+    HISTORY: (personnelId) => `/medical/history/${personnelId}`,
+  },
+  TRAINING: {
+    BASE: '/training',
+    BY_ID: (id) => `/training/${id}`,
+    RECORDS: (id) => `/training/${id}/records`,
+    RECORD_BY_INDEX: (id, index) => `/training/${id}/records/${index}`,
+    COMPLETE: (id) => `/training/${id}/complete`,
+  },
   HEALTH: '/health',
 };

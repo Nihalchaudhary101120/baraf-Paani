@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import TrainingClearance from "../models/approval-models/training.js";
 import Personnel from "../models/master-models/personnel.js";
 import Expedition from "../models/master-models/expedition.js";
@@ -11,6 +12,15 @@ const allowedCategories = [
     "ENVIRONMENT",
     "EQUIPMENT"
 ];
+
+const resolveExpeditionId = async (expId) => {
+    if (!expId || expId === "ALL" || expId === "All") return null;
+    if (mongoose.Types.ObjectId.isValid(expId)) {
+        return expId;
+    }
+    const exp = await Expedition.findOne({ expeditionCode: expId });
+    return exp ? exp._id : null;
+};
 
 const calculateOverallStatus = (trainings) => {
     if (!trainings || trainings.length === 0) {
@@ -32,6 +42,44 @@ const calculateOverallStatus = (trainings) => {
     return "PENDING";
 };
 
+
+// =====================================================
+// GET ALL TRAINING CLEARANCES
+// =====================================================
+export const getAllTrainingClearances = async (req, res) => {
+    try {
+        const { expeditionId, status } = req.query;
+        const query = {};
+        if (expeditionId && expeditionId !== "ALL" && expeditionId !== "All") {
+            const resolvedExpId = await resolveExpeditionId(expeditionId);
+            if (resolvedExpId) {
+                query.expeditionId = resolvedExpId;
+            }
+        }
+        if (status && status !== "ALL" && status !== "All") query.overallStatus = status;
+
+        const clearances = await TrainingClearance.find(query)
+            .populate({
+                path: "personnelId",
+                populate: { path: "userId", select: "name employeeId email role stationId" }
+            })
+            .populate("expeditionId", "expeditionCode missionTitle season year")
+            .populate("finalClearedBy", "name employeeId")
+            .sort({ updatedAt: -1 });
+
+        return res.status(200).json({
+            success: true,
+            count: clearances.length,
+            clearances
+        });
+    } catch (error) {
+        console.error("Get all training clearances error:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Failed to fetch training clearances"
+        });
+    }
+};
 
 // =====================================================
 // CREATE TRAINING CLEARANCE

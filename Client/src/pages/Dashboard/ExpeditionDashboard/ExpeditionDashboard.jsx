@@ -240,11 +240,23 @@ const CreateCargoManifestModal = ({ expedition, stations, onClose, onCreated }) 
 
 // ─── Personnel Roster Panel ──────────────────────────────────────────────────
 
-const PersonnelRosterPanel = ({ expedition, allPersonnel, onClose, onAssign }) => {
+const PersonnelRosterPanel = ({ expedition, allPersonnel, stations, onClose, onAssign }) => {
   const [search, setSearch] = useState('');
-  const [selected, setSelected] = useState([]);
+  const [selectedStation, setSelectedStation] = useState(expedition.stations?.[0]?.stationId?._id || '');
   const [participationType, setParticipationType] = useState(expedition.season || 'WINTER');
   const [saving, setSaving] = useState(false);
+
+  // Pre-select personnel who already belong to this expedition
+  const [selected, setSelected] = useState(() => {
+    return (allPersonnel || [])
+      .filter(p => (
+        p.expeditionId === expedition._id ||
+        p.expeditionId?._id === expedition._id ||
+        p.expedition?.expeditionId === expedition._id ||
+        p.expedition?.expeditionId?._id === expedition._id
+      ))
+      .map(p => p._id);
+  });
 
   const filtered = (allPersonnel || []).filter(p => {
     const name = p.name || p.userId?.name || '';
@@ -258,11 +270,26 @@ const PersonnelRosterPanel = ({ expedition, allPersonnel, onClose, onAssign }) =
     prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
   );
 
+  const handleSelectAll = () => {
+    if (selected.length === filtered.length) {
+      setSelected([]);
+    } else {
+      setSelected(filtered.map(p => p._id));
+    }
+  };
+
   const handleAssign = async () => {
-    if (!selected.length) return;
+    if (!selected.length) {
+      alert('Please select at least one personnel candidate.');
+      return;
+    }
     setSaving(true);
     try {
-      await onAssign(expedition._id, { personnelIds: selected, participationType });
+      await onAssign(expedition._id, {
+        personnelIds: selected,
+        participationType,
+        stationId: selectedStation || undefined
+      });
       onClose();
     } catch (e) {
       console.error('Assign error', e);
@@ -273,36 +300,52 @@ const PersonnelRosterPanel = ({ expedition, allPersonnel, onClose, onAssign }) =
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 3000, backgroundColor: 'rgba(15,23,42,0.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-      <div style={{ backgroundColor: '#fff', borderRadius: '10px', width: '100%', maxWidth: '780px', maxHeight: '85vh', display: 'flex', flexDirection: 'column', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)', border: '1px solid #E2E8F0' }}>
+      <div style={{ backgroundColor: '#fff', borderRadius: '10px', width: '100%', maxWidth: '850px', maxHeight: '88vh', display: 'flex', flexDirection: 'column', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)', border: '1px solid #E2E8F0' }}>
         
         {/* Header */}
-        <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+        <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0, backgroundColor: '#f8fafc' }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <span className="material-symbols-outlined" style={{ fontSize: '22px', color: '#005B7F' }}>group_add</span>
-              <h2 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#005B7F', margin: 0 }}>
-                {expedition.expeditionCode} — Personnel Roster
+              <span className="material-symbols-outlined" style={{ fontSize: '24px', color: '#005B7F' }}>group_add</span>
+              <h2 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#005B7F', margin: 0 }}>
+                {expedition.expeditionCode} — Personnel Roster Nomination & Assignment
               </h2>
             </div>
-            <p style={{ fontSize: '0.78rem', color: '#64748B', margin: '0.15rem 0 0' }}>
-              Select personnel to assign to this expedition. {selected.length > 0 && <strong>({selected.length} selected)</strong>}
+            <p style={{ fontSize: '0.8rem', color: '#64748B', margin: '0.2rem 0 0' }}>
+              Nominate personnel from the pool to this expedition. Assigned candidates automatically get pending baseline medical & polar training workflows initialized.
             </p>
           </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer', color: '#64748B' }}>✕</button>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '1.25rem', cursor: 'pointer', color: '#64748B' }}>✕</button>
         </div>
 
         {/* Controls */}
-        <div style={{ padding: '0.85rem 1.5rem', borderBottom: '1px solid #F1F5F9', display: 'flex', gap: '0.75rem', alignItems: 'center', flexShrink: 0 }}>
+        <div style={{ padding: '0.85rem 1.5rem', borderBottom: '1px solid #F1F5F9', display: 'flex', gap: '0.75rem', alignItems: 'center', flexShrink: 0, flexWrap: 'wrap' }}>
           <input
-            type="text" placeholder="Search by name, employee ID, or role..."
+            type="text" placeholder="Search by name, employee ID, role..."
             value={search} onChange={e => setSearch(e.target.value)}
-            style={{ ...INPUT_STYLE, flex: 1 }}
+            style={{ ...INPUT_STYLE, flex: 1, minWidth: '200px' }}
           />
           <select value={participationType} onChange={e => setParticipationType(e.target.value)}
-            style={{ padding: '0.55rem 0.75rem', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '0.82rem', backgroundColor: '#fff' }}>
+            style={{ padding: '0.55rem 0.75rem', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '0.82rem', backgroundColor: '#fff', fontWeight: 600 }}>
             <option value="SUMMER">SUMMER Participant</option>
             <option value="WINTER">WINTER Participant</option>
           </select>
+          {stations && stations.length > 0 && (
+            <select value={selectedStation} onChange={e => setSelectedStation(e.target.value)}
+              style={{ padding: '0.55rem 0.75rem', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '0.82rem', backgroundColor: '#fff', fontWeight: 600 }}>
+              <option value="">Default Expedition Base</option>
+              {stations.map(st => (
+                <option key={st._id} value={st._id}>{st.name} ({st.code})</option>
+              ))}
+            </select>
+          )}
+          <button
+            type="button"
+            onClick={handleSelectAll}
+            style={{ padding: '0.55rem 0.85rem', borderRadius: '6px', border: '1px solid #cbd5e1', backgroundColor: '#f1f5f9', color: '#334155', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer' }}
+          >
+            {selected.length === filtered.length ? 'Deselect All' : 'Select All Filtered'}
+          </button>
         </div>
 
         {/* Table */}
@@ -310,8 +353,15 @@ const PersonnelRosterPanel = ({ expedition, allPersonnel, onClose, onAssign }) =
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
             <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
               <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #E2E8F0' }}>
-                <th style={{ padding: '0.65rem 1rem', width: '40px' }}></th>
-                {['Name', 'Employee ID', 'Role', 'Station', 'Readiness'].map(h => (
+                <th style={{ padding: '0.65rem 1rem', width: '40px', textAlign: 'center' }}>
+                  <input
+                    type="checkbox"
+                    checked={filtered.length > 0 && selected.length === filtered.length}
+                    onChange={handleSelectAll}
+                    style={{ cursor: 'pointer', accentColor: '#005B7F' }}
+                  />
+                </th>
+                {['Candidate Name', 'Employee ID', 'Role', 'Assigned Station', 'Medical Status', 'Expedition Status'].map(h => (
                   <th key={h} style={{ padding: '0.65rem 1rem', textAlign: 'left', fontWeight: 700, color: '#475569', fontSize: '0.72rem', textTransform: 'uppercase' }}>{h}</th>
                 ))}
               </tr>
@@ -319,7 +369,7 @@ const PersonnelRosterPanel = ({ expedition, allPersonnel, onClose, onAssign }) =
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={6} style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>
+                  <td colSpan={7} style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>
                     <span className="material-symbols-outlined" style={{ fontSize: '32px', display: 'block', marginBottom: '0.35rem' }}>person_search</span>
                     No personnel found matching search criteria.
                   </td>
@@ -330,7 +380,12 @@ const PersonnelRosterPanel = ({ expedition, allPersonnel, onClose, onAssign }) =
                 const empId = p.employeeId || p.userId?.employeeId || '—';
                 const role = p.role || p.userId?.role || '—';
                 const station = p.station || p.stationCode || '—';
-                const ready = p.readinessStatus === 'READY_FOR_DEPLOYMENT';
+                const isCurrentlyAssigned = (
+                  p.expeditionId === expedition._id ||
+                  p.expeditionId?._id === expedition._id ||
+                  p.expedition?.expeditionId === expedition._id ||
+                  p.expedition?.expeditionId?._id === expedition._id
+                );
                 const isSelected = selected.includes(id);
 
                 return (
@@ -338,17 +393,37 @@ const PersonnelRosterPanel = ({ expedition, allPersonnel, onClose, onAssign }) =
                     onClick={() => toggle(id)}
                     style={{ borderBottom: '1px solid #F1F5F9', backgroundColor: isSelected ? '#f0f9ff' : i % 2 === 0 ? '#fff' : '#fafafa', cursor: 'pointer' }}
                   >
-                    <td style={{ padding: '0.6rem 1rem', textAlign: 'center' }}>
+                    <td style={{ padding: '0.6rem 1rem', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
                       <input type="checkbox" checked={isSelected} onChange={() => toggle(id)}
                         style={{ cursor: 'pointer', accentColor: '#005B7F' }} />
                     </td>
-                    <td style={{ padding: '0.6rem 1rem', fontWeight: 600, color: '#0F172A' }}>{name}</td>
+                    <td style={{ padding: '0.6rem 1rem', fontWeight: 700, color: '#0F172A' }}>
+                      {name}
+                      {isCurrentlyAssigned && (
+                        <span style={{ marginLeft: '0.4rem', fontSize: '0.65rem', backgroundColor: '#e0f2fe', color: '#0369a1', padding: '0.1rem 0.4rem', borderRadius: '4px', fontWeight: 800 }}>
+                          CURRENT
+                        </span>
+                      )}
+                    </td>
                     <td style={{ padding: '0.6rem 1rem', color: '#475569', fontFamily: 'monospace', fontSize: '0.78rem' }}>{empId}</td>
                     <td style={{ padding: '0.6rem 1rem', color: '#475569' }}>{role}</td>
                     <td style={{ padding: '0.6rem 1rem', color: '#64748B' }}>{station}</td>
                     <td style={{ padding: '0.6rem 1rem' }}>
-                      <span style={{ padding: '0.18rem 0.5rem', borderRadius: '99px', fontSize: '0.68rem', fontWeight: 700, backgroundColor: ready ? '#f0fdf4' : '#fff7ed', color: ready ? '#15803d' : '#d97706' }}>
-                        {ready ? 'READY' : 'PENDING'}
+                      <span style={{
+                        padding: '0.18rem 0.5rem', borderRadius: '99px', fontSize: '0.68rem', fontWeight: 700,
+                        backgroundColor: p.medicalClearance === 'FIT' ? '#dcfce7' : '#fef3c7',
+                        color: p.medicalClearance === 'FIT' ? '#15803d' : '#b45309'
+                      }}>
+                        {p.medicalClearance || 'PENDING'}
+                      </span>
+                    </td>
+                    <td style={{ padding: '0.6rem 1rem' }}>
+                      <span style={{
+                        padding: '0.18rem 0.5rem', borderRadius: '99px', fontSize: '0.68rem', fontWeight: 700,
+                        backgroundColor: isCurrentlyAssigned ? '#dcfce7' : '#f1f5f9',
+                        color: isCurrentlyAssigned ? '#15803d' : '#64748B'
+                      }}>
+                        {isCurrentlyAssigned ? 'ASSIGNED' : 'UNASSIGNED'}
                       </span>
                     </td>
                   </tr>
@@ -361,15 +436,16 @@ const PersonnelRosterPanel = ({ expedition, allPersonnel, onClose, onAssign }) =
         {/* Footer */}
         <div style={{ padding: '1rem 1.5rem', borderTop: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0, backgroundColor: '#f8fafc' }}>
           <span style={{ fontSize: '0.82rem', color: '#64748B' }}>
-            {selected.length} of {allPersonnel?.length || 0} personnel selected
+            <strong>{selected.length}</strong> of {allPersonnel?.length || 0} candidates selected for assignment
           </span>
           <div style={{ display: 'flex', gap: '0.75rem' }}>
             <button onClick={onClose} style={{ padding: '0.55rem 1.1rem', borderRadius: '6px', border: '1px solid #CBD5E1', backgroundColor: '#fff', color: '#475569', fontWeight: 600, fontSize: '0.82rem', cursor: 'pointer' }}>
               Cancel
             </button>
             <button onClick={handleAssign} disabled={!selected.length || saving}
-              style={{ padding: '0.55rem 1.25rem', borderRadius: '6px', border: 'none', backgroundColor: selected.length ? '#005B7F' : '#94a3b8', color: '#fff', fontWeight: 700, fontSize: '0.82rem', cursor: selected.length ? 'pointer' : 'not-allowed' }}>
-              {saving ? 'Assigning...' : `Assign ${selected.length || ''} Personnel`}
+              style={{ padding: '0.55rem 1.35rem', borderRadius: '6px', border: 'none', backgroundColor: selected.length ? '#005B7F' : '#94a3b8', color: '#fff', fontWeight: 700, fontSize: '0.82rem', cursor: selected.length ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>check_circle</span>
+              {saving ? 'Assigning Candidates...' : `Confirm Assignment (${selected.length})`}
             </button>
           </div>
         </div>
@@ -524,22 +600,76 @@ const ExpeditionDetailPanel = ({ expedition, allPersonnel, stations, onClose, on
             )}
 
             {/* PERSONNEL TAB */}
-            {tab === 'personnel' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.82rem', color: '#64748B' }}>{expedition.summary?.personnelCount ?? 0} personnel assigned to this expedition.</span>
-                  <button onClick={() => setShowRoster(true)} style={{ padding: '0.45rem 1rem', backgroundColor: '#005B7F', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                    <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>group_add</span>
-                    + Add Personnel
-                  </button>
+            {tab === 'personnel' && (() => {
+              const assignedPersonnel = (allPersonnel || []).filter(p => (
+                p.expeditionId === expedition._id ||
+                p.expeditionId?._id === expedition._id ||
+                p.expedition?.expeditionId === expedition._id ||
+                p.expedition?.expeditionId?._id === expedition._id
+              ));
+
+              return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.82rem', color: '#64748B' }}>
+                      <strong>{assignedPersonnel.length}</strong> candidate(s) currently nominated & assigned to {expedition.expeditionCode}.
+                    </span>
+                    <button onClick={() => setShowRoster(true)} style={{ padding: '0.45rem 1rem', backgroundColor: '#005B7F', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                      <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>group_add</span>
+                      + Nominate / Assign Personnel
+                    </button>
+                  </div>
+
+                  {assignedPersonnel.length === 0 ? (
+                    <div style={{ padding: '2.5rem', textAlign: 'center', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px dashed #CBD5E1', color: '#94a3b8' }}>
+                      <span className="material-symbols-outlined" style={{ fontSize: '36px', display: 'block', marginBottom: '0.5rem' }}>badge</span>
+                      <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>No Personnel Nominated Yet</div>
+                      <div style={{ fontSize: '0.78rem' }}>Click "+ Nominate / Assign Personnel" to assign candidates from the pool to this expedition.</div>
+                    </div>
+                  ) : (
+                    <div style={{ border: '1px solid #E2E8F0', borderRadius: '8px', overflow: 'hidden' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+                        <thead style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #E2E8F0' }}>
+                          <tr>
+                            {['Candidate', 'Employee ID', 'Role', 'Station', 'Medical Status', 'Participation'].map(h => (
+                              <th key={h} style={{ padding: '0.6rem 0.85rem', textAlign: 'left', fontWeight: 700, color: '#475569', fontSize: '0.7rem', textTransform: 'uppercase' }}>{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {assignedPersonnel.map((p, i) => {
+                            const name = p.name || p.userId?.name || '—';
+                            const empId = p.employeeId || p.userId?.employeeId || '—';
+                            const role = p.role || p.userId?.role || '—';
+                            const station = p.station || p.stationCode || '—';
+                            const medStatus = p.medicalClearance || 'PENDING';
+                            const partType = p.participationType || expedition.season || 'WINTER';
+                            return (
+                              <tr key={p._id || i} style={{ borderBottom: '1px solid #F1F5F9', backgroundColor: i % 2 === 0 ? '#fff' : '#fafafa' }}>
+                                <td style={{ padding: '0.6rem 0.85rem', fontWeight: 700, color: '#0F172A' }}>{name}</td>
+                                <td style={{ padding: '0.6rem 0.85rem', color: '#475569', fontFamily: 'monospace' }}>{empId}</td>
+                                <td style={{ padding: '0.6rem 0.85rem', color: '#475569' }}>{role}</td>
+                                <td style={{ padding: '0.6rem 0.85rem', color: '#64748B' }}>{station}</td>
+                                <td style={{ padding: '0.6rem 0.85rem' }}>
+                                  <span style={{
+                                    padding: '0.15rem 0.5rem', borderRadius: '99px', fontSize: '0.68rem', fontWeight: 700,
+                                    backgroundColor: medStatus === 'FIT' ? '#dcfce7' : '#fef3c7',
+                                    color: medStatus === 'FIT' ? '#15803d' : '#b45309'
+                                  }}>
+                                    {medStatus}
+                                  </span>
+                                </td>
+                                <td style={{ padding: '0.6rem 0.85rem', fontWeight: 600, color: '#005B7F' }}>{partType}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
-                <div style={{ padding: '2.5rem', textAlign: 'center', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px dashed #CBD5E1', color: '#94a3b8' }}>
-                  <span className="material-symbols-outlined" style={{ fontSize: '36px', display: 'block', marginBottom: '0.5rem' }}>badge</span>
-                  <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>Manage Personnel Assignments</div>
-                  <div style={{ fontSize: '0.78rem' }}>Click "+ Add Personnel" to select participants from the roster for this expedition.</div>
-                </div>
-              </div>
-            )}
+              );
+            })()}
 
             {/* CARGO MANIFESTS TAB */}
             {tab === 'manifests' && (
@@ -617,6 +747,7 @@ const ExpeditionDetailPanel = ({ expedition, allPersonnel, stations, onClose, on
         <PersonnelRosterPanel
           expedition={expedition}
           allPersonnel={allPersonnel}
+          stations={stations}
           onClose={() => setShowRoster(false)}
           onAssign={onAssignPersonnel}
         />
@@ -872,8 +1003,27 @@ const ExpeditionDashboard = () => {
   };
 
   const handleAssignPersonnel = async (expId, data) => {
-    await assignPersonnelToExpeditionApi(expId, data);
-    fetchExpeditions(true);
+    try {
+      const res = await assignPersonnelToExpeditionApi(expId, data);
+      await Promise.all([
+        fetchExpeditions(true),
+        fetchPersonnel(true)
+      ]);
+      setSelectedExp(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          summary: {
+            ...prev.summary,
+            personnelCount: res?.totalAssigned ?? (prev.summary?.personnelCount || 0) + data.personnelIds.length
+          }
+        };
+      });
+      alert(res?.message || `Personnel roster updated successfully! Baseline medical and training clearances initialized.`);
+    } catch (e) {
+      console.error('Assign error', e);
+      alert('Failed to assign personnel: ' + (e.response?.data?.message || e.message));
+    }
   };
 
   const filtered = expeditions.filter(e => !filterStatus || e.status === filterStatus);
