@@ -29,15 +29,27 @@ const TrainingRecordSchema = new mongoose.Schema(
       ref: "User"
     },
 
+    instructorName: {
+      type: String
+    },
+
     certificateNumber: String,
     validUntil: Date,
 
     passed: {
       type: Boolean,
       default: false
-    }
+    },
+
+    status: {
+      type: String,
+      enum: ["PENDING", "PASSED", "FAILED"],
+      default: "PENDING"
+    },
+
+    remarks: String
   },
-  { _id: false }
+  { _id: true }
 );
 
 const TrainingClearanceSchema = new mongoose.Schema(
@@ -66,12 +78,21 @@ const TrainingClearanceSchema = new mongoose.Schema(
       default: "PENDING"
     },
 
+    verifiedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User"
+    },
+
+    verifiedAt: Date,
+
     finalClearedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User"
     },
 
-    clearanceDate: Date
+    clearanceDate: Date,
+
+    remarks: String
   },
   {
     timestamps: true

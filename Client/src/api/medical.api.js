@@ -62,12 +62,22 @@ export const getTrainingClearanceByIdApi = (id) => {
   return axiosInstance.get(ENDPOINTS.TRAINING.BY_ID(id));
 };
 
+// Get training clearance for a candidate
+export const getCandidateTrainingClearanceApi = (expeditionId, personnelId) => {
+  return axiosInstance.get(ENDPOINTS.TRAINING.CANDIDATE(expeditionId, personnelId));
+};
+
+// Assign required training modules for a candidate
+export const assignRequiredTrainingApi = (data) => {
+  return axiosInstance.post(ENDPOINTS.TRAINING.ASSIGN, data);
+};
+
 // Create training clearance
 export const createTrainingClearanceApi = (data) => {
   return axiosInstance.post(ENDPOINTS.TRAINING.BASE, data);
 };
 
-// Add training record to clearance
+// Add / Record training result
 export const addTrainingRecordApi = (id, record) => {
   return axiosInstance.post(ENDPOINTS.TRAINING.RECORDS(id), record);
 };
@@ -82,7 +92,13 @@ export const deleteTrainingRecordApi = (id, index) => {
   return axiosInstance.delete(ENDPOINTS.TRAINING.RECORD_BY_INDEX(id, index));
 };
 
+// HQ Command Verify Training Clearance
+export const verifyTrainingClearanceApi = (id, data = {}) => {
+  return axiosInstance.patch(ENDPOINTS.TRAINING.VERIFY(id), data);
+};
+
 // Complete training clearance
 export const completeTrainingClearanceApi = (id) => {
   return axiosInstance.patch(ENDPOINTS.TRAINING.COMPLETE(id));
 };
+

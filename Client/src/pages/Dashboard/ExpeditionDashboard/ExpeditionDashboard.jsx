@@ -13,6 +13,7 @@ import {
 import { getManifests, createManifest } from '@/api/cargo.api';
 import axiosInstance from '@/api/axiosInstance';
 import { useAdminData } from '@/context/AdminContext';
+import { TrainingWorkflowModal } from './TrainingWorkflowModal';
 
 // ─── Helpers & Styles ────────────────────────────────────────────────────────
 
@@ -608,6 +609,7 @@ const ExpeditionDetailPanel = ({ expedition, allPersonnel, stations, onClose, on
   const [confirmingId, setConfirmingId] = useState(null);
   const [removingId, setRemovingId] = useState(null);
   const [reviewCandidate, setReviewCandidate] = useState(null);
+  const [selectedTrainingCandidate, setSelectedTrainingCandidate] = useState(null);
 
   const statusCfg = STATUS_CONFIG[expedition.status] || STATUS_CONFIG.PLANNING;
   const stationNames = expedition.stations?.map(s => s.stationId?.name || s.stationId?.code || '—').join(', ') || 'Not configured';
@@ -944,13 +946,21 @@ const ExpeditionDetailPanel = ({ expedition, allPersonnel, stations, onClose, on
 
                                 {/* Training Status */}
                                 <td style={{ padding: '0.55rem 0.75rem' }}>
-                                  <span style={{
-                                    display: 'inline-block', padding: '0.12rem 0.45rem', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 700,
-                                    backgroundColor: trn === 'COMPLETED' ? '#dcfce7' : trn === 'PARTIAL' ? '#fef3c7' : '#f1f5f9',
-                                    color: trn === 'COMPLETED' ? '#15803d' : trn === 'PARTIAL' ? '#b45309' : '#64748B'
-                                  }}>
+                                  <button
+                                    onClick={() => setSelectedTrainingCandidate(c)}
+                                    title="Click to manage polar training assignments, instructor results & HQ verification"
+                                    style={{
+                                      display: 'inline-flex', alignItems: 'center', gap: '0.25rem',
+                                      padding: '0.15rem 0.5rem', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 700,
+                                      backgroundColor: trn === 'COMPLETED' ? '#dcfce7' : trn === 'PARTIAL' ? '#fef3c7' : '#eff6ff',
+                                      color: trn === 'COMPLETED' ? '#15803d' : trn === 'PARTIAL' ? '#b45309' : '#0369a1',
+                                      border: `1px solid ${trn === 'COMPLETED' ? '#86efac' : trn === 'PARTIAL' ? '#fde68a' : '#bfdbfe'}`,
+                                      cursor: 'pointer'
+                                    }}
+                                  >
+                                    <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>school</span>
                                     {trn === 'COMPLETED' ? '✔ COMPLETED' : trn === 'PARTIAL' ? '◐ PARTIAL' : '⏳ PENDING'}
-                                  </span>
+                                  </button>
                                 </td>
 
                                 {/* Overall Readiness Status */}
@@ -973,6 +983,20 @@ const ExpeditionDetailPanel = ({ expedition, allPersonnel, stations, onClose, on
                                 {/* Actions */}
                                 <td style={{ padding: '0.55rem 0.75rem' }}>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                    {/* Training Workflow Action */}
+                                    <button
+                                      onClick={() => setSelectedTrainingCandidate(c)}
+                                      title="Manage Training (Assign / Record Results / HQ Verification)"
+                                      style={{
+                                        padding: '0.28rem 0.55rem', backgroundColor: '#eff6ff', color: '#0369a1',
+                                        border: '1px solid #bfdbfe', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 700,
+                                        cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.2rem'
+                                      }}
+                                    >
+                                      <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>school</span>
+                                      Training
+                                    </button>
+
                                     {isReady ? (
                                       <button
                                         onClick={() => {
@@ -984,8 +1008,8 @@ const ExpeditionDetailPanel = ({ expedition, allPersonnel, stations, onClose, on
                                         }}
                                         disabled={confirmingId === c._id}
                                         style={{
-                                          padding: '0.3rem 0.65rem', backgroundColor: '#005B7F', color: '#fff',
-                                          border: 'none', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 700,
+                                          padding: '0.28rem 0.65rem', backgroundColor: '#005B7F', color: '#fff',
+                                          border: 'none', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 700,
                                           cursor: confirmingId === c._id ? 'not-allowed' : 'pointer',
                                           display: 'flex', alignItems: 'center', gap: '0.25rem'
                                         }}
@@ -998,8 +1022,8 @@ const ExpeditionDetailPanel = ({ expedition, allPersonnel, stations, onClose, on
                                         disabled
                                         title={isNotFit ? 'Declared NOT FIT for deployment' : 'Medical or training checks are still pending'}
                                         style={{
-                                          padding: '0.3rem 0.55rem', backgroundColor: '#f1f5f9', color: '#94a3b8',
-                                          border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 600,
+                                          padding: '0.28rem 0.5rem', backgroundColor: '#f1f5f9', color: '#94a3b8',
+                                          border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 600,
                                           cursor: 'not-allowed'
                                         }}
                                       >
@@ -1200,6 +1224,19 @@ const ExpeditionDetailPanel = ({ expedition, allPersonnel, stations, onClose, on
           confirming={confirmingId === reviewCandidate._id}
           onClose={() => setReviewCandidate(null)}
           onConfirm={(candId, payload) => handleCandidateConfirmed(candId, payload)}
+        />
+      )}
+
+      {/* Training Workflow Modal */}
+      {selectedTrainingCandidate && (
+        <TrainingWorkflowModal
+          candidate={selectedTrainingCandidate}
+          expedition={expedition}
+          onClose={() => setSelectedTrainingCandidate(null)}
+          onUpdated={async () => {
+            await fetchCandidates();
+            onRefresh && onRefresh();
+          }}
         />
       )}
 

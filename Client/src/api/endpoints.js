@@ -60,8 +60,11 @@ export const ENDPOINTS = {
   TRAINING: {
     BASE: '/training',
     BY_ID: (id) => `/training/${id}`,
+    CANDIDATE: (expId, persId) => `/training/candidate/${expId}/${persId}`,
+    ASSIGN: '/training/assign',
     RECORDS: (id) => `/training/${id}/records`,
     RECORD_BY_INDEX: (id, index) => `/training/${id}/records/${index}`,
+    VERIFY: (id) => `/training/${id}/verify`,
     COMPLETE: (id) => `/training/${id}/complete`,
   },
   HEALTH: '/health',
