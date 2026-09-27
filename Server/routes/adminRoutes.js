@@ -52,7 +52,7 @@ router.get("/command-overview", requireRole("HQ_COMMAND", "HQ_ADMIN", "STATION_C
 router.get("/personnel-readiness", requireRole("HQ_COMMAND", "HQ_ADMIN", "STATION_COMMANDER", "MEDICAL_OFFICER"), getPersonnelReadiness);
 
 // Expedition Management & Candidate Lifecycle — Read allowed for operational roles; Write HQ_ADMIN & HQ_COMMAND
-router.get("/expeditions", requireRole("HQ_ADMIN", "HQ_COMMAND", "MEDICAL_OFFICER", "STATION_COMMANDER", "LOGISTICS_OFFICER"), getAllExpeditions);
+router.get("/expeditions", requireRole("HQ_ADMIN", "HQ_COMMAND", "MEDICAL_OFFICER", "STATION_COMMANDER", "LOGISTICS_OFFICER", "CARGO_OFFICER"), getAllExpeditions);
 router.post("/expeditions", requireRole("HQ_ADMIN", "HQ_COMMAND"), createExpedition);
 router.patch("/expeditions/:id", requireRole("HQ_ADMIN", "HQ_COMMAND"), updateExpedition);
 router.post("/expeditions/:id/assign-personnel", requireRole("HQ_ADMIN", "HQ_COMMAND"), assignPersonnelToExpedition);

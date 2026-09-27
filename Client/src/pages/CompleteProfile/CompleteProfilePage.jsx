@@ -52,6 +52,13 @@ export default function CompleteProfilePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  React.useEffect(() => {
+    const personnelRoles = ['SCIENTIST', 'STATION_OPERATOR', 'INVENTORY_MANAGER', 'MEDICAL_OFFICER', 'STATION_COMMANDER', 'SHIP_OFFICER', 'FLIGHT_OFFICER'];
+    if (user && (!personnelRoles.includes(user.role) || user.profileStatus !== 'INCOMPLETE')) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [user, navigate]);
+
   /* ── Helpers ── */
   const set = (path, value) => {
     setForm((prev) => {

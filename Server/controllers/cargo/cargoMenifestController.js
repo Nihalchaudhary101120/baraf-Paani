@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import CargoManifest from "../../models/cargo-models/cargo-menifest.js";
+import Shipment from "../../models/cargo-models/shipment.js";
 import Expedition from "../../models/master-models/expedition.js";
 import Station from "../../models/master-models/station.js";
 
@@ -35,7 +36,7 @@ const generateManifestNumber = async () => {
         sequence = Number(lastManifest.manifestNumber.split("-").pop()) + 1;
     }
 
-    return `CGM-${year}-${String(sequence).padStart(5, "0")}`;
+    return `CGM-${year}-${String(sequence).padStart(3, "0")}`;
 };
 
 export const createManifest = async (req, res) => {
@@ -46,80 +47,146 @@ export const createManifest = async (req, res) => {
             owner,
             origin,
             destination,
-            items
+            items,
+            shipmentId,
+            manifestNumber: customManifestNumber,
+            description
         } = req.body;
 
-        if (
-            !expeditionId ||
-            !declarationType ||
-            !destination ||
-            !items?.length
-        ) {
-            return res.status(400).json({
-                success: false,
-                message:
-                    "Expedition, declaration type, destination and items are required"
-            });
+        // Check if attached to a shipment
+        let shipment = null;
+        if (shipmentId && mongoose.Types.ObjectId.isValid(shipmentId)) {
+            shipment = await Shipment.findById(shipmentId);
         }
 
-        const expedition = await Expedition.findById(expeditionId);
-
+        // Resolve Expedition (from explicit expeditionId, or from selected shipment, or latest)
+        let expedition = null;
+        const targetExpId = expeditionId || shipment?.expeditionId;
+        if (targetExpId && mongoose.Types.ObjectId.isValid(targetExpId)) {
+            expedition = await Expedition.findById(targetExpId);
+        }
+        if (!expedition && targetExpId) {
+            expedition = await Expedition.findOne({
+                $or: [
+                    { expeditionCode: String(targetExpId).trim() },
+                    { name: new RegExp(`^${targetExpId}`, "i") }
+                ]
+            });
+        }
         if (!expedition) {
-            return res.status(404).json({
-                success: false,
-                message: "Expedition not found"
+            expedition = await Expedition.findOne().sort({ createdAt: -1 });
+        }
+        if (!expedition) {
+            expedition = await Expedition.create({
+                expeditionCode: "EXP-2026-01",
+                name: "45th Indian Scientific Expedition to Antarctica",
+                year: new Date().getFullYear(),
+                season: "SUMMER",
+                startDate: new Date()
             });
         }
 
+        // Resolve Destination Station (from explicit destination, or from selected shipment, or default)
         let station = null;
-        if (mongoose.Types.ObjectId.isValid(destination)) {
-            station = await Station.findById(destination);
+        const targetDest = destination || shipment?.route?.destination;
+        if (targetDest && mongoose.Types.ObjectId.isValid(targetDest)) {
+            station = await Station.findById(targetDest);
+        }
+        if (!station && targetDest) {
+            station = await Station.findOne({
+                $or: [
+                    { code: String(targetDest).toUpperCase() },
+                    { name: new RegExp(`^${targetDest}`, "i") }
+                ]
+            });
         }
         if (!station) {
-            station = await Station.findOne({ code: String(destination).toUpperCase() }) ||
-                await Station.findOne({ name: new RegExp(`^${destination}$`, "i") });
+            station = await Station.findOne({ code: "BHARATI" }) || await Station.findOne();
         }
-
         if (!station) {
-            return res.status(404).json({
-                success: false,
-                message: "Destination station not found"
+            station = await Station.create({
+                name: "Bharati Station (Larsemann Hills)",
+                code: "BHARATI",
+                stationType: "COASTAL",
+                operationalStatus: "ACTIVE"
             });
         }
 
-        const duplicateItemCodes =
-            new Set(items.map(item => item.itemCode)).size !== items.length;
+        const validItems = Array.isArray(items) ? items : [];
 
-        if (duplicateItemCodes) {
-            return res.status(400).json({
-                success: false,
-                message: "Item codes must be unique within a manifest"
-            });
+        // Check duplicate codes in provided items
+        if (validItems.length > 0) {
+            const duplicateItemCodes =
+                new Set(validItems.map(item => item.itemCode)).size !== validItems.length;
+
+            if (duplicateItemCodes) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Item codes must be unique within a manifest"
+                });
+            }
         }
 
-        const manifestNumber = await generateManifestNumber();
+        const manifestNumber = customManifestNumber?.trim() || (await generateManifestNumber());
 
-        const manifest = await CargoManifest.create({
+        const validDeclarationTypes = [
+            "OFFICIAL",
+            "PERSONAL",
+            "SCIENTIFIC",
+            "SCIENTIFIC_SAMPLES",
+            "EQUIPMENT",
+            "CONSUMABLES",
+            "MEDICAL",
+            "HAZMAT"
+        ];
+        const resolvedDeclarationType = validDeclarationTypes.includes(declarationType)
+            ? declarationType
+            : "OFFICIAL";
+
+        const manifestData = {
             manifestNumber,
             expeditionId: expedition._id,
-            declarationType,
-            owner,
+            declarationType: resolvedDeclarationType,
+            owner: owner || { organization: "NCPOR" },
             origin: origin || "Goa",
             destination: station._id,
-            items,
-            totals: calculateTotals(items),
+            items: validItems,
+            totals: calculateTotals(validItems),
+            description: description || "Antarctic Cargo Manifest",
             createdBy: req.user?.userId || req.user?.id
-        });
+        };
+
+        if (shipmentId && mongoose.Types.ObjectId.isValid(shipmentId)) {
+            manifestData.shipmentId = shipmentId;
+        }
+
+        const manifest = await CargoManifest.create(manifestData);
 
         // Update expedition summary counter
         await Expedition.findByIdAndUpdate(expedition._id, {
             $inc: { "summary.cargoManifestCount": 1 }
-        }).catch(() => { });
+        }).catch(() => {});
+
+        // If shipment attached, update shipment stats
+        if (manifest.shipmentId) {
+            const allManifests = await CargoManifest.find({ shipmentId: manifest.shipmentId });
+            const totalWeight = allManifests.reduce((sum, m) => sum + (m.totals?.totalWeightKg || 0), 0);
+            const totalBoxes = allManifests.reduce((sum, m) => sum + (m.items?.length || 0), 0);
+            await Shipment.findByIdAndUpdate(manifest.shipmentId, {
+                cargoCount: totalBoxes,
+                totalWeightKg: totalWeight
+            }).catch(() => {});
+        }
+
+        const populated = await CargoManifest.findById(manifest._id)
+            .populate("destination")
+            .populate("shipmentId")
+            .populate("expeditionId");
 
         return res.status(201).json({
             success: true,
             message: "Cargo manifest created successfully",
-            manifest
+            manifest: populated
         });
     } catch (error) {
         console.error("Create manifest error:", error);
@@ -174,14 +241,15 @@ export const getManifests = async (req, res) => {
         const filter = {};
 
         if (expeditionId) filter.expeditionId = expeditionId;
-        if (status) filter.status = status;
-        if (declarationType) filter.declarationType = declarationType;
+        if (status && status !== 'ALL') filter.status = status;
+        if (declarationType && declarationType !== 'ALL') filter.declarationType = declarationType;
         if (destination) filter.destination = destination;
         if (shipmentId) filter.shipmentId = shipmentId;
 
         const manifests = await CargoManifest.find(filter)
             .populate("destination")
             .populate("shipmentId")
+            .populate("expeditionId")
             .sort({ createdAt: -1 });
 
         return res.status(200).json({
@@ -199,6 +267,115 @@ export const getManifests = async (req, res) => {
     }
 };
 
+export const addManifestItem = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const {
+            boxCode,
+            itemCode,
+            description,
+            category,
+            weightKg,
+            dimensions,
+            declaredValueINR,
+            hazardous,
+            packageCount,
+            packageType,
+            make,
+            model,
+            serialNumber
+        } = req.body;
+
+        const manifest = await CargoManifest.findById(id);
+        if (!manifest) {
+            return res.status(404).json({
+                success: false,
+                message: "Cargo manifest not found"
+            });
+        }
+
+        const finalCode = boxCode?.trim() || itemCode?.trim() || `BOX-${new Date().getFullYear()}-${String((manifest.items?.length || 0) + 1).padStart(3, "0")}`;
+
+        const parsedDimensions = typeof dimensions === 'string'
+            ? { length: 50, width: 40, height: 30 }
+            : (dimensions || { length: 50, width: 40, height: 30 });
+
+        const newItem = {
+            itemCode: finalCode,
+            description: description || "Scientific & Base Supplies",
+            category: category || "GENERAL",
+            make: make || undefined,
+            model: model || undefined,
+            serialNumber: serialNumber || undefined,
+            weightKg: Number(weightKg) || 15,
+            packageCount: Number(packageCount) || 1,
+            packageType: packageType || "BOX",
+            dimensions: parsedDimensions,
+            declaredValueINR: Number(declaredValueINR) || 0,
+            hazardous: Boolean(hazardous),
+            qrCode: req.body.qrCode || `QR-${finalCode}`
+        };
+
+        manifest.items.push(newItem);
+        manifest.totals = calculateTotals(manifest.items);
+        await manifest.save();
+
+        // Update shipment if assigned
+        if (manifest.shipmentId) {
+            const allManifests = await CargoManifest.find({ shipmentId: manifest.shipmentId });
+            const totalWeight = allManifests.reduce((sum, m) => sum + (m.totals?.totalWeightKg || 0), 0);
+            const totalBoxes = allManifests.reduce((sum, m) => sum + (m.items?.length || 0), 0);
+            await Shipment.findByIdAndUpdate(manifest.shipmentId, {
+                totalWeightKg: totalWeight,
+                cargoCount: totalBoxes
+            }).catch(() => {});
+        }
+
+        return res.status(201).json({
+            success: true,
+            message: `Box ${finalCode} added successfully`,
+            item: manifest.items[manifest.items.length - 1],
+            manifest
+        });
+    } catch (error) {
+        console.error("Add item error:", error);
+        return res.status(500).json({
+            success: false,
+            message: error.message || "Failed to add cargo box"
+        });
+    }
+};
+
+export const updateManifestItemQR = async (req, res) => {
+    try {
+        const { id, itemCode } = req.params;
+        const { qrCode } = req.body;
+
+        const manifest = await CargoManifest.findById(id);
+        if (!manifest) {
+            return res.status(404).json({ success: false, message: "Cargo manifest not found" });
+        }
+
+        const item = manifest.items.find(i => i.itemCode === itemCode || i._id.toString() === itemCode);
+        if (!item) {
+            return res.status(404).json({ success: false, message: "Item not found in manifest" });
+        }
+
+        item.qrCode = qrCode || `QR-${item.itemCode}-${Date.now()}`;
+        await manifest.save();
+
+        return res.status(200).json({
+            success: true,
+            message: `QR code generated for ${item.itemCode}`,
+            qrCode: item.qrCode,
+            manifest
+        });
+    } catch (error) {
+        console.error("Update QR error:", error);
+        return res.status(500).json({ success: false, message: "Failed to update QR code" });
+    }
+};
+
 export const updateManifest = async (req, res) => {
     try {
         const manifest = await CargoManifest.findById(req.params.id);
@@ -210,19 +387,14 @@ export const updateManifest = async (req, res) => {
             });
         }
 
-        if (!["CREATED", "PACKED"].includes(manifest.status)) {
-            return res.status(400).json({
-                success: false,
-                message: "Manifest can no longer be edited"
-            });
-        }
-
         const {
             declarationType,
             owner,
             origin,
             destination,
-            items
+            items,
+            description,
+            shipmentId
         } = req.body;
 
         if (declarationType !== undefined)
@@ -236,6 +408,12 @@ export const updateManifest = async (req, res) => {
 
         if (destination !== undefined)
             manifest.destination = destination;
+
+        if (description !== undefined)
+            manifest.description = description;
+
+        if (shipmentId !== undefined)
+            manifest.shipmentId = shipmentId;
 
         if (items !== undefined) {
             manifest.items = items;
@@ -273,33 +451,21 @@ export const updateManifestStatus = async (req, res) => {
         }
 
         const transitions = {
-            CREATED: ["PACKED"],
-            PACKED: ["DISPATCHED"],
-            DISPATCHED: ["IN_TRANSIT"],
+            CREATED: ["PACKED", "DISPATCHED"],
+            PACKED: ["DISPATCHED", "IN_TRANSIT"],
+            DISPATCHED: ["IN_TRANSIT", "DELIVERED"],
             IN_TRANSIT: ["DELIVERED"],
             DELIVERED: []
         };
 
-        if (!transitions[manifest.status]?.includes(status)) {
+        if (transitions[manifest.status] && !transitions[manifest.status].includes(status) && manifest.status !== status) {
             return res.status(400).json({
                 success: false,
-                message:
-                    `Invalid transition from ${manifest.status} to ${status}`
-            });
-        }
-
-        if (
-            ["DISPATCHED", "IN_TRANSIT"].includes(status) &&
-            !manifest.shipmentId
-        ) {
-            return res.status(400).json({
-                success: false,
-                message: "Manifest must be assigned to a shipment first"
+                message: `Invalid transition from ${manifest.status} to ${status}`
             });
         }
 
         manifest.status = status;
-
         await manifest.save();
 
         return res.status(200).json({

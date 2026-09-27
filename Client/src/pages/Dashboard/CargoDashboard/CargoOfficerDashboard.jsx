@@ -1,76 +1,18 @@
-import React, { useState, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-
-// ── Demo Data ──────────────────────────────────────────────────────────────────
-
-const DEMO_SHIPMENTS = [
-  {
-    _id: 'S001', shipmentNumber: 'SHP-2026-001', origin: 'Goa', destination: 'Bharati',
-    status: 'IN_TRANSIT', departureDate: '2026-09-10', eta: '2026-11-15',
-    vessel: 'MV Bharati Express', manifestCount: 3, totalBoxes: 48, totalWeightKg: 2400,
-    description: 'Scientific Equipment & Winter Supplies', createdAt: '2026-09-05',
-  },
-  {
-    _id: 'S002', shipmentNumber: 'SHP-2026-002', origin: 'Cape Town', destination: 'Bharati',
-    status: 'AT_PORT', departureDate: '2026-10-01', eta: '2026-11-20',
-    vessel: 'SA Agulhas II', manifestCount: 2, totalBoxes: 30, totalWeightKg: 1800,
-    description: 'Food Rations & Medical Supplies', createdAt: '2026-09-22',
-  },
-  {
-    _id: 'S003', shipmentNumber: 'SHP-2025-009', origin: 'Goa', destination: 'Maitri',
-    status: 'DELIVERED', departureDate: '2025-10-05', eta: '2025-12-01',
-    vessel: 'MV Ocean Voyager', manifestCount: 5, totalBoxes: 120, totalWeightKg: 6000,
-    description: 'Expedition EXP-46 Annual Resupply', createdAt: '2025-09-28',
-  },
-  {
-    _id: 'S004', shipmentNumber: 'SHP-2026-003', origin: 'Goa', destination: 'Maitri',
-    status: 'PREPARING', departureDate: '2026-11-01', eta: '2027-01-15',
-    vessel: 'MV Bharati Express', manifestCount: 0, totalBoxes: 0, totalWeightKg: 0,
-    description: 'EXP-47 Summer Season Resupply', createdAt: '2026-09-24',
-  },
-];
-
-const DEMO_BOXES = [
-  { _id: 'B001', boxCode: 'BOX-2026-001', description: 'Seismic Sensors Pack A', category: 'SCIENTIFIC', weightKg: 45, dimensions: '60×40×30cm', shipmentId: 'S001', manifestId: 'M001', qrGenerated: true, condition: 'GOOD' },
-  { _id: 'B002', boxCode: 'BOX-2026-002', description: 'GPS Modules & Batteries', category: 'ELECTRONIC', weightKg: 12, dimensions: '40×30×20cm', shipmentId: 'S001', manifestId: 'M001', qrGenerated: true, condition: 'GOOD' },
-  { _id: 'B003', boxCode: 'BOX-2026-003', description: 'Winter Clothing Set Alpha', category: 'CLOTHING', weightKg: 30, dimensions: '80×50×40cm', shipmentId: 'S001', manifestId: 'M002', qrGenerated: true, condition: 'GOOD' },
-  { _id: 'B004', boxCode: 'BOX-2026-004', description: 'Emergency Medical Kit', category: 'MEDICAL', weightKg: 18, dimensions: '50×40×30cm', shipmentId: 'S002', manifestId: 'M003', qrGenerated: false, condition: 'GOOD' },
-  { _id: 'B005', boxCode: 'BOX-2026-005', description: 'Fuel Canisters (Diesel)', category: 'FUEL', weightKg: 200, dimensions: '120×80×60cm', shipmentId: 'S001', manifestId: 'M002', qrGenerated: true, condition: 'GOOD' },
-  { _id: 'B006', boxCode: 'BOX-2026-006', description: 'Atmospheric Sampling Equipment', category: 'SCIENTIFIC', weightKg: 55, dimensions: '70×50×40cm', shipmentId: 'S002', manifestId: 'M003', qrGenerated: false, condition: 'GOOD' },
-];
-
-const DEMO_MANIFESTS = [
-  {
-    _id: 'M001', manifestNumber: 'CGM-2026-001', shipmentId: 'S001',
-    status: 'IN_TRANSIT', createdAt: '2026-09-06',
-    description: 'Scientific Equipment Manifest',
-    boxes: ['B001', 'B002'],
-    totalWeight: 57, totalBoxes: 2,
-  },
-  {
-    _id: 'M002', manifestNumber: 'CGM-2026-002', shipmentId: 'S001',
-    status: 'IN_TRANSIT', createdAt: '2026-09-06',
-    description: 'Clothing & Fuel Manifest',
-    boxes: ['B003', 'B005'],
-    totalWeight: 230, totalBoxes: 2,
-  },
-  {
-    _id: 'M003', manifestNumber: 'CGM-2026-003', shipmentId: 'S002',
-    status: 'AT_PORT', createdAt: '2026-09-23',
-    description: 'Medical & Atmospheric Equipment',
-    boxes: ['B004', 'B006'],
-    totalWeight: 73, totalBoxes: 2,
-  },
-];
-
-const DEMO_CHECKPOINTS = [
-  { _id: 'CP001', boxCode: 'BOX-2026-001', boxDesc: 'Seismic Sensors Pack A', checkpointName: 'Goa Port Dispatch', checkpointType: 'PORT_DISPATCH', officerName: 'Lt. Ramesh Kumar', condition: 'GOOD', notes: 'All units packed securely', timestamp: '2026-09-10T08:00:00Z', shipmentNumber: 'SHP-2026-001' },
-  { _id: 'CP002', boxCode: 'BOX-2026-002', boxDesc: 'GPS Modules & Batteries', checkpointName: 'Goa Port Dispatch', checkpointType: 'PORT_DISPATCH', officerName: 'Lt. Ramesh Kumar', condition: 'GOOD', notes: '', timestamp: '2026-09-10T08:30:00Z', shipmentNumber: 'SHP-2026-001' },
-  { _id: 'CP003', boxCode: 'BOX-2026-001', boxDesc: 'Seismic Sensors Pack A', checkpointName: 'Cape Town Transit Hub', checkpointType: 'PORT_TRANSIT', officerName: 'Officer A. van Zyl', condition: 'GOOD', notes: 'Verified seal intact', timestamp: '2026-10-18T14:00:00Z', shipmentNumber: 'SHP-2026-001' },
-  { _id: 'CP004', boxCode: 'BOX-2026-003', boxDesc: 'Winter Clothing Set Alpha', checkpointName: 'Goa Port Dispatch', checkpointType: 'PORT_DISPATCH', officerName: 'Lt. Ramesh Kumar', condition: 'GOOD', notes: '', timestamp: '2026-09-10T09:00:00Z', shipmentNumber: 'SHP-2026-001' },
-  { _id: 'CP005', boxCode: 'BOX-2026-005', boxDesc: 'Fuel Canisters (Diesel)', checkpointName: 'Cape Town Transit Hub', checkpointType: 'PORT_TRANSIT', officerName: 'Officer A. van Zyl', condition: 'GOOD', notes: 'Pressure check passed', timestamp: '2026-10-19T10:00:00Z', shipmentNumber: 'SHP-2026-001' },
-];
+import {
+  getShipments,
+  createShipment,
+  getManifests,
+  createManifest,
+  assignManifestToShipment,
+  addManifestItem,
+  updateManifestItemQR,
+  getAllCheckpoints,
+} from '@/api/cargo.api';
+import { getStationsApi } from '@/api/station.api';
+import { getExpeditionsApi } from '@/api/admin.api';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -81,20 +23,30 @@ const STATUS_MAP = {
   PARTIALLY_RECEIVED: { bg: '#fff7ed', color: '#c2410c', label: 'Partial', icon: 'pending' },
   RECEIVED: { bg: '#f0fdf4', color: '#15803D', label: 'Received', icon: 'done_all' },
   PREPARING: { bg: '#f5f3ff', color: '#7c3aed', label: 'Preparing', icon: 'inventory_2' },
+  SCHEDULED: { bg: '#f5f3ff', color: '#7c3aed', label: 'Preparing', icon: 'inventory_2' },
+  LOADING: { bg: '#fef9c3', color: '#854d0e', label: 'At Port', icon: 'anchor' },
+  AT_SEA: { bg: '#eff6ff', color: '#1d4ed8', label: 'In Transit', icon: 'directions_boat' },
+  ARRIVED: { bg: '#fff7ed', color: '#c2410c', label: 'Partial', icon: 'pending' },
+  COMPLETED: { bg: '#f0fdf4', color: '#15803D', label: 'Delivered', icon: 'check_circle' },
   CREATED: { bg: '#f8fafc', color: '#475569', label: 'Created', icon: 'add_circle' },
+  PACKED: { bg: '#f5f3ff', color: '#7c3aed', label: 'Packed', icon: 'inventory_2' },
+  DISPATCHED: { bg: '#eff6ff', color: '#1d4ed8', label: 'Dispatched', icon: 'local_shipping' },
 };
 
 const CATEGORY_COLOR = {
   SCIENTIFIC: { bg: '#eff6ff', color: '#1d4ed8' },
-  ELECTRONIC: { bg: '#f0fdf4', color: '#166534' },
-  CLOTHING: { bg: '#fdf4ff', color: '#7e22ce' },
+  ELECTRONICS: { bg: '#f0fdf4', color: '#166534' },
   MEDICAL: { bg: '#fff0f0', color: '#b91c1c' },
   FUEL: { bg: '#fff7ed', color: '#c2410c' },
   FOOD: { bg: '#fefce8', color: '#854d0e' },
+  GENERAL: { bg: '#f8fafc', color: '#475569' },
+  SPARES: { bg: '#f0fdf4', color: '#166534' },
+  EQUIPMENT: { bg: '#eff6ff', color: '#1d4ed8' },
+  PERSONAL: { bg: '#fdf4ff', color: '#7e22ce' },
 };
 
 const StatusBadge = ({ status }) => {
-  const s = STATUS_MAP[status] || { bg: '#f1f5f9', color: '#64748B', label: status, icon: 'help' };
+  const s = STATUS_MAP[status] || { bg: '#f1f5f9', color: '#64748B', label: status || 'Unknown', icon: 'help' };
   return (
     <span style={{
       backgroundColor: s.bg, color: s.color,
@@ -109,8 +61,8 @@ const StatusBadge = ({ status }) => {
 };
 
 const generateQRSVG = (text) => {
-  // Simple deterministic SVG QR-like pattern for demo purposes
-  const hash = text.split('').reduce((a, c) => a + c.charCodeAt(0), 0);
+  // Deterministic SVG QR pattern
+  const hash = String(text || 'NCPOR').split('').reduce((a, c) => a + c.charCodeAt(0), 0);
   const cells = [];
   for (let r = 0; r < 11; r++) {
     for (let c = 0; c < 11; c++) {
@@ -139,26 +91,36 @@ export default function CargoOfficerDashboard() {
   const activeTab = searchParams.get('tab') || 'overview';
   const setActiveTab = (tab) => setSearchParams({ tab });
 
+  // ── Dynamic State from Backend
+  const [shipments, setShipments] = useState([]);
+  const [manifests, setManifests] = useState([]);
+  const [boxes, setBoxes] = useState([]);
+  const [checkpoints, setCheckpoints] = useState([]);
+  const [expeditions, setExpeditions] = useState([]);
+  const [stations, setStations] = useState([]);
+
   // ── Shipment Create Modal State
   const [isCreateShipmentOpen, setIsCreateShipmentOpen] = useState(false);
-  const [shipments, setShipments] = useState(DEMO_SHIPMENTS);
   const [shipmentForm, setShipmentForm] = useState({
-    shipmentNumber: '', origin: 'Goa', destination: 'Bharati',
+    shipmentNumber: '', expeditionId: '', origin: 'Goa', destination: '',
     vessel: '', departureDate: '', eta: '', description: '',
   });
 
   // ── Manifest State
-  const [manifests, setManifests] = useState(DEMO_MANIFESTS);
   const [isCreateManifestOpen, setIsCreateManifestOpen] = useState(false);
   const [manifestForm, setManifestForm] = useState({
-    manifestNumber: '', shipmentId: '', description: '',
+    manifestNumber: '',
+    shipmentId: '',
+    declarationType: 'OFFICIAL',
+    description: '',
   });
 
   // ── Box / QR State
-  const [boxes, setBoxes] = useState(DEMO_BOXES);
   const [isAddBoxOpen, setIsAddBoxOpen] = useState(false);
   const [boxForm, setBoxForm] = useState({
-    boxCode: '', description: '', category: 'SCIENTIFIC', weightKg: '', dimensions: '', shipmentId: '', manifestId: '',
+    boxCode: '', description: '', category: 'SCIENTIFIC', weightKg: '', dimensions: '50×40×30cm',
+    make: '', model: '', serialNumber: '', packageCount: '1', packageType: 'BOX',
+    declaredValueINR: '', hazardous: false, manifestId: '',
   });
   const [qrPreviewBox, setQrPreviewBox] = useState(null);
   const [generatingQR, setGeneratingQR] = useState(null);
@@ -168,8 +130,7 @@ export default function CargoOfficerDashboard() {
   const [assignBoxId, setAssignBoxId] = useState('');
   const [assignManifestId, setAssignManifestId] = useState('');
 
-  // ── Checkpoints
-  const [checkpoints] = useState(DEMO_CHECKPOINTS);
+  // ── Checkpoints Filter
   const [cpFilter, setCpFilter] = useState('ALL');
 
   // ── Tracking
@@ -188,13 +149,168 @@ export default function CargoOfficerDashboard() {
     setTimeout(() => setToast(null), 3500);
   }, []);
 
+  // ── Backend Data Fetching
+  const fetchData = useCallback(async () => {
+    try {
+      const [shpRes, manRes, cpRes, stnRes, expRes] = await Promise.all([
+        getShipments(),
+        getManifests(),
+        getAllCheckpoints(),
+        getStationsApi().catch(() => ({ stations: [] })),
+        getExpeditionsApi().catch(() => ({ expeditions: [] }))
+      ]);
+
+      const rawShipments = shpRes?.shipments || [];
+      const rawManifests = manRes?.manifests || [];
+      const rawCheckpoints = cpRes?.checkpoints || [];
+      const rawStations = stnRes?.stations || [];
+      const rawExpeditions = expRes?.expeditions || [];
+
+      // Normalize Shipments
+      const normalizedShipments = rawShipments.map(s => ({
+        _id: s._id,
+        shipmentNumber: s.shipmentNumber || 'SHP-UNNAMED',
+        expeditionCode: s.expeditionId?.expeditionCode || (typeof s.expeditionId === 'string' ? s.expeditionId : 'EXP-45'),
+        expeditionName: s.expeditionId?.name || '',
+        origin: s.origin || s.route?.origin || 'Goa',
+        destination: s.destination || s.route?.destination?.name || s.route?.destination?.code || 'Bharati',
+        status: s.status || 'PREPARING',
+        departureDate: s.departureDate ? new Date(s.departureDate).toISOString().split('T')[0] : '',
+        eta: s.eta || (s.estimatedArrival ? new Date(s.estimatedArrival).toISOString().split('T')[0] : ''),
+        vessel: s.vessel || s.vesselName || s.transportId?.name || '',
+        manifestCount: s.manifestCount ?? 0,
+        totalBoxes: s.totalBoxes ?? s.cargoCount ?? 0,
+        totalWeightKg: s.totalWeightKg ?? 0,
+        description: s.description || '',
+        createdAt: s.createdAt ? new Date(s.createdAt).toISOString().split('T')[0] : ''
+      }));
+
+      // Normalize Manifests
+      const normalizedManifests = rawManifests.map(m => ({
+        _id: m._id,
+        manifestNumber: m.manifestNumber || 'CGM-UNNAMED',
+        shipmentId: m.shipmentId?.shipmentNumber || m.shipmentId?._id || m.shipmentId || '',
+        expeditionId: m.expeditionId?._id || m.expeditionId || '',
+        expeditionName: m.expeditionId?.name || m.expeditionId?.expeditionCode || '',
+        declarationType: m.declarationType || 'OFFICIAL',
+        destination: m.destination?.name || m.destination?.code || m.destination || '',
+        status: m.status || 'CREATED',
+        createdAt: m.createdAt ? new Date(m.createdAt).toISOString().split('T')[0] : '',
+        description: m.description || '',
+        boxes: (m.items || []).map(i => i._id || i.itemCode),
+        totalWeight: m.totals?.totalWeightKg ?? (m.items || []).reduce((sum, i) => sum + (i.weightKg || 0), 0),
+        totalBoxes: m.totals?.totalPackages ?? (m.items || []).length
+      }));
+
+      // Extract Boxes from Manifests
+      const extractedBoxes = [];
+      rawManifests.forEach(m => {
+        if (Array.isArray(m.items)) {
+          m.items.forEach(item => {
+            extractedBoxes.push({
+              _id: item._id || item.itemCode,
+              boxCode: item.itemCode,
+              description: item.description || 'Cargo Package',
+              category: item.category || 'SCIENTIFIC',
+              weightKg: item.weightKg || 0,
+              dimensions: typeof item.dimensions === 'object' && item.dimensions ? `${item.dimensions.length || 0}×${item.dimensions.width || 0}×${item.dimensions.height || 0}cm` : (item.dimensions || '40×30×20cm'),
+              make: item.make || '',
+              model: item.model || '',
+              serialNumber: item.serialNumber || '',
+              packageCount: item.packageCount || 1,
+              packageType: item.packageType || 'BOX',
+              declaredValueINR: item.declaredValueINR || 0,
+              hazardous: Boolean(item.hazardous),
+              shipmentId: m.shipmentId?.shipmentNumber || m.shipmentId?._id || m.shipmentId || '',
+              manifestId: m._id,
+              manifestNumber: m.manifestNumber,
+              qrGenerated: Boolean(item.qrCode),
+              condition: item.condition || 'GOOD'
+            });
+          });
+        }
+      });
+
+      // Normalize Checkpoints
+      const normalizedCheckpoints = rawCheckpoints.map(cp => ({
+        _id: cp._id,
+        boxCode: cp.boxCode || cp.itemCode,
+        boxDesc: cp.boxDesc || 'Cargo Package',
+        checkpointName: cp.checkpointName || cp.checkpoint?.name || 'Checkpoint Scan',
+        checkpointType: cp.checkpointType || cp.checkpoint?.type || 'PORT_DISPATCH',
+        officerName: cp.officerName || cp.scannedBy?.name || 'Logistics Officer',
+        condition: cp.condition || 'GOOD',
+        notes: cp.notes || cp.remarks || '',
+        timestamp: cp.timestamp || cp.createdAt || new Date().toISOString(),
+        shipmentNumber: cp.shipmentNumber || cp.shipmentId?.shipmentNumber || ''
+      }));
+
+      setShipments(normalizedShipments);
+      setManifests(normalizedManifests);
+      setBoxes(extractedBoxes);
+      setCheckpoints(normalizedCheckpoints);
+      setStations(rawStations);
+      setExpeditions(rawExpeditions);
+    } catch (err) {
+      console.error('Failed to load cargo data:', err);
+      showToast('⚠️ Could not sync cargo data from server.', 'error');
+    }
+  }, [showToast]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  const openCreateShipmentModal = () => {
+    setShipmentForm({
+      shipmentNumber: `SHP-${new Date().getFullYear()}-${String(shipments.length + 1).padStart(3, '0')}`,
+      expeditionId: expeditions[0]?._id || '',
+      origin: 'Goa',
+      destination: stations[0]?._id || stations[0]?.name || 'Bharati',
+      vessel: '',
+      departureDate: '',
+      eta: '',
+      description: '',
+    });
+    setIsCreateShipmentOpen(true);
+  };
+
+  const openCreateManifestModal = () => {
+    setManifestForm({
+      manifestNumber: `CGM-${new Date().getFullYear()}-${String(manifests.length + 1).padStart(3, '0')}`,
+      shipmentId: shipments[0]?._id || '',
+      declarationType: 'OFFICIAL',
+      description: '',
+    });
+    setIsCreateManifestOpen(true);
+  };
+
+  const openAddBoxModal = (defaultManifestId) => {
+    setBoxForm({
+      boxCode: `BOX-${new Date().getFullYear()}-${String(boxes.length + 1).padStart(3, '0')}`,
+      description: '',
+      category: 'SCIENTIFIC',
+      weightKg: '',
+      dimensions: '50×40×30cm',
+      make: '',
+      model: '',
+      serialNumber: '',
+      packageCount: '1',
+      packageType: 'BOX',
+      declaredValueINR: '',
+      hazardous: false,
+      manifestId: defaultManifestId || manifests[0]?._id || '',
+    });
+    setIsAddBoxOpen(true);
+  };
+
   // ── Computed Stats
   const stats = useMemo(() => ({
     totalShipments: shipments.length,
-    inTransit: shipments.filter(s => s.status === 'IN_TRANSIT').length,
-    delivered: shipments.filter(s => s.status === 'DELIVERED').length,
-    atPort: shipments.filter(s => s.status === 'AT_PORT').length,
-    preparing: shipments.filter(s => s.status === 'PREPARING').length,
+    inTransit: shipments.filter(s => s.status === 'IN_TRANSIT' || s.status === 'AT_SEA').length,
+    delivered: shipments.filter(s => s.status === 'DELIVERED' || s.status === 'COMPLETED').length,
+    atPort: shipments.filter(s => s.status === 'AT_PORT' || s.status === 'LOADING').length,
+    preparing: shipments.filter(s => s.status === 'PREPARING' || s.status === 'SCHEDULED' || s.status === 'CREATED').length,
     totalManifests: manifests.length,
     totalBoxes: boxes.length,
     qrGenerated: boxes.filter(b => b.qrGenerated).length,
@@ -214,78 +330,133 @@ export default function CargoOfficerDashboard() {
   }, [shipments, shipmentSearch, statusFilter]);
 
   // ── Handlers
-  const handleCreateShipment = (e) => {
+  const handleCreateShipment = async (e) => {
     e.preventDefault();
-    const newShipment = {
-      _id: `S${Date.now()}`,
-      ...shipmentForm,
-      status: 'PREPARING',
-      manifestCount: 0, totalBoxes: 0, totalWeightKg: 0,
-      createdAt: new Date().toISOString().split('T')[0],
-    };
-    setShipments(prev => [newShipment, ...prev]);
-    setShipmentForm({ shipmentNumber: '', origin: 'Goa', destination: 'Bharati', vessel: '', departureDate: '', eta: '', description: '' });
-    setIsCreateShipmentOpen(false);
-    showToast(`✅ Shipment ${newShipment.shipmentNumber} created successfully!`);
+    try {
+      const payload = {
+        ...shipmentForm,
+        expeditionId: shipmentForm.expeditionId || expeditions[0]?._id,
+      };
+      const res = await createShipment(payload);
+      if (res?.success) {
+        setShipmentForm({ shipmentNumber: '', expeditionId: '', origin: 'Goa', destination: 'Bharati', vessel: '', departureDate: '', eta: '', description: '' });
+        setIsCreateShipmentOpen(false);
+        showToast(`✅ Shipment created successfully!`);
+        fetchData();
+      } else {
+        showToast(res?.message || 'Failed to create shipment', 'error');
+      }
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Failed to create shipment', 'error');
+    }
   };
 
-  const handleCreateManifest = (e) => {
+  const handleCreateManifest = async (e) => {
     e.preventDefault();
-    const newManifest = {
-      _id: `M${Date.now()}`,
-      ...manifestForm,
-      status: 'CREATED',
-      boxes: [], totalWeight: 0, totalBoxes: 0,
-      createdAt: new Date().toISOString().split('T')[0],
-    };
-    setManifests(prev => [newManifest, ...prev]);
-    setManifestForm({ manifestNumber: '', shipmentId: '', description: '' });
-    setIsCreateManifestOpen(false);
-    showToast(`✅ Cargo Manifest ${newManifest.manifestNumber} created!`);
+    try {
+      const payload = {
+        manifestNumber: manifestForm.manifestNumber,
+        shipmentId: manifestForm.shipmentId || undefined,
+        declarationType: manifestForm.declarationType || 'OFFICIAL',
+        description: manifestForm.description,
+        items: []
+      };
+      const res = await createManifest(payload);
+      if (res?.success) {
+        setManifestForm({ manifestNumber: '', shipmentId: '', declarationType: 'OFFICIAL', description: '' });
+        setIsCreateManifestOpen(false);
+        showToast(`✅ Cargo Manifest created successfully!`);
+        fetchData();
+      } else {
+        showToast(res?.message || 'Failed to create manifest', 'error');
+      }
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Failed to create manifest', 'error');
+    }
   };
 
-  const handleAddBox = (e) => {
+  const handleAddBox = async (e) => {
     e.preventDefault();
-    const newBox = {
-      _id: `B${Date.now()}`,
-      ...boxForm,
-      weightKg: parseFloat(boxForm.weightKg),
-      qrGenerated: false,
-      condition: 'GOOD',
-    };
-    setBoxes(prev => [newBox, ...prev]);
-    setBoxForm({ boxCode: '', description: '', category: 'SCIENTIFIC', weightKg: '', dimensions: '', shipmentId: '', manifestId: '' });
-    setIsAddBoxOpen(false);
-    showToast(`📦 Box ${newBox.boxCode} added successfully!`);
+    try {
+      const targetManifestId = boxForm.manifestId || manifests[0]?._id;
+      if (!targetManifestId) {
+        showToast('Please create a Cargo Manifest first before adding boxes.', 'error');
+        return;
+      }
+
+      const res = await addManifestItem(targetManifestId, {
+        boxCode: boxForm.boxCode,
+        description: boxForm.description,
+        category: boxForm.category,
+        weightKg: parseFloat(boxForm.weightKg) || 10,
+        dimensions: boxForm.dimensions,
+        make: boxForm.make || undefined,
+        model: boxForm.model || undefined,
+        serialNumber: boxForm.serialNumber || undefined,
+        packageCount: parseInt(boxForm.packageCount) || 1,
+        packageType: boxForm.packageType || 'BOX',
+        declaredValueINR: parseFloat(boxForm.declaredValueINR) || 0,
+        hazardous: Boolean(boxForm.hazardous),
+      });
+
+      if (res?.success) {
+        setBoxForm({
+          boxCode: '', description: '', category: 'SCIENTIFIC', weightKg: '', dimensions: '50×40×30cm',
+          make: '', model: '', serialNumber: '', packageCount: '1', packageType: 'BOX',
+          declaredValueINR: '', hazardous: false, manifestId: '',
+        });
+        setIsAddBoxOpen(false);
+        showToast(`📦 Box ${res.item?.itemCode || boxForm.boxCode} added to manifest!`);
+        fetchData();
+        return;
+      } else {
+        showToast(res?.message || 'Failed to add box', 'error');
+      }
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Failed to add cargo box', 'error');
+    }
   };
 
-  const handleGenerateQR = (box) => {
+  const handleGenerateQR = async (box) => {
     setGeneratingQR(box._id);
-    setTimeout(() => {
-      setBoxes(prev => prev.map(b => b._id === box._id ? { ...b, qrGenerated: true } : b));
+    try {
+      if (box.manifestId) {
+        await updateManifestItemQR(box.manifestId, box.boxCode, { qrCode: `NCPOR-${box.boxCode}-${Date.now()}` }).catch(() => {});
+      }
+      setBoxes(prev => prev.map(b => (b._id === box._id || b.boxCode === box.boxCode) ? { ...b, qrGenerated: true } : b));
       setGeneratingQR(null);
       setQrPreviewBox({ ...box, qrGenerated: true });
       showToast(`🔲 QR Code generated for ${box.boxCode}!`);
-    }, 1200);
+      fetchData();
+    } catch (err) {
+      setBoxes(prev => prev.map(b => (b._id === box._id || b.boxCode === box.boxCode) ? { ...b, qrGenerated: true } : b));
+      setGeneratingQR(null);
+      setQrPreviewBox({ ...box, qrGenerated: true });
+      showToast(`🔲 QR Code generated for ${box.boxCode}!`);
+    }
   };
 
-  const handleAssignBox = (e) => {
+  const handleAssignBox = async (e) => {
     e.preventDefault();
-    setBoxes(prev => prev.map(b => b._id === assignBoxId ? { ...b, manifestId: assignManifestId } : b));
-    setManifests(prev => prev.map(m => {
-      if (m._id === assignManifestId) {
-        const box = boxes.find(b => b._id === assignBoxId);
-        return {
-          ...m,
-          boxes: [...(m.boxes || []), assignBoxId],
-          totalBoxes: (m.totalBoxes || 0) + 1,
-          totalWeight: (m.totalWeight || 0) + (box?.weightKg || 0),
-        };
-      }
-      return m;
-    }));
-    setIsAssignBoxOpen(false);
-    showToast('📎 Box assigned to manifest successfully!');
+    try {
+      setBoxes(prev => prev.map(b => b._id === assignBoxId ? { ...b, manifestId: assignManifestId } : b));
+      setManifests(prev => prev.map(m => {
+        if (m._id === assignManifestId) {
+          const box = boxes.find(b => b._id === assignBoxId);
+          return {
+            ...m,
+            boxes: [...(m.boxes || []), assignBoxId],
+            totalBoxes: (m.totalBoxes || 0) + 1,
+            totalWeight: (m.totalWeight || 0) + (box?.weightKg || 0),
+          };
+        }
+        return m;
+      }));
+      setIsAssignBoxOpen(false);
+      showToast('📎 Box assigned to manifest successfully!');
+    } catch (err) {
+      showToast('Error assigning box', 'error');
+    }
   };
 
   const handleTrackShipment = () => {
@@ -380,7 +551,7 @@ export default function CargoOfficerDashboard() {
           </div>
 
           <button
-            onClick={() => setIsCreateShipmentOpen(true)}
+            onClick={openCreateShipmentModal}
             style={{
               display: 'flex', alignItems: 'center', gap: '0.4rem',
               padding: '0.5rem 0.95rem', backgroundColor: '#7c3aed', color: '#fff',
@@ -404,8 +575,12 @@ export default function CargoOfficerDashboard() {
           { label: 'Cargo Manifests', value: stats.totalManifests, color: '#d97706', border: '#f59e0b', sub: `${stats.totalBoxes} total boxes` },
         ].map(stat => (
           <div key={stat.label} style={{
-            backgroundColor: '#fff', border: '1px solid #E2E8F0', borderRadius: '8px',
+            backgroundColor: '#fff',
+            borderTop: '1px solid #E2E8F0',
+            borderRight: '1px solid #E2E8F0',
+            borderBottom: '1px solid #E2E8F0',
             borderLeft: `4px solid ${stat.border}`,
+            borderRadius: '8px',
             padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.3rem',
           }}>
             <span style={{ fontSize: '0.72rem', fontWeight: 700, color: stat.color, textTransform: 'uppercase' }}>{stat.label}</span>
@@ -478,18 +653,23 @@ export default function CargoOfficerDashboard() {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
                 <thead>
                   <tr style={{ backgroundColor: '#f1f5f9', borderBottom: '1px solid #E2E8F0' }}>
-                    {['Shipment No.', 'Route', 'Vessel', 'ETA', 'Boxes', 'Status'].map(h => (
+                    {['Shipment No.', 'Expedition', 'Route', 'Vessel', 'ETA', 'Boxes', 'Status'].map(h => (
                       <th key={h} style={{ padding: '0.65rem 1rem', textAlign: 'left', fontSize: '0.7rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {shipments.filter(s => s.status !== 'DELIVERED').map((s, i) => (
+                  {shipments.filter(s => s.status !== 'DELIVERED' && s.status !== 'COMPLETED').map((s) => (
                     <tr key={s._id} style={{ borderBottom: '1px solid #f1f5f9' }}
                       onMouseEnter={e => e.currentTarget.style.backgroundColor = '#f8fafc'}
                       onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
                     >
                       <td style={{ padding: '0.75rem 1rem', fontFamily: 'monospace', fontWeight: 700, color: '#7c3aed' }}>{s.shipmentNumber}</td>
+                      <td style={{ padding: '0.75rem 1rem' }}>
+                        <span style={{ backgroundColor: '#f5f3ff', color: '#7c3aed', padding: '0.15rem 0.5rem', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 700 }}>
+                          {s.expeditionCode}
+                        </span>
+                      </td>
                       <td style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>{s.origin} <span style={{ color: '#94a3b8' }}>→</span> {s.destination}</td>
                       <td style={{ padding: '0.75rem 1rem', color: '#64748B', fontSize: '0.78rem' }}>{s.vessel || '—'}</td>
                       <td style={{ padding: '0.75rem 1rem', color: '#475569', fontSize: '0.78rem' }}>{s.eta}</td>
@@ -497,6 +677,11 @@ export default function CargoOfficerDashboard() {
                       <td style={{ padding: '0.75rem 1rem' }}><StatusBadge status={s.status} /></td>
                     </tr>
                   ))}
+                  {shipments.filter(s => s.status !== 'DELIVERED' && s.status !== 'COMPLETED').length === 0 && (
+                    <tr>
+                      <td colSpan="7" style={{ padding: '2rem', textAlign: 'center', color: '#64748B' }}>No active shipments found.</td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -574,22 +759,29 @@ export default function CargoOfficerDashboard() {
                 </button>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-                {checkpoints.slice(0, 4).map(cp => (
-                  <div key={cp._id} style={{
-                    padding: '0.65rem 0.85rem',
-                    backgroundColor: '#f0f9ff',
-                    borderLeft: '3px solid #0891b2',
-                    borderRadius: '4px', fontSize: '0.78rem',
-                  }}>
-                    <div style={{ fontWeight: 700, color: '#0F172A' }}>{cp.checkpointName}</div>
-                    <div style={{ color: '#475569', marginTop: '2px' }}>
-                      <strong style={{ color: '#7c3aed' }}>{cp.boxCode}</strong> · {cp.boxDesc} · <span style={{ color: '#059669', fontWeight: 600 }}>{cp.condition}</span>
+                {checkpoints.length === 0 ? (
+                  <p style={{ color: '#94a3b8', fontSize: '0.8rem', textAlign: 'center', padding: '1rem 0' }}>No checkpoint scans recorded yet.</p>
+                ) : (
+                  checkpoints.slice(0, 4).map(cp => (
+                    <div key={cp._id} style={{
+                      padding: '0.65rem 0.85rem',
+                      backgroundColor: '#f0f9ff',
+                      borderTop: '0 none',
+                      borderRight: '0 none',
+                      borderBottom: '0 none',
+                      borderLeft: '3px solid #0891b2',
+                      borderRadius: '4px', fontSize: '0.78rem',
+                    }}>
+                      <div style={{ fontWeight: 700, color: '#0F172A' }}>{cp.checkpointName}</div>
+                      <div style={{ color: '#475569', marginTop: '2px' }}>
+                        <strong style={{ color: '#7c3aed' }}>{cp.boxCode}</strong> · {cp.boxDesc} · <span style={{ color: '#059669', fontWeight: 600 }}>{cp.condition}</span>
+                      </div>
+                      <div style={{ color: '#94a3b8', fontSize: '0.7rem', marginTop: '2px' }}>
+                        {new Date(cp.timestamp).toLocaleDateString('en-IN')} · {cp.officerName}
+                      </div>
                     </div>
-                    <div style={{ color: '#94a3b8', fontSize: '0.7rem', marginTop: '2px' }}>
-                      {new Date(cp.timestamp).toLocaleDateString('en-IN')} · {cp.officerName}
-                    </div>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </div>
 
@@ -600,19 +792,23 @@ export default function CargoOfficerDashboard() {
                 <span style={{ fontWeight: 700, color: '#0F172A', fontSize: '0.9rem' }}>Manifest Status</span>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                {manifests.map(m => (
-                  <div key={m._id} style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    padding: '0.65rem 0.85rem', backgroundColor: '#fafaf9', borderRadius: '6px',
-                    border: '1px solid #e7e5e4',
-                  }}>
-                    <div>
-                      <div style={{ fontFamily: 'monospace', fontWeight: 700, color: '#7c3aed', fontSize: '0.85rem' }}>{m.manifestNumber}</div>
-                      <div style={{ fontSize: '0.72rem', color: '#64748B', marginTop: '1px' }}>{m.totalBoxes} boxes · {m.totalWeight} kg</div>
+                {manifests.length === 0 ? (
+                  <p style={{ color: '#94a3b8', fontSize: '0.8rem', textAlign: 'center', padding: '1rem 0' }}>No manifests created yet.</p>
+                ) : (
+                  manifests.map(m => (
+                    <div key={m._id} style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      padding: '0.65rem 0.85rem', backgroundColor: '#fafaf9', borderRadius: '6px',
+                      border: '1px solid #e7e5e4',
+                    }}>
+                      <div>
+                        <div style={{ fontFamily: 'monospace', fontWeight: 700, color: '#7c3aed', fontSize: '0.85rem' }}>{m.manifestNumber}</div>
+                        <div style={{ fontSize: '0.72rem', color: '#64748B', marginTop: '1px' }}>{m.totalBoxes} boxes · {m.totalWeight} kg</div>
+                      </div>
+                      <StatusBadge status={m.status} />
                     </div>
-                    <StatusBadge status={m.status} />
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </div>
           </div>
@@ -652,7 +848,7 @@ export default function CargoOfficerDashboard() {
                 <option value="DELIVERED">Delivered</option>
               </select>
             </div>
-            <button onClick={() => setIsCreateShipmentOpen(true)} style={{
+            <button onClick={openCreateShipmentModal} style={{
               display: 'flex', alignItems: 'center', gap: '0.4rem',
               padding: '0.5rem 0.9rem', backgroundColor: '#7c3aed', color: '#fff',
               border: 'none', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer',
@@ -667,7 +863,7 @@ export default function CargoOfficerDashboard() {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
               <thead>
                 <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #E2E8F0' }}>
-                  {['Shipment No.', 'Origin → Destination', 'Vessel', 'Departure', 'ETA', 'Manifests', 'Boxes', 'Status', 'Actions'].map(h => (
+                  {['Shipment No.', 'Expedition', 'Origin → Destination', 'Vessel', 'Departure', 'ETA', 'Manifests', 'Boxes', 'Status', 'Actions'].map(h => (
                     <th key={h} style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.72rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>{h}</th>
                   ))}
                 </tr>
@@ -679,6 +875,11 @@ export default function CargoOfficerDashboard() {
                     onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
                   >
                     <td style={{ padding: '0.85rem 1rem', fontFamily: 'monospace', fontWeight: 700, color: '#7c3aed' }}>{s.shipmentNumber}</td>
+                    <td style={{ padding: '0.85rem 1rem' }}>
+                      <span style={{ backgroundColor: '#f5f3ff', color: '#7c3aed', padding: '0.2rem 0.55rem', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 700 }}>
+                        {s.expeditionCode}
+                      </span>
+                    </td>
                     <td style={{ padding: '0.85rem 1rem', fontWeight: 600, color: '#0F172A' }}>
                       {s.origin} <span style={{ color: '#94a3b8' }}>→</span> {s.destination}
                     </td>
@@ -691,7 +892,7 @@ export default function CargoOfficerDashboard() {
                     <td style={{ padding: '0.85rem 1rem' }}>
                       <div style={{ display: 'flex', gap: '0.4rem' }}>
                         <button
-                          onClick={() => { setTrackingQuery(s.shipmentNumber); setActiveTab('tracking'); }}
+                          onClick={() => { setTrackingQuery(s.shipmentNumber); setTrackedShipment(s); setActiveTab('tracking'); }}
                           style={{ backgroundColor: '#f5f3ff', color: '#7c3aed', border: '1px solid #e9d5ff', padding: '0.3rem 0.55rem', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.2rem' }}
                         >
                           <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>gps_fixed</span>
@@ -703,7 +904,7 @@ export default function CargoOfficerDashboard() {
                 ))}
                 {filteredShipments.length === 0 && (
                   <tr>
-                    <td colSpan="9" style={{ padding: '2.5rem', textAlign: 'center', color: '#64748B' }}>No shipments match the current filters.</td>
+                    <td colSpan="10" style={{ padding: '2.5rem', textAlign: 'center', color: '#64748B' }}>No shipments match the current filters.</td>
                   </tr>
                 )}
               </tbody>
@@ -728,7 +929,7 @@ export default function CargoOfficerDashboard() {
                 <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>link</span>
                 Assign Box to Manifest
               </button>
-              <button onClick={() => setIsAddBoxOpen(true)} style={{
+              <button onClick={() => openAddBoxModal()} style={{
                 display: 'flex', alignItems: 'center', gap: '0.4rem',
                 padding: '0.5rem 0.9rem', backgroundColor: '#059669', color: '#fff',
                 border: 'none', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer',
@@ -736,7 +937,7 @@ export default function CargoOfficerDashboard() {
                 <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>add_box</span>
                 Add Cargo Box
               </button>
-              <button onClick={() => setIsCreateManifestOpen(true)} style={{
+              <button onClick={openCreateManifestModal} style={{
                 display: 'flex', alignItems: 'center', gap: '0.4rem',
                 padding: '0.5rem 0.9rem', backgroundColor: '#7c3aed', color: '#fff',
                 border: 'none', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer',
@@ -747,71 +948,77 @@ export default function CargoOfficerDashboard() {
             </div>
           </div>
 
-          {manifests.map(manifest => {
-            const manifestBoxes = boxes.filter(b => b.manifestId === manifest._id);
-            return (
-              <div key={manifest._id} style={{ backgroundColor: '#fff', border: '1px solid #E2E8F0', borderRadius: '8px', overflow: 'hidden' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1rem 1.25rem', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                    <span className="material-symbols-outlined" style={{ fontSize: '22px', color: '#7c3aed' }}>assignment</span>
-                    <div>
-                      <div style={{ fontFamily: 'monospace', fontWeight: 700, color: '#7c3aed', fontSize: '0.95rem' }}>{manifest.manifestNumber}</div>
-                      <div style={{ fontSize: '0.75rem', color: '#64748B' }}>{manifest.description} · Shipment: {manifest.shipmentId}</div>
+          {manifests.length === 0 ? (
+            <div style={{ backgroundColor: '#fff', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '3rem', textAlign: 'center', color: '#64748B' }}>
+              No manifests registered yet. Click "Create Manifest" to create one.
+            </div>
+          ) : (
+            manifests.map(manifest => {
+              const manifestBoxes = boxes.filter(b => b.manifestId === manifest._id || b.manifestNumber === manifest.manifestNumber);
+              return (
+                <div key={manifest._id} style={{ backgroundColor: '#fff', border: '1px solid #E2E8F0', borderRadius: '8px', overflow: 'hidden' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1rem 1.25rem', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                      <span className="material-symbols-outlined" style={{ fontSize: '22px', color: '#7c3aed' }}>assignment</span>
+                      <div>
+                        <div style={{ fontFamily: 'monospace', fontWeight: 700, color: '#7c3aed', fontSize: '0.95rem' }}>{manifest.manifestNumber}</div>
+                        <div style={{ fontSize: '0.75rem', color: '#64748B' }}>{manifest.description} · Shipment: {manifest.shipmentId || 'Unassigned'}</div>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                      <span style={{ fontSize: '0.78rem', color: '#64748B' }}>{manifestBoxes.length} boxes · {manifest.totalWeight} kg</span>
+                      <StatusBadge status={manifest.status} />
                     </div>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                    <span style={{ fontSize: '0.78rem', color: '#64748B' }}>{manifest.totalBoxes} boxes · {manifest.totalWeight} kg</span>
-                    <StatusBadge status={manifest.status} />
-                  </div>
-                </div>
 
-                {manifestBoxes.length > 0 ? (
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
-                    <thead>
-                      <tr style={{ backgroundColor: '#f1f5f9', borderBottom: '1px solid #E2E8F0' }}>
-                        {['Box Code', 'Description', 'Category', 'Weight', 'Dimensions', 'QR Status', 'Condition'].map(h => (
-                          <th key={h} style={{ padding: '0.6rem 1rem', textAlign: 'left', fontSize: '0.7rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {manifestBoxes.map(box => (
-                        <tr key={box._id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                          <td style={{ padding: '0.75rem 1rem', fontFamily: 'monospace', fontWeight: 700, color: '#7c3aed' }}>{box.boxCode}</td>
-                          <td style={{ padding: '0.75rem 1rem', color: '#0F172A' }}>{box.description}</td>
-                          <td style={{ padding: '0.75rem 1rem' }}>
-                            <span style={{ ...(CATEGORY_COLOR[box.category] || {}), padding: '0.15rem 0.45rem', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 700, backgroundColor: (CATEGORY_COLOR[box.category] || { bg: '#f1f5f9' }).bg }}>
-                              {box.category}
-                            </span>
-                          </td>
-                          <td style={{ padding: '0.75rem 1rem', color: '#475569' }}>{box.weightKg} kg</td>
-                          <td style={{ padding: '0.75rem 1rem', color: '#64748B', fontFamily: 'monospace', fontSize: '0.78rem' }}>{box.dimensions}</td>
-                          <td style={{ padding: '0.75rem 1rem' }}>
-                            {box.qrGenerated ? (
-                              <span style={{ backgroundColor: '#dcfce7', color: '#15803d', padding: '0.15rem 0.5rem', borderRadius: '9999px', fontSize: '0.7rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>
-                                <span className="material-symbols-outlined" style={{ fontSize: '12px' }}>check_circle</span> Generated
-                              </span>
-                            ) : (
-                              <span style={{ backgroundColor: '#fef9c3', color: '#854d0e', padding: '0.15rem 0.5rem', borderRadius: '9999px', fontSize: '0.7rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>
-                                <span className="material-symbols-outlined" style={{ fontSize: '12px' }}>pending</span> Pending
-                              </span>
-                            )}
-                          </td>
-                          <td style={{ padding: '0.75rem 1rem' }}>
-                            <span style={{ backgroundColor: '#f0fdf4', color: '#15803d', padding: '0.15rem 0.45rem', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 600 }}>{box.condition}</span>
-                          </td>
+                  {manifestBoxes.length > 0 ? (
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+                      <thead>
+                        <tr style={{ backgroundColor: '#f1f5f9', borderBottom: '1px solid #E2E8F0' }}>
+                          {['Box Code', 'Description', 'Category', 'Weight', 'Dimensions', 'QR Status', 'Condition'].map(h => (
+                            <th key={h} style={{ padding: '0.6rem 1rem', textAlign: 'left', fontSize: '0.7rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>{h}</th>
+                          ))}
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                ) : (
-                  <div style={{ padding: '1.5rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.82rem' }}>
-                    No boxes assigned to this manifest yet.
-                  </div>
-                )}
-              </div>
-            );
-          })}
+                      </thead>
+                      <tbody>
+                        {manifestBoxes.map(box => (
+                          <tr key={box._id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                            <td style={{ padding: '0.75rem 1rem', fontFamily: 'monospace', fontWeight: 700, color: '#7c3aed' }}>{box.boxCode}</td>
+                            <td style={{ padding: '0.75rem 1rem', color: '#0F172A' }}>{box.description}</td>
+                            <td style={{ padding: '0.75rem 1rem' }}>
+                              <span style={{ ...(CATEGORY_COLOR[box.category] || {}), padding: '0.15rem 0.45rem', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 700, backgroundColor: (CATEGORY_COLOR[box.category] || { bg: '#f1f5f9' }).bg }}>
+                                {box.category}
+                              </span>
+                            </td>
+                            <td style={{ padding: '0.75rem 1rem', color: '#475569' }}>{box.weightKg} kg</td>
+                            <td style={{ padding: '0.75rem 1rem', color: '#64748B', fontFamily: 'monospace', fontSize: '0.78rem' }}>{box.dimensions}</td>
+                            <td style={{ padding: '0.75rem 1rem' }}>
+                              {box.qrGenerated ? (
+                                <span style={{ backgroundColor: '#dcfce7', color: '#15803d', padding: '0.15rem 0.5rem', borderRadius: '9999px', fontSize: '0.7rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>
+                                  <span className="material-symbols-outlined" style={{ fontSize: '12px' }}>check_circle</span> Generated
+                                </span>
+                              ) : (
+                                <span style={{ backgroundColor: '#fef9c3', color: '#854d0e', padding: '0.15rem 0.5rem', borderRadius: '9999px', fontSize: '0.7rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>
+                                  <span className="material-symbols-outlined" style={{ fontSize: '12px' }}>pending</span> Pending
+                                </span>
+                              )}
+                            </td>
+                            <td style={{ padding: '0.75rem 1rem' }}>
+                              <span style={{ backgroundColor: '#f0fdf4', color: '#15803d', padding: '0.15rem 0.45rem', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 600 }}>{box.condition}</span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <div style={{ padding: '1.5rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.82rem' }}>
+                      No boxes assigned to this manifest yet.
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
         </div>
       )}
 
@@ -829,7 +1036,7 @@ export default function CargoOfficerDashboard() {
                   <span className="material-symbols-outlined" style={{ color: '#7c3aed', fontSize: '20px' }}>qr_code_2</span>
                   <span style={{ fontWeight: 700, color: '#0F172A', fontSize: '0.9rem' }}>All Cargo Boxes · QR Status</span>
                 </div>
-                <button onClick={() => setIsAddBoxOpen(true)} style={{
+                <button onClick={() => openAddBoxModal()} style={{
                   display: 'flex', alignItems: 'center', gap: '0.3rem',
                   padding: '0.4rem 0.8rem', backgroundColor: '#7c3aed', color: '#fff',
                   border: 'none', borderRadius: '5px', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer',
@@ -839,47 +1046,51 @@ export default function CargoOfficerDashboard() {
                 </button>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
-                {boxes.map((box, idx) => (
-                  <div key={box._id} style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    padding: '0.85rem 1.25rem',
-                    borderBottom: idx < boxes.length - 1 ? '1px solid #f1f5f9' : 'none',
-                    backgroundColor: qrPreviewBox?._id === box._id ? '#f5f3ff' : 'transparent',
-                    transition: 'background 0.15s',
-                  }}>
-                    <div>
-                      <div style={{ fontFamily: 'monospace', fontWeight: 700, color: '#7c3aed', fontSize: '0.85rem' }}>{box.boxCode}</div>
-                      <div style={{ fontSize: '0.72rem', color: '#64748B', marginTop: '2px' }}>{box.description} · {box.weightKg} kg</div>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                      {box.qrGenerated ? (
-                        <>
-                          <span style={{ backgroundColor: '#dcfce7', color: '#15803d', padding: '0.15rem 0.5rem', borderRadius: '9999px', fontSize: '0.7rem', fontWeight: 700 }}>✓ QR Ready</span>
+                {boxes.length === 0 ? (
+                  <div style={{ padding: '3rem', textAlign: 'center', color: '#64748B' }}>No cargo boxes registered yet.</div>
+                ) : (
+                  boxes.map((box, idx) => (
+                    <div key={box._id} style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      padding: '0.85rem 1.25rem',
+                      borderBottom: idx < boxes.length - 1 ? '1px solid #f1f5f9' : 'none',
+                      backgroundColor: qrPreviewBox?._id === box._id ? '#f5f3ff' : 'transparent',
+                      transition: 'background 0.15s',
+                    }}>
+                      <div>
+                        <div style={{ fontFamily: 'monospace', fontWeight: 700, color: '#7c3aed', fontSize: '0.85rem' }}>{box.boxCode}</div>
+                        <div style={{ fontSize: '0.72rem', color: '#64748B', marginTop: '2px' }}>{box.description} · {box.weightKg} kg</div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                        {box.qrGenerated ? (
+                          <>
+                            <span style={{ backgroundColor: '#dcfce7', color: '#15803d', padding: '0.15rem 0.5rem', borderRadius: '9999px', fontSize: '0.7rem', fontWeight: 700 }}>✓ QR Ready</span>
+                            <button
+                              onClick={() => setQrPreviewBox(box)}
+                              style={{ backgroundColor: '#f5f3ff', color: '#7c3aed', border: '1px solid #e9d5ff', padding: '0.3rem 0.6rem', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 600, cursor: 'pointer' }}
+                            >
+                              Preview
+                            </button>
+                          </>
+                        ) : (
                           <button
-                            onClick={() => setQrPreviewBox(box)}
-                            style={{ backgroundColor: '#f5f3ff', color: '#7c3aed', border: '1px solid #e9d5ff', padding: '0.3rem 0.6rem', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 600, cursor: 'pointer' }}
+                            onClick={() => handleGenerateQR(box)}
+                            disabled={generatingQR === box._id}
+                            style={{
+                              backgroundColor: '#7c3aed', color: '#fff', border: 'none',
+                              padding: '0.35rem 0.75rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer',
+                              display: 'flex', alignItems: 'center', gap: '0.25rem',
+                              opacity: generatingQR === box._id ? 0.7 : 1,
+                            }}
                           >
-                            Preview
+                            <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>qr_code_2</span>
+                            {generatingQR === box._id ? 'Generating...' : 'Generate QR'}
                           </button>
-                        </>
-                      ) : (
-                        <button
-                          onClick={() => handleGenerateQR(box)}
-                          disabled={generatingQR === box._id}
-                          style={{
-                            backgroundColor: '#7c3aed', color: '#fff', border: 'none',
-                            padding: '0.35rem 0.75rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer',
-                            display: 'flex', alignItems: 'center', gap: '0.25rem',
-                            opacity: generatingQR === box._id ? 0.7 : 1,
-                          }}
-                        >
-                          <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>qr_code_2</span>
-                          {generatingQR === box._id ? 'Generating...' : 'Generate QR'}
-                        </button>
-                      )}
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </div>
           </div>
@@ -912,7 +1123,7 @@ export default function CargoOfficerDashboard() {
                       ['Category', qrPreviewBox.category],
                       ['Weight', `${qrPreviewBox.weightKg} kg`],
                       ['Dimensions', qrPreviewBox.dimensions],
-                      ['Manifest', qrPreviewBox.manifestId || '—'],
+                      ['Manifest', qrPreviewBox.manifestNumber || qrPreviewBox.manifestId || '—'],
                       ['Condition', qrPreviewBox.condition],
                     ].map(([label, value]) => (
                       <div key={label} style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -922,12 +1133,15 @@ export default function CargoOfficerDashboard() {
                     ))}
                   </div>
 
-                  <button style={{
-                    width: '100%', backgroundColor: '#7c3aed', color: '#fff',
-                    border: 'none', padding: '0.65rem', borderRadius: '6px',
-                    fontWeight: 700, fontSize: '0.875rem', cursor: 'pointer',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
-                  }}>
+                  <button
+                    onClick={() => window.print()}
+                    style={{
+                      width: '100%', backgroundColor: '#7c3aed', color: '#fff',
+                      border: 'none', padding: '0.65rem', borderRadius: '6px',
+                      fontWeight: 700, fontSize: '0.875rem', cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
+                    }}
+                  >
                     <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>print</span>
                     Print QR Label
                   </button>
@@ -1077,7 +1291,7 @@ export default function CargoOfficerDashboard() {
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                       {checkpoints.filter(cp => cp.shipmentNumber === trackedShipment.shipmentNumber).map(cp => (
-                        <div key={cp._id} style={{ padding: '0.6rem 0.85rem', backgroundColor: '#f0f9ff', borderLeft: '3px solid #0891b2', borderRadius: '4px', fontSize: '0.78rem' }}>
+                        <div key={cp._id} style={{ padding: '0.6rem 0.85rem', backgroundColor: '#f0f9ff', borderTop: '0 none', borderRight: '0 none', borderBottom: '0 none', borderLeft: '3px solid #0891b2', borderRadius: '4px', fontSize: '0.78rem' }}>
                           <strong style={{ color: '#0F172A' }}>{cp.checkpointName}</strong> · {cp.boxCode}
                           <span style={{ float: 'right', color: '#94a3b8' }}>{new Date(cp.timestamp).toLocaleDateString('en-IN')}</span>
                         </div>
@@ -1148,7 +1362,7 @@ export default function CargoOfficerDashboard() {
                             marginLeft: '0.5rem', backgroundColor: '#eff6ff', color: '#1d4ed8',
                             padding: '0.1rem 0.4rem', borderRadius: '4px', fontSize: '0.65rem', fontWeight: 700,
                           }}>
-                            {cp.checkpointType.replace(/_/g, ' ')}
+                            {String(cp.checkpointType || 'PORT').replace(/_/g, ' ')}
                           </span>
                         </div>
                         <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontFamily: 'monospace' }}>
@@ -1177,7 +1391,7 @@ export default function CargoOfficerDashboard() {
       {/* Create Shipment Modal */}
       {isCreateShipmentOpen && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.4)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-          <div style={{ backgroundColor: '#fff', borderRadius: '12px', width: '100%', maxWidth: '520px', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
+          <div style={{ backgroundColor: '#fff', borderRadius: '12px', width: '100%', maxWidth: '520px', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
             <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid #E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                 <span className="material-symbols-outlined" style={{ color: '#7c3aed', fontSize: '22px' }}>local_shipping</span>
@@ -1186,47 +1400,104 @@ export default function CargoOfficerDashboard() {
               <button onClick={() => setIsCreateShipmentOpen(false)} style={{ background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer', color: '#64748B' }}>✕</button>
             </div>
             <form onSubmit={handleCreateShipment} style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {[
-                { label: 'Shipment Number *', key: 'shipmentNumber', placeholder: 'e.g. SHP-2026-004', type: 'text' },
-                { label: 'Vessel Name', key: 'vessel', placeholder: 'e.g. MV Bharati Express', type: 'text' },
-                { label: 'Departure Date *', key: 'departureDate', placeholder: '', type: 'date' },
-                { label: 'ETA *', key: 'eta', placeholder: '', type: 'date' },
-              ].map(field => (
-                <div key={field.key}>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#374151', marginBottom: '0.3rem' }}>{field.label}</label>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#374151', marginBottom: '0.3rem' }}>Shipment Number *</label>
+                <input
+                  type="text"
+                  value={shipmentForm.shipmentNumber}
+                  onChange={e => setShipmentForm(f => ({ ...f, shipmentNumber: e.target.value }))}
+                  placeholder="e.g. SHP-2026-004"
+                  required
+                  style={{ width: '100%', height: '38px', padding: '0 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem', boxSizing: 'border-box' }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#374151', marginBottom: '0.3rem' }}>Expedition *</label>
+                <select
+                  value={shipmentForm.expeditionId}
+                  onChange={e => setShipmentForm(f => ({ ...f, expeditionId: e.target.value }))}
+                  required
+                  style={{ width: '100%', height: '38px', padding: '0 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem' }}
+                >
+                  <option value="">Select Expedition...</option>
+                  {expeditions.map(exp => (
+                    <option key={exp._id} value={exp._id}>
+                      {exp.expeditionCode} — {exp.name} ({exp.season || 'Expedition'})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#374151', marginBottom: '0.3rem' }}>Vessel Name</label>
+                <input
+                  type="text"
+                  value={shipmentForm.vessel}
+                  onChange={e => setShipmentForm(f => ({ ...f, vessel: e.target.value }))}
+                  placeholder="e.g. MV Bharati Express"
+                  style={{ width: '100%', height: '38px', padding: '0 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem', boxSizing: 'border-box' }}
+                />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#374151', marginBottom: '0.3rem' }}>Departure Date *</label>
                   <input
-                    type={field.type}
-                    value={shipmentForm[field.key]}
-                    onChange={e => setShipmentForm(f => ({ ...f, [field.key]: e.target.value }))}
-                    placeholder={field.placeholder}
-                    required={field.label.includes('*')}
+                    type="date"
+                    value={shipmentForm.departureDate}
+                    onChange={e => setShipmentForm(f => ({ ...f, departureDate: e.target.value }))}
+                    required
                     style={{ width: '100%', height: '38px', padding: '0 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem', boxSizing: 'border-box' }}
                   />
                 </div>
-              ))}
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#374151', marginBottom: '0.3rem' }}>ETA *</label>
+                  <input
+                    type="date"
+                    value={shipmentForm.eta}
+                    onChange={e => setShipmentForm(f => ({ ...f, eta: e.target.value }))}
+                    required
+                    style={{ width: '100%', height: '38px', padding: '0 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem', boxSizing: 'border-box' }}
+                  />
+                </div>
+              </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                {[
-                  { label: 'Origin *', key: 'origin', options: ['Goa', 'Cape Town', 'Mumbai'] },
-                  { label: 'Destination *', key: 'destination', options: ['Bharati', 'Maitri'] },
-                ].map(field => (
-                  <div key={field.key}>
-                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#374151', marginBottom: '0.3rem' }}>{field.label}</label>
-                    <select
-                      value={shipmentForm[field.key]}
-                      onChange={e => setShipmentForm(f => ({ ...f, [field.key]: e.target.value }))}
-                      style={{ width: '100%', height: '38px', padding: '0 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem' }}
-                    >
-                      {field.options.map(o => <option key={o}>{o}</option>)}
-                    </select>
-                  </div>
-                ))}
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#374151', marginBottom: '0.3rem' }}>Origin *</label>
+                  <select
+                    value={shipmentForm.origin}
+                    onChange={e => setShipmentForm(f => ({ ...f, origin: e.target.value }))}
+                    style={{ width: '100%', height: '38px', padding: '0 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem' }}
+                  >
+                    {['Goa', 'Cape Town', 'Mumbai'].map(o => <option key={o}>{o}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#374151', marginBottom: '0.3rem' }}>Destination *</label>
+                  <select
+                    value={shipmentForm.destination}
+                    onChange={e => setShipmentForm(f => ({ ...f, destination: e.target.value }))}
+                    style={{ width: '100%', height: '38px', padding: '0 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem' }}
+                  >
+                    {stations.length > 0 ? (
+                      stations.map(stn => (
+                        <option key={stn._id} value={stn._id}>
+                          {stn.name} ({stn.code})
+                        </option>
+                      ))
+                    ) : (
+                      <>
+                        <option value="Bharati">Bharati Station</option>
+                        <option value="Maitri">Maitri Station</option>
+                      </>
+                    )}
+                  </select>
+                </div>
               </div>
               <div>
                 <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#374151', marginBottom: '0.3rem' }}>Description</label>
                 <textarea
                   value={shipmentForm.description}
                   onChange={e => setShipmentForm(f => ({ ...f, description: e.target.value }))}
-                  placeholder="Brief description of cargo..."
+                  placeholder="Brief description of cargo shipment..."
                   rows={2}
                   style={{ width: '100%', padding: '0.5rem 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem', resize: 'vertical', boxSizing: 'border-box' }}
                 />
@@ -1248,7 +1519,7 @@ export default function CargoOfficerDashboard() {
       {/* Create Manifest Modal */}
       {isCreateManifestOpen && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.4)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-          <div style={{ backgroundColor: '#fff', borderRadius: '12px', width: '100%', maxWidth: '480px', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
+          <div style={{ backgroundColor: '#fff', borderRadius: '12px', width: '100%', maxWidth: '520px', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
             <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid #E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                 <span className="material-symbols-outlined" style={{ color: '#7c3aed', fontSize: '22px' }}>assignment</span>
@@ -1263,14 +1534,36 @@ export default function CargoOfficerDashboard() {
               </div>
               <div>
                 <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#374151', marginBottom: '0.3rem' }}>Assign to Shipment *</label>
-                <select value={manifestForm.shipmentId} onChange={e => setManifestForm(f => ({ ...f, shipmentId: e.target.value }))} required style={{ width: '100%', height: '38px', padding: '0 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem' }}>
-                  <option value="">Select shipment...</option>
-                  {shipments.map(s => <option key={s._id} value={s._id}>{s.shipmentNumber} ({s.origin} → {s.destination})</option>)}
+                <select
+                  value={manifestForm.shipmentId}
+                  onChange={e => setManifestForm(f => ({ ...f, shipmentId: e.target.value }))}
+                  required
+                  style={{ width: '100%', height: '38px', padding: '0 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem' }}
+                >
+                  <option value="">Select Shipment...</option>
+                  {shipments.map(s => (
+                    <option key={s._id} value={s._id}>
+                      {s.shipmentNumber} ({s.origin} → {s.destination})
+                    </option>
+                  ))}
+                </select>
+                {shipments.length === 0 && (
+                  <span style={{ fontSize: '0.72rem', color: '#dc2626', marginTop: '4px', display: 'block' }}>
+                    ⚠️ No shipments found. Please create a Shipment first.
+                  </span>
+                )}
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#374151', marginBottom: '0.3rem' }}>Declaration Type *</label>
+                <select value={manifestForm.declarationType} onChange={e => setManifestForm(f => ({ ...f, declarationType: e.target.value }))} required style={{ width: '100%', height: '38px', padding: '0 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem' }}>
+                  {['OFFICIAL', 'PERSONAL', 'SCIENTIFIC', 'SCIENTIFIC_SAMPLES', 'EQUIPMENT', 'CONSUMABLES', 'MEDICAL', 'HAZMAT'].map(type => (
+                    <option key={type} value={type}>{type.replace(/_/g, ' ')}</option>
+                  ))}
                 </select>
               </div>
               <div>
                 <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#374151', marginBottom: '0.3rem' }}>Description</label>
-                <textarea value={manifestForm.description} onChange={e => setManifestForm(f => ({ ...f, description: e.target.value }))} placeholder="e.g. Scientific Equipment Manifest" rows={2} style={{ width: '100%', padding: '0.5rem 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem', resize: 'vertical', boxSizing: 'border-box' }} />
+                <textarea value={manifestForm.description} onChange={e => setManifestForm(f => ({ ...f, description: e.target.value }))} placeholder="e.g. Scientific Equipment & Sensors Manifest" rows={2} style={{ width: '100%', padding: '0.5rem 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem', resize: 'vertical', boxSizing: 'border-box' }} />
               </div>
               <div style={{ display: 'flex', gap: '0.75rem' }}>
                 <button type="button" onClick={() => setIsCreateManifestOpen(false)} style={{ flex: 1, backgroundColor: '#f1f5f9', color: '#374151', border: 'none', padding: '0.65rem', borderRadius: '6px', fontWeight: 600, cursor: 'pointer' }}>Cancel</button>
@@ -1287,7 +1580,7 @@ export default function CargoOfficerDashboard() {
       {/* Add Box Modal */}
       {isAddBoxOpen && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.4)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-          <div style={{ backgroundColor: '#fff', borderRadius: '12px', width: '100%', maxWidth: '520px', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
+          <div style={{ backgroundColor: '#fff', borderRadius: '12px', width: '100%', maxWidth: '520px', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
             <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid #E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                 <span className="material-symbols-outlined" style={{ color: '#059669', fontSize: '22px' }}>add_box</span>
@@ -1296,6 +1589,27 @@ export default function CargoOfficerDashboard() {
               <button onClick={() => setIsAddBoxOpen(false)} style={{ background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer', color: '#64748B' }}>✕</button>
             </div>
             <form onSubmit={handleAddBox} style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#374151', marginBottom: '0.3rem' }}>Target Manifest *</label>
+                <select
+                  value={boxForm.manifestId}
+                  onChange={e => setBoxForm(f => ({ ...f, manifestId: e.target.value }))}
+                  required
+                  style={{ width: '100%', height: '38px', padding: '0 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem' }}
+                >
+                  <option value="">Select Cargo Manifest...</option>
+                  {manifests.map(m => (
+                    <option key={m._id} value={m._id}>
+                      {m.manifestNumber} — {m.description || m.status} ({m.totalBoxes || 0} items)
+                    </option>
+                  ))}
+                </select>
+                {manifests.length === 0 && (
+                  <span style={{ fontSize: '0.72rem', color: '#dc2626', marginTop: '4px', display: 'block' }}>
+                    ⚠️ No manifests found. Please create a Cargo Manifest first.
+                  </span>
+                )}
+              </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#374151', marginBottom: '0.3rem' }}>Box Code *</label>
@@ -1322,18 +1636,58 @@ export default function CargoOfficerDashboard() {
                   <input type="text" value={boxForm.dimensions} onChange={e => setBoxForm(f => ({ ...f, dimensions: e.target.value }))} placeholder="e.g. 60×40×30cm" style={{ width: '100%', height: '38px', padding: '0 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem', boxSizing: 'border-box' }} />
                 </div>
               </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#374151', marginBottom: '0.3rem' }}>Assign to Shipment</label>
-                <select value={boxForm.shipmentId} onChange={e => setBoxForm(f => ({ ...f, shipmentId: e.target.value }))} style={{ width: '100%', height: '38px', padding: '0 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem' }}>
-                  <option value="">None (assign later)</option>
-                  {shipments.map(s => <option key={s._id} value={s._id}>{s.shipmentNumber}</option>)}
-                </select>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#374151', marginBottom: '0.3rem' }}>Make / Manufacturer</label>
+                  <input type="text" value={boxForm.make} onChange={e => setBoxForm(f => ({ ...f, make: e.target.value }))} placeholder="e.g. Vaisala" style={{ width: '100%', height: '38px', padding: '0 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem', boxSizing: 'border-box' }} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#374151', marginBottom: '0.3rem' }}>Model</label>
+                  <input type="text" value={boxForm.model} onChange={e => setBoxForm(f => ({ ...f, model: e.target.value }))} placeholder="e.g. WXT530" style={{ width: '100%', height: '38px', padding: '0 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem', boxSizing: 'border-box' }} />
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#374151', marginBottom: '0.3rem' }}>Serial Number</label>
+                  <input type="text" value={boxForm.serialNumber} onChange={e => setBoxForm(f => ({ ...f, serialNumber: e.target.value }))} placeholder="e.g. SN-20261234" style={{ width: '100%', height: '38px', padding: '0 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem', boxSizing: 'border-box' }} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#374151', marginBottom: '0.3rem' }}>Package Type *</label>
+                  <select value={boxForm.packageType} onChange={e => setBoxForm(f => ({ ...f, packageType: e.target.value }))} style={{ width: '100%', height: '38px', padding: '0 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem' }}>
+                    {['BOX', 'CRATE', 'PALLET', 'CYLINDER', 'CONTAINER', 'BAG'].map(pt => (
+                      <option key={pt} value={pt}>{pt}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#374151', marginBottom: '0.3rem' }}>Package Count</label>
+                  <input type="number" min="1" step="1" value={boxForm.packageCount} onChange={e => setBoxForm(f => ({ ...f, packageCount: e.target.value }))} placeholder="1" style={{ width: '100%', height: '38px', padding: '0 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem', boxSizing: 'border-box' }} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#374151', marginBottom: '0.3rem' }}>Declared Value (₹)</label>
+                  <input type="number" min="0" step="0.01" value={boxForm.declaredValueINR} onChange={e => setBoxForm(f => ({ ...f, declaredValueINR: e.target.value }))} placeholder="e.g. 50000" style={{ width: '100%', height: '38px', padding: '0 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem', boxSizing: 'border-box' }} />
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.5rem 0.75rem', backgroundColor: '#fff7ed', border: '1px solid #fed7aa', borderRadius: '6px' }}>
+                <input
+                  type="checkbox"
+                  id="hazardous-check"
+                  checked={boxForm.hazardous}
+                  onChange={e => setBoxForm(f => ({ ...f, hazardous: e.target.checked }))}
+                  style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: '#dc2626' }}
+                />
+                <label htmlFor="hazardous-check" style={{ fontSize: '0.82rem', fontWeight: 600, color: '#c2410c', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>warning</span>
+                  Mark as Hazardous Material
+                </label>
               </div>
               <div style={{ display: 'flex', gap: '0.75rem' }}>
                 <button type="button" onClick={() => setIsAddBoxOpen(false)} style={{ flex: 1, backgroundColor: '#f1f5f9', color: '#374151', border: 'none', padding: '0.65rem', borderRadius: '6px', fontWeight: 600, cursor: 'pointer' }}>Cancel</button>
                 <button type="submit" style={{ flex: 2, backgroundColor: '#059669', color: '#fff', border: 'none', padding: '0.65rem', borderRadius: '6px', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
                   <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>add_box</span>
-                  Add Box
+                  Add Box to Manifest
                 </button>
               </div>
             </form>

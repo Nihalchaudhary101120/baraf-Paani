@@ -12,7 +12,6 @@ const PERSONNEL_ROLES = [
   'INVENTORY_MANAGER',
   'MEDICAL_OFFICER',
   'STATION_COMMANDER',
-  'LOGISTICS_OFFICER',
   'SHIP_OFFICER',
   'FLIGHT_OFFICER',
 ];
@@ -37,6 +36,14 @@ const ProtectedRoute = ({ children }) => {
 
   if (!isAuthenticated) {
     return <Navigate to={ROUTES.LOGIN} state={{ from: location }} replace />;
+  }
+
+  // If on /complete-profile but the user does NOT need profile completion (e.g. HQ_ADMIN, LOGISTICS_OFFICER, or completed profile),
+  // redirect immediately to /dashboard
+  if (location.pathname === '/complete-profile') {
+    if (!user || !PERSONNEL_ROLES.includes(user.role) || user.profileStatus !== 'INCOMPLETE') {
+      return <Navigate to={ROUTES.DASHBOARD} replace />;
+    }
   }
 
   // If the user is a personnel role with an INCOMPLETE profile,

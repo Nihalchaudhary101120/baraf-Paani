@@ -4,14 +4,17 @@ import HQAdminDashboard from './HQAdmin/HQAdminDashboard';
 import HQCommandDashboard from './HQCommand/HQCommandDashboard';
 import MedicalOfficerDashboard from './MedicalDashboard/MedicalOfficerDashboard';
 import CargoOfficerDashboard from './CargoDashboard/CargoOfficerDashboard';
+import LogisticsOfficerDashboard from './CargoDashboard/LogisticsOfficerDashboard';
 
 /**
  * Main Centralized Dashboard Router
  * Dynamically mounts the appropriate role-based dashboard:
- * - HQ_ADMIN: System Administration Dashboard (Users, Stations, Devices, Diagnostics)
- * - HQ_COMMAND: Operations Command Center (Expeditions, Personnel Readiness, Supply Pipelines, SOS)
- * - MEDICAL_OFFICER: Antarctic Medical & Training Dashboard (AL-2205 Assessments, Clearances, Alerts)
- * - Other roles: Tailored command views
+ * - HQ_ADMIN:          System Administration Dashboard
+ * - HQ_COMMAND:        Operations Command Center
+ * - MEDICAL_OFFICER:   Antarctic Medical & Training Dashboard
+ * - CARGO_OFFICER:     Cargo Officer Portal (Shipments, Manifests, QR)
+ * - LOGISTICS_OFFICER: Logistics Officer Portal (QR Scan, Checkpoints, Offline Sync)
+ * - Other roles:       Tailored command views
  */
 const DashboardPage = () => {
   const { user } = useAuth();
@@ -27,6 +30,10 @@ const DashboardPage = () => {
 
   if (role === 'CARGO_OFFICER') {
     return <CargoOfficerDashboard />;
+  }
+
+  if (role === 'LOGISTICS_OFFICER') {
+    return <LogisticsOfficerDashboard />;
   }
 
   // HQ_COMMAND and default operational view

@@ -21,7 +21,8 @@ const LoginPage = () => {
   const [formErrors, setFormErrors] = useState({});
   const [simulatedError, setSimulatedError] = useState(null);
 
-  const from = location.state?.from?.pathname || ROUTES.DASHBOARD;
+  const rawFrom = location.state?.from?.pathname;
+  const from = rawFrom && rawFrom !== '/complete-profile' ? rawFrom : ROUTES.DASHBOARD;
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;

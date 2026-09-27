@@ -11,6 +11,7 @@ import { ROUTES } from '@/utils/constants';
 const DashboardPage          = lazy(() => import('@/pages/Dashboard/DashboardPage'));
 const StationDashboard        = lazy(() => import('@/pages/Dashboard/StationDashboard/StationDashboard'));
 const CargoDashboard         = lazy(() => import('@/pages/Dashboard/CargoDashboard/CargoDashboard'));
+const LogisticsOfficerDashboard = lazy(() => import('@/pages/Dashboard/CargoDashboard/LogisticsOfficerDashboard'));
 const InventoryDashboard     = lazy(() => import('@/pages/Dashboard/InventoryDashboard/InventoryDashboard'));
 const FieldOpsDashboard      = lazy(() => import('@/pages/Dashboard/FieldOpsDashboard/FieldOpsDashboard'));
 const EquipmentDashboard     = lazy(() => import('@/pages/Dashboard/EquipmentDashboard/EquipmentDashboard'));
@@ -79,6 +80,9 @@ const AppRoutes = () => {
         } />
         <Route path="cargo" element={
           <Suspense fallback={<PageLoader />}><CargoDashboard /></Suspense>
+        } />
+        <Route path="logistics" element={
+          <Suspense fallback={<PageLoader />}><LogisticsOfficerDashboard /></Suspense>
         } />
         <Route path="inventory" element={
           <Suspense fallback={<PageLoader />}><InventoryDashboard /></Suspense>

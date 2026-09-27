@@ -5,7 +5,9 @@ import {
     getManifest,
     getManifests,
     updateManifest,
-    updateManifestStatus
+    updateManifestStatus,
+    addManifestItem,
+    updateManifestItemQR
 } from "../../controllers/cargo/cargoMenifestController.js";
 
 import requireAuth from "../../middleware/authMiddleware.js";
@@ -44,6 +46,21 @@ router.patch(
     requireAuth,
     requireRole("HQ_ADMIN", "LOGISTICS_OFFICER", "HQ_COMMAND", "CARGO_OFFICER"),
     updateManifestStatus
+);
+
+// ── Box / Item routes ────────────────────────────────────────────────────────
+router.post(
+    "/:id/items",
+    requireAuth,
+    requireRole("HQ_ADMIN", "LOGISTICS_OFFICER", "HQ_COMMAND", "CARGO_OFFICER"),
+    addManifestItem
+);
+
+router.patch(
+    "/:id/items/:itemCode/qr",
+    requireAuth,
+    requireRole("HQ_ADMIN", "LOGISTICS_OFFICER", "HQ_COMMAND", "CARGO_OFFICER"),
+    updateManifestItemQR
 );
 
 export default router;

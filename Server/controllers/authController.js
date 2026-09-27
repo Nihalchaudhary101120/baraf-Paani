@@ -69,7 +69,7 @@ export const login = async (req, res) => {
         res.cookie("token", token, cookieOptions);
 
         // Check personnel profile status for field-level roles
-        const personnelRoles = ["SCIENTIST", "STATION_OPERATOR", "INVENTORY_MANAGER", "MEDICAL_OFFICER", "STATION_COMMANDER", "LOGISTICS_OFFICER", "SHIP_OFFICER", "FLIGHT_OFFICER"];
+        const personnelRoles = ["SCIENTIST", "STATION_OPERATOR", "INVENTORY_MANAGER", "MEDICAL_OFFICER", "STATION_COMMANDER", "SHIP_OFFICER", "FLIGHT_OFFICER"];
         let profileStatus = null;
         if (personnelRoles.includes(user.role)) {
             const personnel = await Personnel.findOne({ userId: user._id }).select("profileStatus");
@@ -137,7 +137,7 @@ export const getMe = async (req, res) => {
         }
 
         // Check personnel profile status for field-level roles
-        const personnelRoles = ["SCIENTIST", "STATION_OPERATOR", "INVENTORY_MANAGER", "MEDICAL_OFFICER", "STATION_COMMANDER", "LOGISTICS_OFFICER", "SHIP_OFFICER", "FLIGHT_OFFICER"];
+        const personnelRoles = ["SCIENTIST", "STATION_OPERATOR", "INVENTORY_MANAGER", "MEDICAL_OFFICER", "STATION_COMMANDER", "SHIP_OFFICER", "FLIGHT_OFFICER"];
         let profileStatus = null;
         if (personnelRoles.includes(user.role)) {
             const personnel = await Personnel.findOne({ userId: user._id }).select("profileStatus");

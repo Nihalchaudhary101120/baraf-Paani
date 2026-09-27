@@ -243,6 +243,52 @@ const CARGO_OFFICER_NAV = [
   },
 ];
 
+const LOGISTICS_OFFICER_NAV = [
+  {
+    path: '/dashboard/logistics',
+    icon: 'dashboard',
+    label: 'Dashboard',
+    section: 'MAIN',
+  },
+  {
+    path: '/dashboard/logistics?tab=scanner',
+    icon: 'qr_code_scanner',
+    label: 'QR Scanner',
+    section: 'SCANNING',
+  },
+  {
+    path: '/dashboard/logistics?tab=today',
+    icon: 'today',
+    label: "Today's Scans",
+    section: 'SCANNING',
+  },
+  {
+    path: '/dashboard/logistics?tab=history',
+    icon: 'route',
+    label: 'Checkpoint History',
+    section: 'HISTORY',
+  },
+  {
+    path: '/dashboard/logistics?tab=offline',
+    icon: 'cloud_off',
+    label: 'Offline Queue',
+    section: 'SYNC',
+  },
+  {
+    path: '/dashboard/cargo',
+    icon: 'local_shipping',
+    label: 'Cargo Pipeline',
+    section: 'READ-ONLY',
+  },
+  {
+    path: '/dashboard/logistics?tab=sos',
+    icon: 'emergency',
+    label: 'SOS / Emergency',
+    danger: true,
+    section: 'EMERGENCY',
+  },
+];
+
 const DashboardLayout = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -252,11 +298,13 @@ const DashboardLayout = () => {
 
   const userRole = user?.role || 'HQ_ADMIN';
 
-  // Dedicated navigation for Medical Officer / Cargo Officer vs Role-filtered for other roles
+  // Dedicated navigation for Medical Officer / Cargo Officer / Logistics Officer vs Role-filtered for other roles
   const visibleNav = userRole === 'MEDICAL_OFFICER'
     ? MEDICAL_OFFICER_NAV
     : userRole === 'CARGO_OFFICER'
     ? CARGO_OFFICER_NAV
+    : userRole === 'LOGISTICS_OFFICER'
+    ? LOGISTICS_OFFICER_NAV
     : ALL_NAV_ITEMS.filter((item) => item.roles.includes(userRole));
 
   const isActive = (path) => {
