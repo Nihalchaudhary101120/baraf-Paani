@@ -18,6 +18,7 @@ import SKUMasterView from './SKUMasterView';
 import AddCargoBoxModal from './AddCargoBoxModal';
 import CreateSKUModal from './CreateSKUModal';
 import ManifestDetailModal from './ManifestDetailModal';
+import CargoQRPreview from './CargoQRPreview';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -1677,6 +1678,15 @@ export default function CargoOfficerDashboard() {
           </div>
         </div>
       )}
+
+      {/* Cargo QR Preview & Label Modal */}
+      {qrPreviewBox && (
+        <CargoQRPreview
+          item={qrPreviewBox}
+          onClose={() => setQrPreviewBox(null)}
+        />
+      )}
     </div>
   );
 }
+

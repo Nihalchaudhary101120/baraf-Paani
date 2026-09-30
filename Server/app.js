@@ -16,6 +16,8 @@ import syncRoutes from "./routes/syncRoutes.js";
 import cargoReceiveRoutes from "./routes/cargoRoutes/cargoReceiveRoutes.js";
 import skuRoutes from "./routes/cargoRoutes/skuRoutes.js";
 import stationRoutes from "./routes/stationRoutes.js";
+import { getScanCargoInfo } from "./controllers/cargo/cargoQrController.js";
+
 
 
 dotenv.config();
@@ -62,16 +64,21 @@ app.use("/api/auth", authRoutes);
 app.use("/api/personnel", personnelRoutes);
 app.use("/api/medical", medicalRoutes);
 app.use("/api/training", trainingRoutes);
+
 app.use("/api/admin", adminRoutes);
 app.use("/api/users", adminRoutes);
 app.use("/api/stations", stationRoutes);
 app.use("/api/cargo/manifests", cargoManifestRoutes);
+app.get("/api/cargo/scan/:trackingCode", getScanCargoInfo);
+app.get("/api/cargo-items/:itemId", getScanCargoInfo);
+app.get("/api/cargo/items/:itemId", getScanCargoInfo);
 app.use("/api/cargo/shipments", shipmentRoutes);
 app.use("/api/cargo/checkpoints", cargoCheckpointRoutes);
 app.use("/api/sync",syncRoutes);
 app.use("/api/cargo/receiving", cargoReceiveRoutes);
 app.use("/api/cargo/skus", skuRoutes);
 app.use("/api/skus", skuRoutes);
+
 
 const PORT = process.env.PORT || 5000;
 

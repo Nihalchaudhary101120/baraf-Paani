@@ -1,4 +1,7 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
+import { generateManifestQRs } from '@/api/cargo.api';
+import { useToast } from '@/context/ToastContext';
+import PrintQRLabelsModal from './PrintQRLabelsModal';
 
 const CATEGORY_COLORS = {
   SCIENTIFIC: { bg: '#EFF6FF', color: '#1D4ED8', border: '#BFDBFE' },
@@ -18,8 +21,13 @@ export default function ManifestDetailModal({
   onClose,
   manifest,
   onAddBox,
-  onViewQR
+  onViewQR,
+  onManifestUpdated
 }) {
+  const { showToast } = useToast();
+  const [generatingQRs, setGeneratingQRs] = useState(false);
+  const [isPrintAllOpen, setIsPrintAllOpen] = useState(false);
+
   if (!isOpen || !manifest) return null;
 
   const items = manifest.items || [];
@@ -38,6 +46,27 @@ export default function ManifestDetailModal({
   const totalWeight = items.reduce((sum, it) => sum + (Number(it.weightKg) || 0), 0);
   const totalDeclared = items.reduce((sum, it) => sum + (Number(it.declaredValueINR) || 0), 0);
   const totalUnits = items.reduce((sum, it) => sum + (Number(it.quantity || it.packageCount || 1)), 0);
+
+  const handleBulkGenerateQRs = async () => {
+    if (!manifest._id) return;
+    try {
+      setGeneratingQRs(true);
+      const res = await generateManifestQRs(manifest._id);
+      if (res?.success) {
+        showToast(`✅ Generated QR codes for ${items.length} items in ${manifest.manifestNumber}!`, 'success');
+        if (onManifestUpdated) {
+          onManifestUpdated();
+        }
+      } else {
+        showToast(res?.message || 'Failed to generate QR codes', 'error');
+      }
+    } catch (err) {
+      console.error('Bulk generate QR error:', err);
+      showToast(err?.response?.data?.message || err.message || 'Failed to generate QR codes', 'error');
+    } finally {
+      setGeneratingQRs(false);
+    }
+  };
 
   return (
     <div
@@ -58,7 +87,7 @@ export default function ManifestDetailModal({
           backgroundColor: '#FFFFFF',
           borderRadius: '14px',
           width: '100%',
-          maxWidth: '860px',
+          maxWidth: '900px',
           maxHeight: '92vh',
           display: 'flex',
           flexDirection: 'column',
@@ -130,6 +159,68 @@ export default function ManifestDetailModal({
         {/* Modal Body */}
         <div style={{ overflowY: 'auto', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           
+          {/* Manifest Action Bar (Bulk QR Generation & Printing) */}
+          <div style={{ backgroundColor: '#EFF6FF', borderRadius: '10px', padding: '1rem', border: '1px solid #BFDBFE', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span className="material-symbols-outlined" style={{ color: '#005B7F', fontSize: '22px' }}>
+                qr_code_2
+              </span>
+              <div>
+                <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#005B7F' }}>
+                  Cargo Manifest QR System
+                </div>
+                <div style={{ fontSize: '0.72rem', color: '#475569' }}>
+                  Generate high-density 'H' QR labels for all {items.length} items in this manifest.
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <button
+                onClick={handleBulkGenerateQRs}
+                disabled={generatingQRs || items.length === 0}
+                style={{
+                  backgroundColor: '#005B7F',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  padding: '0.45rem 0.85rem',
+                  borderRadius: '6px',
+                  fontSize: '0.78rem',
+                  fontWeight: 800,
+                  cursor: items.length > 0 ? 'pointer' : 'not-allowed',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.3rem',
+                  opacity: generatingQRs ? 0.7 : 1
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>auto_awesome</span>
+                {generatingQRs ? 'Generating QRs...' : 'Generate All QR Codes'}
+              </button>
+
+              <button
+                onClick={() => setIsPrintAllOpen(true)}
+                disabled={items.length === 0}
+                style={{
+                  backgroundColor: '#7C3AED',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  padding: '0.45rem 0.85rem',
+                  borderRadius: '6px',
+                  fontSize: '0.78rem',
+                  fontWeight: 800,
+                  cursor: items.length > 0 ? 'pointer' : 'not-allowed',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.3rem'
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>print</span>
+                Preview / Print All Labels
+              </button>
+            </div>
+          </div>
+
           {/* Manifest Metrics Overview */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.75rem' }}>
             <div style={{ backgroundColor: '#F8FAFC', padding: '0.75rem 1rem', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
@@ -359,6 +450,14 @@ export default function ManifestDetailModal({
           </button>
         </div>
       </div>
+
+      {/* Print All Labels Modal */}
+      <PrintQRLabelsModal
+        isOpen={isPrintAllOpen}
+        manifest={manifest}
+        items={items}
+        onClose={() => setIsPrintAllOpen(false)}
+      />
     </div>
   );
 }

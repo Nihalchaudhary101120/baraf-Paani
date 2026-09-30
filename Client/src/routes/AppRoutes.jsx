@@ -29,6 +29,8 @@ const AdminCargoView         = lazy(() => import('@/pages/Dashboard/HQAdmin/Admi
 const AdminFieldOpsView      = lazy(() => import('@/pages/Dashboard/HQAdmin/AdminFieldOpsView'));
 const AdminInventoryView     = lazy(() => import('@/pages/Dashboard/HQAdmin/AdminInventoryView'));
 
+const CargoScanView = lazy(() => import('@/pages/Dashboard/CargoDashboard/CargoScanView'));
+
 const PageLoader = () => (
   <div style={{
     display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -48,6 +50,11 @@ const AppRoutes = () => {
 
   return (
     <Routes>
+      {/* ── Public QR Scan Routes ── */}
+      <Route path="/scan/cargo/:trackingCode" element={<Suspense fallback={<PageLoader />}><CargoScanView /></Suspense>} />
+      <Route path="/cargo/scan/:trackingCode" element={<Suspense fallback={<PageLoader />}><CargoScanView /></Suspense>} />
+      <Route path="/scan/cargo" element={<Suspense fallback={<PageLoader />}><CargoScanView /></Suspense>} />
+
       {/* ── Public Routes (with MainLayout header/footer) ── */}
       <Route element={<MainLayout user={user} onLogout={logout} />}>
         <Route path={ROUTES.HOME} element={<HomePage />} />

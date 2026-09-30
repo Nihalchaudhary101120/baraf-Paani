@@ -133,7 +133,12 @@ const CargoItemSchema = new mongoose.Schema(
       default: "PACKED"
     },
 
-    qrCode: String
+    qrCode: String,
+    trackingCode: {
+      type: String,
+      trim: true,
+      index: true
+    }
   }
 );
 
@@ -224,5 +229,7 @@ const CargoManifestSchema = new mongoose.Schema(
 
 CargoManifestSchema.index({ expeditionId: 1 });
 CargoManifestSchema.index({ status: 1 });
+CargoManifestSchema.index({ "items.trackingCode": 1 });
+CargoManifestSchema.index({ "items.itemCode": 1 });
 
-export default mongoose.model("CargoManifest", CargoManifestSchema);
+export default mongoose.model("CargoManifest", CargoManifestSchema);

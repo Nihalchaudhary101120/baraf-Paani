@@ -19,13 +19,26 @@ export const addManifestItem = (manifestId, itemData) => api.post(`/cargo/manife
 export const updateManifestItemQR = (manifestId, itemCode, qrData) =>
   api.patch(`/cargo/manifests/${manifestId}/items/${itemCode}/qr`, qrData);
 
-// ── QR Lookup ──────────────────────────────────────────────────────
+// ── QR Generation & Scan Lookup ──────────────────────────────────────────────
+export const generateManifestQRs = (manifestId) => api.post(`/cargo/manifests/${manifestId}/generate-qr`);
+export const generateSingleItemQR = (manifestId, itemCode) => api.post(`/cargo/manifests/${manifestId}/items/${itemCode}/qr`);
+export const getScanCargoInfo = (trackingCode) => api.get(`/cargo/scan/${trackingCode}`);
+export const getCargoItemById = (itemId) => api.get(`/cargo-items/${itemId}`);
+
 // Resolves a scanned QR / itemCode → full box + manifest + shipment details
 export const lookupBoxByQR = async (itemCode) => {
+  try {
+    const scanRes = await getScanCargoInfo(itemCode);
+    if (scanRes?.success && scanRes?.cargo) {
+      return { manifest: { _id: scanRes.cargo.manifestId, manifestNumber: scanRes.cargo.manifestNumber }, item: scanRes.cargo, checkpoints: scanRes.checkpoints };
+    }
+  } catch (err) {
+    // fallback search
+  }
   const res = await api.get('/cargo/manifests');
   const manifests = res?.data?.manifests || res?.manifests || [];
   for (const m of manifests) {
-    const item = (m.items || []).find(i => i.itemCode === itemCode || i.qrCode === itemCode);
+    const item = (m.items || []).find(i => i.itemCode === itemCode || i.boxCode === itemCode || i.qrCode === itemCode || i.trackingCode === itemCode);
     if (item) return { manifest: m, item };
   }
   return null;
