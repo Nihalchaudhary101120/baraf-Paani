@@ -13,7 +13,11 @@ router.post(
   requireRole(
     "STATION_OPERATOR",
     "STATION_COMMANDER",
-    "INVENTORY_MANAGER"
+    "INVENTORY_MANAGER",
+    "HQ_ADMIN",
+    "HQ_COMMAND",
+    "LOGISTICS_OFFICER",
+    "CARGO_OFFICER"
   ),
   receiveCargo
 );

@@ -67,5 +67,14 @@ export const ENDPOINTS = {
     VERIFY: (id) => `/training/${id}/verify`,
     COMPLETE: (id) => `/training/${id}/complete`,
   },
+  INVENTORY: {
+    STATIONS: '/inventory/stations',
+    BY_STATION: (id) => `/inventory/${id}`,
+    SUMMARY: (id) => `/inventory/${id}/summary`,
+    BATCHES: (stationId, skuId) => `/inventory/${stationId}/${skuId}/batches`,
+    CONSUME: (stationId) => `/inventory/${stationId}/consume`,
+    TRANSACTIONS: (stationId) => `/inventory/${stationId}/transactions`,
+    RECEIVE: (stationId) => `/inventory/${stationId}/receive`,
+  },
   HEALTH: '/health',
 };

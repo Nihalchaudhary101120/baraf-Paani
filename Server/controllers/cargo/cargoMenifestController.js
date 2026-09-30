@@ -4,6 +4,7 @@ import Shipment from "../../models/cargo-models/shipment.js";
 import Expedition from "../../models/master-models/expedition.js";
 import Station from "../../models/master-models/station.js";
 import SKU from "../../models/cargo-models/sku.js";
+import processManifestDelivery from "../../services/inventoryReceiptService.js";
 
 const calculateTotals = (items = []) => {
     return items.reduce(
@@ -540,12 +541,23 @@ export const updateManifestStatus = async (req, res) => {
             });
         }
 
+        const previousStatus = manifest.status;
         manifest.status = status;
         await manifest.save();
+
+        // ── Auto-receive inventory when manifest is marked DELIVERED ──────
+        // This is idempotent: if already DELIVERED, receipt service skips duplicates.
+        if (status === "DELIVERED" && previousStatus !== "DELIVERED") {
+            const performedBy = req.user?.userId || req.user?.id || req.user?._id;
+            processManifestDelivery(manifest._id, performedBy).catch((err) => {
+                console.error(`[InventoryReceipt] Failed for manifest ${manifest.manifestNumber}:`, err.message);
+            });
+        }
 
         return res.status(200).json({
             success: true,
             message: `Manifest status changed to ${status}`,
+            inventoryQueued: status === "DELIVERED",
             manifest
         });
     } catch (error) {

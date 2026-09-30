@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { queueEvent } from '@/services/syncServices/queueService';
-import { getManifests } from '@/api/cargo.api';
+import { getManifests, receiveCargo, getShipments } from '@/api/cargo.api';
 
-// ── Demo data ───────────────────────────────────────────────────────
+// ── Demo data fallback ───────────────────────────────────────────────
 const DEMO_SHIPMENTS = [
   { _id: 'S001', shipmentNumber: 'SHP-2026-001', origin: 'Goa', destination: 'Bharati', status: 'IN_TRANSIT', departureDate: '2026-09-10', eta: '2026-11-15', manifestCount: 3 },
   { _id: 'S002', shipmentNumber: 'SHP-2026-002', origin: 'Cape Town', destination: 'Bharati', status: 'AT_PORT', departureDate: '2026-10-01', eta: '2026-11-20', manifestCount: 2 },
@@ -32,13 +32,20 @@ const DEMO_CHECKPOINTS = [
 
 const StatusBadge = ({ status }) => {
   const map = {
+    SCHEDULED:          { bg: '#f1f5f9', color: '#475569', label: 'Scheduled' },
+    LOADING:            { bg: '#fef3c7', color: '#b45309', label: 'Loading' },
+    DEPARTED:           { bg: '#e0f2fe', color: '#0369a1', label: 'Departed' },
     IN_TRANSIT:         { bg: '#eff6ff', color: '#1d4ed8', label: 'In Transit' },
     AT_PORT:            { bg: '#fef9c3', color: '#854d0e', label: 'At Port' },
+    CUSTOMS_HOLD:       { bg: '#fee2e2', color: '#b91c1c', label: 'Customs Hold' },
     DELIVERED:          { bg: '#f0fdf4', color: '#15803D', label: 'Delivered' },
+    PARTIALLY_DELIVERED:{ bg: '#fff7ed', color: '#c2410c', label: 'Partial Delivery' },
     PARTIALLY_RECEIVED: { bg: '#fff7ed', color: '#c2410c', label: 'Partial' },
     RECEIVED:           { bg: '#f0fdf4', color: '#15803D', label: 'Received' },
+    CREATED:            { bg: '#f1f5f9', color: '#475569', label: 'Created' },
+    CANCELLED:          { bg: '#fef2f2', color: '#991b1b', label: 'Cancelled' },
   };
-  const s = map[status] || { bg: '#f1f5f9', color: '#64748B', label: status };
+  const s = map[status] || { bg: '#f1f5f9', color: '#64748B', label: status?.replace?.(/_/g, ' ') || status };
   return (
     <span style={{
       backgroundColor: s.bg, color: s.color,
@@ -50,11 +57,54 @@ const StatusBadge = ({ status }) => {
 
 const CargoDashboard = () => {
   const [activeTab, setActiveTab] = useState('shipments');
+  const [shipmentsList, setShipmentsList] = useState([]);
+  const [loadingShipments, setLoadingShipments] = useState(false);
   const [manifestsList, setManifestsList] = useState(DEMO_MANIFESTS);
   const [selectedManifest, setSelectedManifest] = useState(null);
   const [receiveForm, setReceiveForm] = useState({ manifestId: '', itemCode: '', acceptedQty: '', remarks: '' });
   const [scanItem, setScanItem] = useState(null);
   const [toast, setToast] = useState(null);
+
+  const fetchLiveShipments = useCallback(async () => {
+    setLoadingShipments(true);
+    try {
+      const res = await getShipments();
+      const list = res?.data?.shipments || res?.shipments || [];
+      if (list && list.length > 0) {
+        const formatted = list.map(s => {
+          const depDate = s.departureDate ? new Date(s.departureDate).toISOString().split('T')[0] : '—';
+          const etaDate = (s.estimatedArrival || s.eta) ? new Date(s.estimatedArrival || s.eta).toISOString().split('T')[0] : '—';
+          const dest = typeof s.destination === 'object'
+            ? (s.destination?.name || s.destination?.code || 'Station')
+            : (s.destination || s.route?.destination?.name || s.route?.destination?.code || 'Station');
+          const orig = typeof s.origin === 'object'
+            ? (s.origin?.name || s.origin?.code || 'Goa')
+            : (s.origin || s.route?.origin || 'Goa');
+
+          return {
+            _id: s._id,
+            shipmentNumber: s.shipmentNumber || 'SHP-XXXX',
+            origin: orig,
+            destination: dest,
+            status: s.status || 'SCHEDULED',
+            departureDate: depDate,
+            eta: etaDate,
+            manifestCount: s.manifestCount ?? (s.manifests?.length || 0),
+            totalBoxes: s.totalBoxes || s.cargoCount || 0,
+            vessel: s.vessel || s.vesselName || s.transportId?.name || ''
+          };
+        });
+        setShipmentsList(formatted);
+      } else {
+        setShipmentsList(DEMO_SHIPMENTS);
+      }
+    } catch (e) {
+      console.log('Using default shipments fallback:', e.message);
+      setShipmentsList(DEMO_SHIPMENTS);
+    } finally {
+      setLoadingShipments(false);
+    }
+  }, []);
 
   const fetchLiveManifests = useCallback(async () => {
     try {
@@ -65,12 +115,18 @@ const CargoDashboard = () => {
           _id: m._id,
           manifestNumber: m.manifestNumber || m.manifestCode || 'CGM-MANIFEST',
           shipmentId: m.shipmentId || 'LIVE',
+          destination: m.destination,
           itemCount: m.items?.length || 0,
           status: m.status || 'CREATED',
           items: (m.items || []).map(it => ({
+            _id: it._id,
             itemCode: it.itemCode,
-            name: it.description || it.itemCode,
-            qty: it.packageCount || 1,
+            boxCode: it.boxCode,
+            name: it.itemName || it.description || it.itemCode,
+            qty: it.quantity || it.packageCount || 1,
+            unit: it.unit || 'PCS',
+            category: it.category || 'GENERAL',
+            status: it.status || 'PACKED'
           }))
         }));
         // Merge without duplicating IDs
@@ -85,33 +141,71 @@ const CargoDashboard = () => {
 
   useEffect(() => {
     fetchLiveManifests();
-  }, [fetchLiveManifests]);
+    fetchLiveShipments();
+  }, [fetchLiveManifests, fetchLiveShipments]);
 
   const showToast = (msg, type = 'success') => {
     setToast({ msg, type });
-    setTimeout(() => setToast(null), 3000);
+    setTimeout(() => setToast(null), 3500);
   };
 
   const handleReceiveCargo = async (e) => {
     e.preventDefault();
-    const manifest = DEMO_MANIFESTS.find(m => m._id === receiveForm.manifestId);
-    if (!manifest) return;
+    const manifest = manifestsList.find(m => m._id === receiveForm.manifestId);
+    if (!manifest) {
+      showToast('Please select a valid manifest from the list', 'error');
+      return;
+    }
+
+    if (!receiveForm.itemCode) {
+      showToast('Please select an item to accept', 'error');
+      return;
+    }
+
+    const qty = parseInt(receiveForm.acceptedQty, 10);
+    if (!qty || qty <= 0) {
+      showToast('Please enter a valid accepted quantity', 'error');
+      return;
+    }
+
+    const selectedItem = (manifest.items || []).find(
+      i => i.itemCode === receiveForm.itemCode || i._id === receiveForm.itemCode
+    );
 
     try {
-      await queueEvent({
-        type: 'CARGO_RECEIVE',
-        manifestId: receiveForm.manifestId,
-        itemCode: receiveForm.itemCode,
-        acceptedQuantity: parseInt(receiveForm.acceptedQty, 10),
-        stationId: 'BHARATI',
-        performedBy: 'current-user-id',
-        remarks: receiveForm.remarks,
-        offlineCreated: !navigator.onLine,
-      });
-      showToast(`✅ Cargo receipt queued${!navigator.onLine ? ' (offline — will sync)' : ' and synced'}!`);
+      if (navigator.onLine) {
+        const payload = {
+          manifestId: receiveForm.manifestId,
+          itemCode: receiveForm.itemCode,
+          boxCode: selectedItem?.boxCode || receiveForm.itemCode,
+          acceptedQuantity: qty,
+          remarks: receiveForm.remarks,
+          skipCheckpointCheck: true,
+        };
+
+        const res = await receiveCargo(payload);
+        const msg = res?.data?.message || res?.message || `Cargo accepted! ${qty} units added to station inventory.`;
+        showToast(`✅ ${msg}`);
+      } else {
+        await queueEvent({
+          type: 'CARGO_RECEIVE',
+          manifestId: receiveForm.manifestId,
+          itemCode: receiveForm.itemCode,
+          boxCode: selectedItem?.boxCode || receiveForm.itemCode,
+          acceptedQuantity: qty,
+          stationId: manifest.destination || 'BHARATI',
+          performedBy: 'current-user-id',
+          remarks: receiveForm.remarks,
+          offlineCreated: true,
+        });
+        showToast('📦 Cargo receipt queued offline — will sync when connected');
+      }
+
       setReceiveForm({ manifestId: '', itemCode: '', acceptedQty: '', remarks: '' });
+      await Promise.all([fetchLiveManifests(), fetchLiveShipments()]);
     } catch (err) {
-      showToast('❌ Failed to queue event: ' + err.message, 'error');
+      const errMsg = err.response?.data?.message || err.message || 'Failed to accept cargo';
+      showToast(`❌ ${errMsg}`, 'error');
     }
   };
 
@@ -160,30 +254,47 @@ const CargoDashboard = () => {
       )}
 
       {/* Page Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '0.75rem', borderBottom: '1px solid #E2E8F0' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '0.75rem', borderBottom: '1px solid #E2E8F0', flexWrap: 'wrap', gap: '0.75rem' }}>
         <div>
           <h1 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#005B7F', margin: 0 }}>CARGO LOGISTICS</h1>
           <p style={{ fontSize: '0.8rem', color: '#64748B', margin: '0.15rem 0 0' }}>
-            Track shipments from Goa → Cape Town → Bharati Station
+            Track shipments across polar supply corridors
           </p>
         </div>
-        {/* Pipeline visual */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.75rem', fontWeight: 600 }}>
-          {['Goa', '→', 'Cape Town', '→', 'Bharati'].map((s, i) => (
-            <span key={i} style={{ color: s === '→' ? '#94a3b8' : (i >= 4 ? '#15803D' : '#005B7F') }}>
-              {s}
-            </span>
-          ))}
+        {/* Pipeline visual & Refresh */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.75rem', fontWeight: 600 }}>
+            {['Goa', '→', 'Cape Town', '→', 'Antarctic Stations'].map((s, i) => (
+              <span key={i} style={{ color: s === '→' ? '#94a3b8' : (i >= 4 ? '#15803D' : '#005B7F') }}>
+                {s}
+              </span>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={() => { fetchLiveShipments(); fetchLiveManifests(); }}
+            title="Refresh Shipments & Manifests"
+            style={{
+              display: 'flex', alignItems: 'center', gap: '0.35rem',
+              backgroundColor: '#f8fafc', border: '1px solid #cbd5e1',
+              borderRadius: '6px', padding: '0.35rem 0.65rem',
+              fontSize: '0.75rem', fontWeight: 600, color: '#475569',
+              cursor: 'pointer'
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '16px', color: '#005B7F' }}>refresh</span>
+            Refresh
+          </button>
         </div>
       </div>
 
       {/* Stats Row */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem' }}>
         {[
-          { label: 'Shipments', value: DEMO_SHIPMENTS.length, icon: 'local_shipping', color: '#005B7F' },
-          { label: 'In Transit', value: DEMO_SHIPMENTS.filter(s => s.status === 'IN_TRANSIT').length, icon: 'directions_boat', color: '#1d4ed8' },
-          { label: 'Manifests', value: DEMO_MANIFESTS.length, icon: 'assignment', color: '#7c3aed' },
-          { label: 'Delivered', value: DEMO_SHIPMENTS.filter(s => s.status === 'DELIVERED').length, icon: 'check_circle', color: '#15803D' },
+          { label: 'Shipments', value: shipmentsList.length, icon: 'local_shipping', color: '#005B7F' },
+          { label: 'In Transit', value: shipmentsList.filter(s => ['IN_TRANSIT', 'DEPARTED', 'AT_PORT', 'LOADING'].includes(s.status)).length, icon: 'directions_boat', color: '#1d4ed8' },
+          { label: 'Manifests', value: manifestsList.length, icon: 'assignment', color: '#7c3aed' },
+          { label: 'Delivered', value: shipmentsList.filter(s => ['DELIVERED', 'RECEIVED'].includes(s.status)).length, icon: 'check_circle', color: '#15803D' },
         ].map(stat => (
           <div key={stat.label} style={{
             backgroundColor: '#fff', border: '1px solid #E2E8F0', borderRadius: '8px',
@@ -243,21 +354,54 @@ const CargoDashboard = () => {
               </tr>
             </thead>
             <tbody>
-              {DEMO_SHIPMENTS.map((s, i) => (
-                <tr key={s._id} style={{ borderBottom: i < DEMO_SHIPMENTS.length - 1 ? '1px solid #f1f5f9' : 'none', transition: 'background 0.1s' }}
-                  onMouseEnter={e => e.currentTarget.style.backgroundColor = '#f8fafc'}
-                  onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
-                >
-                  <td style={{ padding: '0.85rem 1rem', fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, color: '#005B7F' }}>{s.shipmentNumber}</td>
-                  <td style={{ padding: '0.85rem 1rem', fontWeight: 600, color: '#0F172A' }}>
-                    {s.origin} <span style={{ color: '#94a3b8' }}>→</span> {s.destination}
+              {loadingShipments && shipmentsList.length === 0 ? (
+                <tr>
+                  <td colSpan="6" style={{ padding: '2.5rem', textAlign: 'center', color: '#64748B', fontSize: '0.875rem' }}>
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span className="material-symbols-outlined" style={{ animation: 'spin 1s linear infinite' }}>sync</span>
+                      Loading live shipments...
+                    </div>
                   </td>
-                  <td style={{ padding: '0.85rem 1rem', color: '#64748B' }}>{s.departureDate}</td>
-                  <td style={{ padding: '0.85rem 1rem', color: '#64748B' }}>{s.eta}</td>
-                  <td style={{ padding: '0.85rem 1rem', color: '#0F172A', fontWeight: 600 }}>{s.manifestCount}</td>
-                  <td style={{ padding: '0.85rem 1rem' }}><StatusBadge status={s.status} /></td>
                 </tr>
-              ))}
+              ) : shipmentsList.length === 0 ? (
+                <tr>
+                  <td colSpan="6" style={{ padding: '2.5rem', textAlign: 'center', color: '#64748B', fontSize: '0.875rem' }}>
+                    No shipments found.
+                  </td>
+                </tr>
+              ) : (
+                shipmentsList.map((s, i) => (
+                  <tr key={s._id || i} style={{ borderBottom: i < shipmentsList.length - 1 ? '1px solid #f1f5f9' : 'none', transition: 'background 0.1s' }}
+                    onMouseEnter={e => e.currentTarget.style.backgroundColor = '#f8fafc'}
+                    onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                  >
+                    <td style={{ padding: '0.85rem 1rem', fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, color: '#005B7F' }}>
+                      {s.shipmentNumber}
+                      {s.vessel && (
+                        <div style={{ fontSize: '0.72rem', color: '#64748B', fontWeight: 500, fontFamily: 'inherit', marginTop: '2px' }}>
+                          🚢 {s.vessel}
+                        </div>
+                      )}
+                    </td>
+                    <td style={{ padding: '0.85rem 1rem', fontWeight: 600, color: '#0F172A' }}>
+                      {s.origin} <span style={{ color: '#94a3b8' }}>→</span> {s.destination}
+                    </td>
+                    <td style={{ padding: '0.85rem 1rem', color: '#64748B' }}>{s.departureDate}</td>
+                    <td style={{ padding: '0.85rem 1rem', color: '#64748B' }}>{s.eta}</td>
+                    <td style={{ padding: '0.85rem 1rem', color: '#0F172A', fontWeight: 600 }}>
+                      <span style={{
+                        display: 'inline-flex', alignItems: 'center', gap: '0.25rem',
+                        backgroundColor: '#f1f5f9', padding: '0.15rem 0.5rem', borderRadius: '4px',
+                        fontSize: '0.78rem'
+                      }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: '14px', color: '#64748B' }}>assignment</span>
+                        {s.manifestCount} {s.manifestCount === 1 ? 'manifest' : 'manifests'}
+                      </span>
+                    </td>
+                    <td style={{ padding: '0.85rem 1rem' }}><StatusBadge status={s.status} /></td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -437,7 +581,8 @@ const CargoDashboard = () => {
               <button
                 type="button"
                 onClick={() => {
-                  const items = DEMO_MANIFESTS.flatMap(m => m.items);
+                  const items = manifestsList.flatMap(m => m.items || []);
+                  if (items.length === 0) return;
                   const random = items[Math.floor(Math.random() * items.length)];
                   handleQRScan(random);
                 }}

@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import User from "../models/master-models/user.js";
 import Personnel from "../models/master-models/personnel.js";
+import Station from "../models/master-models/station.js";
 
 const generateToken = (user) => {
     return jwt.sign(
@@ -75,6 +76,8 @@ export const login = async (req, res) => {
             const personnel = await Personnel.findOne({ userId: user._id }).select("profileStatus");
             profileStatus = personnel ? personnel.profileStatus : "INCOMPLETE";
         }
+
+        await user.populate("stationId", "code name stationType");
 
         return res.status(200).json({
             success: true,

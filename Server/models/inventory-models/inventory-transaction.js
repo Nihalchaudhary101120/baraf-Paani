@@ -1,7 +1,28 @@
-//We never update stock directly. The InventoryItem stores the current stock for fast reads, while every change creates an InventoryTransaction for a complete audit trail.
+//We never update stock directly. The InventoryItem stores the current stock for fast reads,
+// while every change creates an InventoryTransaction for a complete audit trail.
 
 
 import mongoose from "mongoose";
+
+/**
+ * ConsumptionAllocation — tracks which batches were consumed in a FCFS operation.
+ * Only populated for CONSUMPTION transactions.
+ */
+const ConsumptionAllocationSchema = new mongoose.Schema(
+  {
+    batchId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "InventoryBatch",
+      required: true
+    },
+    quantity: {
+      type: Number,
+      required: true,
+      min: 0
+    }
+  },
+  { _id: false }
+);
 
 const InventoryTransactionSchema = new mongoose.Schema(
   {
@@ -27,9 +48,22 @@ const InventoryTransactionSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Expedition"
     },
-    //jab cargo aaya to station operator ne receipt baniye aur inventory transaction create jisse stock change hua 
 
-    //ab man lo scientist ko chaiye MED-001 Quantity: 5 to station operator scans the item qr  with type consumption 
+    // SKU reference — denormalized for fast history queries
+    skuId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "SKU"
+    },
+
+    skuCode: {
+      type: String,
+      trim: true,
+      uppercase: true
+    },
+
+    //jab cargo aaya to station operator ne receipt baniye aur inventory transaction create jisse stock change hua
+
+    //ab man lo scientist ko chaiye MED-001 Quantity: 5 to station operator scans the item qr  with type consumption
 
     //compelete trace hoga Goa
     /*↓
@@ -53,7 +87,7 @@ const InventoryTransactionSchema = new mongoose.Schema(
         "TRANSFER_IN",
         "TRANSFER_OUT",
         "ADJUSTMENT",
-        "DISPOSAL", 
+        "DISPOSAL",
         "CHECKOUT",
         "CHECKIN"
       ],
@@ -72,10 +106,19 @@ const InventoryTransactionSchema = new mongoose.Schema(
 
     expiryDate: Date,
 
+    // Source for RECEIPT transactions
     sourceManifestId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "CargoManifest"
     },
+
+    sourceManifestNumber: {
+      type: String,
+      trim: true
+    },
+
+    // FCFS batch allocations — populated for CONSUMPTION transactions
+    consumptionAllocations: [ConsumptionAllocationSchema],
 
     fromStation: {
       type: mongoose.Schema.Types.ObjectId,
@@ -91,6 +134,11 @@ const InventoryTransactionSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true
+    },
+
+    reason: {
+      type: String,
+      trim: true
     },
 
     deviceId: String,
@@ -134,7 +182,21 @@ InventoryTransactionSchema.index({
 });
 
 InventoryTransactionSchema.index({
+  stationId: 1,
+  createdAt: -1
+});
+
+InventoryTransactionSchema.index({
+  skuId: 1,
+  stationId: 1
+});
+
+InventoryTransactionSchema.index({
   syncStatus: 1
+});
+
+InventoryTransactionSchema.index({
+  sourceManifestId: 1
 });
 
 export default mongoose.model("InventoryTransaction", InventoryTransactionSchema);
