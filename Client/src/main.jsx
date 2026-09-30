@@ -10,6 +10,7 @@ import { MedicalProvider } from '@/context/MedicalContext';
 import { ToastProvider } from '@/context/ToastContext';
 import { SKUProvider } from '@/context/SKUContext';
 import { InventoryProvider } from '@/context/InventoryContext';
+import { FieldExcursionProvider } from '@/context/FieldExcursionContext';
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
@@ -20,7 +21,9 @@ createRoot(document.getElementById('root')).render(
             <ToastProvider>
               <SKUProvider>
                 <InventoryProvider>
-                  <App />
+                  <FieldExcursionProvider>
+                    <App />
+                  </FieldExcursionProvider>
                 </InventoryProvider>
               </SKUProvider>
             </ToastProvider>

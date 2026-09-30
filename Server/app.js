@@ -17,6 +17,7 @@ import cargoReceiveRoutes from "./routes/cargoRoutes/cargoReceiveRoutes.js";
 import skuRoutes from "./routes/cargoRoutes/skuRoutes.js";
 import stationRoutes from "./routes/stationRoutes.js";
 import inventoryRoutes from "./routes/inventoryRoutes.js";
+import fieldExcursionRoutes from "./routes/fieldExcursionRoutes.js";
 import { getScanCargoInfo } from "./controllers/cargo/cargoQrController.js";
 
 
@@ -80,6 +81,8 @@ app.use("/api/cargo/receiving", cargoReceiveRoutes);
 app.use("/api/cargo/skus", skuRoutes);
 app.use("/api/skus", skuRoutes);
 app.use("/api/inventory", inventoryRoutes);
+app.use("/api/field-excursions", fieldExcursionRoutes);
+app.use("/api/field/excursions", fieldExcursionRoutes);
 
 
 const PORT = process.env.PORT || 5000;

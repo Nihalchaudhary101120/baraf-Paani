@@ -15,8 +15,8 @@ const processExcursionEnd = async (event, session) => {
     return excursion;
   }
 
-  if (excursion.status !== "ACTIVE") {
-    throw new Error("Only ACTIVE excursions can be completed.");
+  if (!["ACTIVE", "OVERDUE"].includes(excursion.status)) {
+    throw new Error("Only ACTIVE or OVERDUE excursions can be completed.");
   }
 
   excursion.status = "COMPLETED";

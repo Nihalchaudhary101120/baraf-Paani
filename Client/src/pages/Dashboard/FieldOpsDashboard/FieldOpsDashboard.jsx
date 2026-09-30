@@ -1,492 +1,1223 @@
-import React, { useState } from 'react';
-import { queueEvent } from '@/services/syncServices/queueService';
-
-// ── Demo data ───────────────────────────────────────────────────────
-const DEMO_EXCURSIONS = [
-  {
-    _id: 'EX001', excursionNumber: 'EXC-2026-001',
-    leader: 'Dr. Rajan Mehta', members: ['Dr. Priya S', 'Anish K', 'Rahul V'],
-    destination: 'Schirmacher Oasis', purpose: 'Geological survey',
-    transportMode: 'Snow Cat',
-    departureTime: '2026-09-25T06:00:00Z',
-    expectedReturnTime: '2026-09-25T18:00:00Z',
-    checkInIntervalMinutes: 120,
-    weatherRisk: 'MEDIUM',
-    status: 'ACTIVE',
-    checkIns: [
-      { time: '08:00', battery: 85, temp: -18, notes: 'All good', lat: -70.77, lng: 11.83 },
-      { time: '10:00', battery: 71, temp: -22, notes: 'Wind picking up', lat: -70.79, lng: 11.91 },
-    ],
-  },
-  {
-    _id: 'EX002', excursionNumber: 'EXC-2026-002',
-    leader: 'Capt. Shinde', members: ['Dr. Kavya', 'Mohan G'],
-    destination: 'Larsemann Hills', purpose: 'Weather sensor maintenance',
-    transportMode: 'Helicopter',
-    departureTime: '2026-09-24T09:00:00Z',
-    expectedReturnTime: '2026-09-24T16:00:00Z',
-    checkInIntervalMinutes: 60,
-    weatherRisk: 'HIGH',
-    status: 'OVERDUE',
-    checkIns: [
-      { time: '10:00', battery: 90, temp: -15, notes: 'Weather sensors located', lat: -69.38, lng: 76.37 },
-    ],
-  },
-  {
-    _id: 'EX003', excursionNumber: 'EXC-2026-003',
-    leader: 'Dr. Ananya', members: ['Vikram P'],
-    destination: 'Ice Core Site-7', purpose: 'Ice core sample collection',
-    transportMode: 'Snowmobile',
-    departureTime: '2026-09-27T07:00:00Z',
-    expectedReturnTime: '2026-09-27T17:00:00Z',
-    checkInIntervalMinutes: 90,
-    weatherRisk: 'LOW',
-    status: 'PLANNED',
-    checkIns: [],
-  },
-];
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '@/context/AuthContext';
+import { useFieldExcursion } from '@/context/FieldExcursionContext';
+import { getStationsApi } from '@/api/station.api';
 
 const STATUS_STYLE = {
   ACTIVE:    { bg: '#ecfdf5', color: '#15803D', border: '#a7f3d0', label: 'ACTIVE', pulse: false },
   OVERDUE:   { bg: '#fef2f2', color: '#B91C1C', border: '#fecaca', label: '⚠ OVERDUE', pulse: true },
   PLANNED:   { bg: '#eff6ff', color: '#1d4ed8', border: '#bfdbfe', label: 'PLANNED', pulse: false },
-  COMPLETED: { bg: '#f8fafc', color: '#64748B', border: '#e2e8f0', label: 'COMPLETED', pulse: false },
-  CANCELLED: { bg: '#f8fafc', color: '#94a3b8', border: '#e2e8f0', label: 'CANCELLED', pulse: false },
+  COMPLETED: { bg: '#f8fafc', color: '#475569', border: '#cbd5e1', label: 'COMPLETED', pulse: false },
+  CANCELLED: { bg: '#f1f5f9', color: '#94a3b8', border: '#e2e8f0', label: 'CANCELLED', pulse: false },
 };
 
 const RISK_STYLE = {
-  LOW:    { color: '#15803D', bg: '#f0fdf4' },
-  MEDIUM: { color: '#854d0e', bg: '#fefce8' },
-  HIGH:   { color: '#B91C1C', bg: '#fef2f2' },
+  LOW:    { color: '#15803D', bg: '#f0fdf4', border: '#bbf7d0' },
+  MEDIUM: { color: '#854d0e', bg: '#fefce8', border: '#fef08a' },
+  HIGH:   { color: '#B91C1C', bg: '#fef2f2', border: '#fecaca' },
+};
+
+const TRANSPORT_ICONS = {
+  SNOWMOBILE:    'two_wheeler',
+  TRACK_VEHICLE: 'directions_bus',
+  HELICOPTER:    'helicopter',
+  FOOT:          'hiking',
 };
 
 const FieldOpsDashboard = () => {
-  const [activeTab, setActiveTab] = useState('excursions');
-  const [selectedExcursion, setSelectedExcursion] = useState(null);
-  const [showStartForm, setShowStartForm] = useState(false);
-  const [checkInForm, setCheckInForm] = useState({ excursionId: '', notes: '', temp: '', battery: '', lat: '', lng: '' });
-  const [startForm, setStartForm] = useState({ leader: '', destination: '', purpose: '', transportMode: 'Snow Cat', departureTime: '', expectedReturn: '', members: '', interval: 60, risk: 'LOW' });
-  const [toast, setToast] = useState(null);
+  const { user } = useAuth();
+  const {
+    activeExcursions,
+    history,
+    myActiveExcursions,
+    selectedExcursion,
+    setSelectedExcursion,
+    checkIns,
+    latestCheckIns,
+    personnelList,
+    summary,
+    loading,
+    fetchExcursionDetails,
+    fetchCheckIns,
+    fetchLatestCheckIns,
+    createExcursion,
+    startExcursion,
+    markReturned,
+    cancelExcursion,
+    submitCheckIn,
+    fetchPersonnel,
+    refreshAll,
+  } = useFieldExcursion();
 
-  const showToast = (msg, type = 'success') => {
-    setToast({ msg, type });
-    setTimeout(() => setToast(null), 3500);
+  const isOperator = ['STATION_OPERATOR', 'STATION_COMMANDER', 'HQ_COMMAND', 'HQ_ADMIN'].includes(user?.role);
+
+  const [activeTab, setActiveTab] = useState(isOperator ? 'active' : 'my_active');
+  const [stations, setStations] = useState([]);
+
+  // Form states
+  const [createForm, setCreateForm] = useState({
+    stationId: user?.stationId?._id || user?.stationId || '',
+    leaderId: '',
+    members: [],
+    purpose: '',
+    destinationName: '',
+    destinationLat: '',
+    destinationLng: '',
+    transportMode: 'TRACK_VEHICLE',
+    departureTime: '',
+    expectedReturnTime: '',
+    checkInIntervalMinutes: 60,
+    weatherRisk: 'LOW',
+  });
+
+  const [checkInForm, setCheckInForm] = useState({
+    excursionId: '',
+    temp: '',
+    battery: '',
+    lat: '',
+    lng: '',
+    notes: '',
+  });
+
+  const [submitting, setSubmitting] = useState(false);
+  const [memberSearch, setMemberSearch] = useState('');
+
+  // Fetch stations for create dropdown
+  useEffect(() => {
+    const loadStations = async () => {
+      try {
+        const res = await getStationsApi();
+        const list = res?.stations || res?.data?.stations || res?.data || [];
+        setStations(Array.isArray(list) ? list : []);
+      } catch (err) {
+        console.error('Error fetching stations:', err);
+      }
+    };
+    loadStations();
+  }, []);
+
+  // When expanding an excursion, load its check-ins and latest member statuses
+  const handleToggleExpand = async (exc) => {
+    if (selectedExcursion?._id === exc._id) {
+      setSelectedExcursion(null);
+    } else {
+      setSelectedExcursion(exc);
+      await Promise.all([
+        fetchExcursionDetails(exc._id),
+        fetchCheckIns(exc._id),
+        fetchLatestCheckIns(exc._id),
+      ]);
+    }
   };
 
-  const handleStartExcursion = async (e) => {
+  // Pre-fill default departure & return times
+  useEffect(() => {
+    const now = new Date();
+    const plus8h = new Date(now.getTime() + 8 * 3600 * 1000);
+    const toLocalISO = (d) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+    setCreateForm((prev) => ({
+      ...prev,
+      departureTime: prev.departureTime || toLocalISO(now),
+      expectedReturnTime: prev.expectedReturnTime || toLocalISO(plus8h),
+      stationId: prev.stationId || user?.stationId?._id || user?.stationId || '',
+    }));
+  }, [user]);
+
+  // Handle Create Excursion submit
+  const handleCreateSubmit = async (e) => {
     e.preventDefault();
-    try {
-      await queueEvent({
-        type: 'EXCURSION_START',
-        excursionNumber: `EXC-${Date.now()}`,
-        expeditionId: 'EXP-46',
-        stationId: 'BHARATI',
-        leaderId: startForm.leader,
-        members: startForm.members.split(',').map(m => m.trim()),
-        purpose: startForm.purpose,
-        destination: startForm.destination,
-        transportMode: startForm.transportMode,
-        departureTime: startForm.departureTime,
-        expectedReturnTime: startForm.expectedReturn,
-        checkInIntervalMinutes: parseInt(startForm.interval, 10),
-        weatherRisk: startForm.risk,
-        offlineCreated: !navigator.onLine,
-      });
-      showToast(`✅ Excursion to ${startForm.destination} registered${!navigator.onLine ? ' (offline)' : ''}!`);
-      setShowStartForm(false);
-      setStartForm({ leader: '', destination: '', purpose: '', transportMode: 'Snow Cat', departureTime: '', expectedReturn: '', members: '', interval: 60, risk: 'LOW' });
-    } catch (err) {
-      showToast('❌ Failed: ' + err.message, 'error');
+    if (!createForm.leaderId) {
+      alert('Please select a Team Leader from the personnel list.');
+      return;
+    }
+    if (new Date(createForm.expectedReturnTime) <= new Date(createForm.departureTime)) {
+      alert('Expected Return Time must be after Departure Time.');
+      return;
+    }
+
+    setSubmitting(true);
+    const payload = {
+      stationId: createForm.stationId || undefined,
+      leaderId: createForm.leaderId,
+      members: createForm.members,
+      purpose: createForm.purpose,
+      destination: {
+        name: createForm.destinationName,
+        coordinates: {
+          latitude: parseFloat(createForm.destinationLat) || 0,
+          longitude: parseFloat(createForm.destinationLng) || 0,
+        },
+      },
+      transportMode: createForm.transportMode,
+      departureTime: new Date(createForm.departureTime).toISOString(),
+      expectedReturnTime: new Date(createForm.expectedReturnTime).toISOString(),
+      checkInIntervalMinutes: parseInt(createForm.checkInIntervalMinutes, 10) || 60,
+      weatherRisk: createForm.weatherRisk,
+    };
+
+    const res = await createExcursion(payload);
+    setSubmitting(false);
+    if (res.success) {
+      setCreateForm((prev) => ({
+        ...prev,
+        purpose: '',
+        destinationName: '',
+        destinationLat: '',
+        destinationLng: '',
+        leaderId: '',
+        members: [],
+      }));
+      setActiveTab('active');
     }
   };
 
-  const handleCheckIn = async (e) => {
+  // Handle Check-In submit
+  const handleCheckInSubmit = async (e) => {
     e.preventDefault();
-    try {
-      await queueEvent({
-        type: 'FIELD_CHECKIN',
-        excursionId: checkInForm.excursionId,
-        personnelId: 'current-user-id',
-        location: { lat: parseFloat(checkInForm.lat), lng: parseFloat(checkInForm.lng) },
-        temperature: parseFloat(checkInForm.temp),
-        batteryLevel: parseInt(checkInForm.battery, 10),
-        networkAvailable: navigator.onLine,
-        notes: checkInForm.notes,
-        offlineCreated: !navigator.onLine,
-      });
-      showToast(`✅ Check-in submitted${!navigator.onLine ? ' (offline — will sync)' : ''}!`);
-      setCheckInForm({ excursionId: '', notes: '', temp: '', battery: '', lat: '', lng: '' });
-    } catch (err) {
-      showToast('❌ Failed: ' + err.message, 'error');
+    if (!checkInForm.excursionId) {
+      alert('Please select an active excursion.');
+      return;
+    }
+
+    setSubmitting(true);
+    const payload = {
+      latitude: parseFloat(checkInForm.lat) || 0,
+      longitude: parseFloat(checkInForm.lng) || 0,
+      temperature: checkInForm.temp !== '' ? parseFloat(checkInForm.temp) : null,
+      batteryLevel: checkInForm.battery !== '' ? parseInt(checkInForm.battery, 10) : null,
+      notes: checkInForm.notes,
+      networkAvailable: navigator.onLine,
+    };
+
+    const res = await submitCheckIn(checkInForm.excursionId, payload);
+    setSubmitting(false);
+    if (res.success) {
+      setCheckInForm({ excursionId: '', temp: '', battery: '', lat: '', lng: '', notes: '' });
+      if (selectedExcursion?._id === checkInForm.excursionId) {
+        fetchCheckIns(checkInForm.excursionId);
+        fetchLatestCheckIns(checkInForm.excursionId);
+      }
     }
   };
 
-  const handleEndExcursion = async (excursion) => {
-    try {
-      await queueEvent({
-        type: 'EXCURSION_END',
-        excursionId: excursion._id,
-        returnTime: new Date().toISOString(),
-        performedBy: 'current-user-id',
-        offlineCreated: !navigator.onLine,
-      });
-      showToast(`✅ Excursion ${excursion.excursionNumber} marked as returned!`);
-    } catch (err) {
-      showToast('❌ Failed: ' + err.message, 'error');
-    }
+  // Helper to prefill Check-In for an excursion
+  const handleOpenCheckInFor = (exc) => {
+    setCheckInForm((prev) => ({ ...prev, excursionId: exc._id }));
+    setActiveTab('checkin');
   };
 
-  const tabs = [
-    { id: 'excursions', label: 'Active Excursions', icon: 'explore' },
-    { id: 'checkin', label: 'Submit Check-in', icon: 'pin_drop' },
-    { id: 'start', label: 'Start Excursion', icon: 'add_location_alt' },
-  ];
+  // Filter members list by search query
+  const filteredPersonnel = personnelList.filter((p) => {
+    const name = p.userId?.name || '';
+    const empId = p.userId?.employeeId || '';
+    const des = p.userId?.designation || '';
+    const q = memberSearch.toLowerCase();
+    return name.toLowerCase().includes(q) || empId.toLowerCase().includes(q) || des.toLowerCase().includes(q);
+  });
+
+  // Candidate excursions for check-in: if operator, all active/overdue; if personnel, myActive
+  const availableExcursionsForCheckIn = isOperator ? activeExcursions.filter((e) => ['ACTIVE', 'OVERDUE'].includes(e.status)) : myActiveExcursions;
+  const currentSelectedForCheckIn = availableExcursionsForCheckIn.find((e) => e._id === checkInForm.excursionId);
+
+  // Define tabs depending on role
+  const tabs = isOperator
+    ? [
+        { id: 'active', label: 'Active Excursions', icon: 'explore', count: activeExcursions.length },
+        { id: 'create', label: 'Register Excursion', icon: 'add_location_alt' },
+        { id: 'checkin', label: 'Submit Check-in', icon: 'pin_drop' },
+        { id: 'history', label: 'Excursion History', icon: 'history', count: history.length },
+      ]
+    : [
+        { id: 'my_active', label: 'My Active Excursions', icon: 'explore', count: myActiveExcursions.length },
+        { id: 'checkin', label: 'Submit Check-in', icon: 'pin_drop' },
+        { id: 'history', label: 'Excursion History', icon: 'history', count: history.length },
+      ];
 
   return (
     <div style={{ maxWidth: '1400px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-
-      {/* Toast */}
-      {toast && (
-        <div style={{
-          position: 'fixed', top: '80px', right: '1.5rem', zIndex: 9999,
-          padding: '0.75rem 1.25rem',
-          backgroundColor: toast.type === 'error' ? '#fef2f2' : '#f0fdf4',
-          border: `1px solid ${toast.type === 'error' ? '#fecaca' : '#bbf7d0'}`,
-          color: toast.type === 'error' ? '#B91C1C' : '#15803D',
-          borderRadius: '8px', fontWeight: 600, fontSize: '0.85rem',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-        }}>
-          {toast.msg}
-        </div>
-      )}
-
-      {/* Page Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '0.75rem', borderBottom: '1px solid #E2E8F0' }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '0.75rem', borderBottom: '1px solid #E2E8F0', flexWrap: 'wrap', gap: '0.75rem' }}>
         <div>
-          <h1 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#005B7F', margin: 0 }}>FIELD OPERATIONS</h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            <h1 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#005B7F', margin: 0 }}>FIELD OPERATIONS</h1>
+            <span style={{ fontSize: '0.7rem', fontWeight: 700, backgroundColor: '#005B7F15', color: '#005B7F', padding: '0.15rem 0.5rem', borderRadius: '4px', textTransform: 'uppercase' }}>
+              {user?.role?.replace(/_/g, ' ') || 'OPERATIONS'}
+            </span>
+          </div>
           <p style={{ fontSize: '0.8rem', color: '#64748B', margin: '0.15rem 0 0' }}>
-            Excursion lifecycle, field check-ins, and overdue monitoring
+            Station field excursions, personnel check-in monitor, and overdue tracking
           </p>
         </div>
-        {/* Summary stats */}
-        <div style={{ display: 'flex', gap: '1rem' }}>
-          {[
-            { label: 'Active', count: DEMO_EXCURSIONS.filter(e => e.status === 'ACTIVE').length, color: '#15803D' },
-            { label: 'Overdue', count: DEMO_EXCURSIONS.filter(e => e.status === 'OVERDUE').length, color: '#B91C1C' },
-            { label: 'Planned', count: DEMO_EXCURSIONS.filter(e => e.status === 'PLANNED').length, color: '#1d4ed8' },
-          ].map(s => (
-            <div key={s.label} style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '1.5rem', fontWeight: 800, color: s.color, lineHeight: 1 }}>{s.count}</div>
-              <div style={{ fontSize: '0.7rem', color: '#64748B', fontWeight: 600, textTransform: 'uppercase' }}>{s.label}</div>
-            </div>
-          ))}
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <button
+            type="button"
+            onClick={() => refreshAll()}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '0.35rem',
+              backgroundColor: '#fff', border: '1px solid #cbd5e1', borderRadius: '6px',
+              padding: '0.4rem 0.8rem', fontSize: '0.78rem', fontWeight: 600, color: '#475569',
+              cursor: 'pointer', transition: 'all 0.15s',
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '16px', color: '#005B7F' }}>refresh</span>
+            Refresh
+          </button>
         </div>
       </div>
 
-      {/* Tab Bar */}
-      <div style={{ display: 'flex', gap: 0, borderBottom: '2px solid #E2E8F0' }}>
-        {tabs.map(tab => (
-          <button key={tab.id} type="button" onClick={() => setActiveTab(tab.id)}
+      {/* Dynamic Summary KPI Cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+        {[
+          { label: 'Active in Field', value: summary.active, icon: 'directions_run', color: '#15803D', bg: '#f0fdf4' },
+          { label: 'Overdue Excursions', value: summary.overdue, icon: 'warning', color: '#B91C1C', bg: '#fef2f2', pulse: summary.overdue > 0 },
+          { label: 'Planned Excursions', value: summary.planned, icon: 'calendar_month', color: '#1d4ed8', bg: '#eff6ff' },
+          { label: 'Completed Missions', value: summary.completed, icon: 'verified', color: '#64748B', bg: '#f8fafc' },
+        ].map((stat) => (
+          <div
+            key={stat.label}
+            style={{
+              backgroundColor: '#fff', border: `1px solid ${stat.pulse ? '#fca5a5' : '#E2E8F0'}`, borderRadius: '8px',
+              padding: '1rem 1.25rem', display: 'flex', alignItems: 'center', gap: '1rem',
+              boxShadow: stat.pulse ? '0 0 12px rgba(239,68,68,0.2)' : 'none',
+            }}
+          >
+            <div
+              style={{
+                width: '42px', height: '42px', borderRadius: '8px',
+                backgroundColor: stat.bg, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: '24px', color: stat.color }}>{stat.icon}</span>
+            </div>
+            <div>
+              <div style={{ fontSize: '1.6rem', fontWeight: 800, color: stat.color, lineHeight: 1 }}>{stat.value || 0}</div>
+              <div style={{ fontSize: '0.72rem', color: '#64748B', fontWeight: 600, textTransform: 'uppercase', marginTop: '3px' }}>{stat.label}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Tabs */}
+      <div style={{ display: 'flex', gap: 0, borderBottom: '2px solid #E2E8F0', overflowX: 'auto' }}>
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setActiveTab(tab.id)}
             style={{
               display: 'flex', alignItems: 'center', gap: '0.5rem',
-              padding: '0.6rem 1.25rem',
-              backgroundColor: 'transparent', border: 'none',
+              padding: '0.65rem 1.25rem', backgroundColor: 'transparent', border: 'none',
               borderBottom: activeTab === tab.id ? '2px solid #005B7F' : '2px solid transparent',
-              marginBottom: '-2px',
-              color: activeTab === tab.id ? '#005B7F' : '#64748B',
-              fontWeight: activeTab === tab.id ? 700 : 500,
-              fontSize: '0.85rem', cursor: 'pointer',
-            }}>
+              marginBottom: '-2px', color: activeTab === tab.id ? '#005B7F' : '#64748B',
+              fontWeight: activeTab === tab.id ? 700 : 500, fontSize: '0.85rem', cursor: 'pointer',
+              whiteSpace: 'nowrap', transition: 'all 0.15s',
+            }}
+          >
             <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>{tab.icon}</span>
             {tab.label}
+            {tab.count !== undefined && (
+              <span
+                style={{
+                  backgroundColor: activeTab === tab.id ? '#005B7F' : '#e2e8f0',
+                  color: activeTab === tab.id ? '#fff' : '#475569',
+                  fontSize: '0.68rem', fontWeight: 700, padding: '0.1rem 0.45rem', borderRadius: '9999px',
+                }}
+              >
+                {tab.count}
+              </span>
+            )}
           </button>
         ))}
       </div>
 
-      {/* ── TAB: EXCURSIONS LIST ───────────────────────────────────── */}
-      {activeTab === 'excursions' && (
+      {/* ── TAB 1: ACTIVE EXCURSIONS (STATION OPERATOR) ────────────────── */}
+      {activeTab === 'active' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          {DEMO_EXCURSIONS.map(exc => {
-            const ss = STATUS_STYLE[exc.status];
-            const risk = RISK_STYLE[exc.weatherRisk];
-            const isExpanded = selectedExcursion?._id === exc._id;
-
-            return (
-              <div key={exc._id} style={{
-                backgroundColor: '#fff',
-                border: `1px solid ${exc.status === 'OVERDUE' ? '#fecaca' : '#E2E8F0'}`,
-                borderLeft: `4px solid ${ss.color}`,
-                borderRadius: '8px', overflow: 'hidden',
-              }}>
-                <div
-                  onClick={() => setSelectedExcursion(isExpanded ? null : exc)}
+          {loading && activeExcursions.length === 0 ? (
+            <div style={{ backgroundColor: '#fff', padding: '3rem', textAlign: 'center', borderRadius: '8px', color: '#64748B' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: '32px', animation: 'spin 1s linear infinite' }}>sync</span>
+              <p style={{ marginTop: '0.5rem', fontWeight: 600 }}>Loading active field excursions...</p>
+            </div>
+          ) : activeExcursions.length === 0 ? (
+            <div style={{ backgroundColor: '#fff', border: '1px dashed #cbd5e1', padding: '3rem', textAlign: 'center', borderRadius: '8px', color: '#64748B' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: '48px', color: '#cbd5e1' }}>explore_off</span>
+              <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#0F172A', marginTop: '0.5rem' }}>No Active Excursions</h3>
+              <p style={{ fontSize: '0.82rem', color: '#64748B', marginTop: '0.25rem' }}>There are currently no planned, active, or overdue field excursions for this station.</p>
+              {isOperator && (
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('create')}
                   style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    padding: '1rem 1.25rem', cursor: 'pointer',
-                    backgroundColor: exc.status === 'OVERDUE' ? '#fff5f5' : '#fff',
+                    marginTop: '1rem', backgroundColor: '#005B7F', color: '#fff', border: 'none',
+                    borderRadius: '6px', padding: '0.5rem 1rem', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer',
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                    <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                        <span style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, color: '#005B7F', fontSize: '0.9rem' }}>{exc.excursionNumber}</span>
-                        <span style={{
-                          backgroundColor: ss.bg, color: ss.color, border: `1px solid ${ss.border}`,
-                          padding: '0.1rem 0.55rem', borderRadius: '9999px', fontSize: '0.7rem', fontWeight: 700,
-                          animation: ss.pulse ? 'pulse-red 1.5s infinite' : 'none',
-                        }}>{ss.label}</span>
-                        <span style={{ backgroundColor: risk.bg, color: risk.color, padding: '0.1rem 0.45rem', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 600 }}>
-                          {exc.weatherRisk} RISK
-                        </span>
-                      </div>
-                      <div style={{ marginTop: '0.2rem', fontSize: '0.82rem', color: '#374151' }}>
-                        <strong>{exc.leader}</strong> → <strong>{exc.destination}</strong> · {exc.members.length + 1} personnel · {exc.transportMode}
-                      </div>
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                    {exc.status === 'ACTIVE' && (
-                      <button
-                        type="button"
-                        onClick={e => { e.stopPropagation(); handleEndExcursion(exc); }}
+                  Register New Excursion
+                </button>
+              )}
+            </div>
+          ) : (
+            activeExcursions.map((exc) => {
+              const ss = STATUS_STYLE[exc.status] || STATUS_STYLE.PLANNED;
+              const risk = RISK_STYLE[exc.weatherRisk] || RISK_STYLE.LOW;
+              const isExpanded = selectedExcursion?._id === exc._id;
+              const leaderName = exc.leaderId?.userId?.name || 'Assigned Leader';
+              const memberCount = (exc.members?.length || 0) + 1;
+              const icon = TRANSPORT_ICONS[exc.transportMode] || 'hiking';
+
+              return (
+                <div
+                  key={exc._id}
+                  style={{
+                    backgroundColor: '#fff',
+                    border: `1px solid ${exc.status === 'OVERDUE' ? '#fecaca' : '#E2E8F0'}`,
+                    borderLeft: `5px solid ${ss.color}`,
+                    borderRadius: '8px', overflow: 'hidden',
+                    boxShadow: exc.status === 'OVERDUE' ? '0 2px 10px rgba(239,68,68,0.1)' : '0 1px 3px rgba(0,0,0,0.04)',
+                  }}
+                >
+                  <div
+                    onClick={() => handleToggleExpand(exc)}
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      padding: '1rem 1.25rem', cursor: 'pointer', flexWrap: 'wrap', gap: '0.75rem',
+                      backgroundColor: exc.status === 'OVERDUE' ? '#fff5f5' : '#fff',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                      <div
                         style={{
-                          backgroundColor: '#15803D', color: '#fff', border: 'none',
-                          padding: '0.3rem 0.75rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 700,
-                          cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem',
+                          width: '42px', height: '42px', borderRadius: '8px',
+                          backgroundColor: `${ss.color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center',
                         }}
                       >
-                        <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>home</span>
-                        Mark Returned
-                      </button>
-                    )}
-                    <span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#94a3b8' }}>
-                      {isExpanded ? 'expand_less' : 'expand_more'}
-                    </span>
-                  </div>
-                </div>
-
-                {isExpanded && (
-                  <div style={{ borderTop: '1px solid #E2E8F0', padding: '1.25rem', backgroundColor: '#fafafa' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
-                      {/* Details */}
-                      <div>
-                        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: '0.5rem' }}>Excursion Details</div>
-                        {[
-                          ['Purpose', exc.purpose],
-                          ['Departure', new Date(exc.departureTime).toLocaleString('en-IN')],
-                          ['Expected Return', new Date(exc.expectedReturnTime).toLocaleString('en-IN')],
-                          ['Check-in Interval', `Every ${exc.checkInIntervalMinutes} min`],
-                          ['Team', [exc.leader, ...exc.members].join(', ')],
-                        ].map(([label, val]) => (
-                          <div key={label} style={{ display: 'flex', gap: '0.75rem', fontSize: '0.82rem', marginBottom: '0.4rem' }}>
-                            <span style={{ color: '#64748B', minWidth: '140px' }}>{label}:</span>
-                            <span style={{ fontWeight: 600, color: '#0F172A' }}>{val}</span>
-                          </div>
-                        ))}
+                        <span className="material-symbols-outlined" style={{ fontSize: '22px', color: ss.color }}>{icon}</span>
                       </div>
-                      {/* Check-in Timeline */}
                       <div>
-                        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: '0.5rem' }}>Check-in History</div>
-                        {exc.checkIns.length === 0 ? (
-                          <div style={{ color: '#94a3b8', fontSize: '0.8rem' }}>No check-ins yet.</div>
-                        ) : (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                            {exc.checkIns.map((ci, idx) => (
-                              <div key={idx} style={{
-                                display: 'flex', alignItems: 'center', gap: '0.75rem',
-                                padding: '0.5rem 0.75rem',
-                                backgroundColor: '#fff', borderRadius: '6px',
-                                border: '1px solid #E2E8F0', fontSize: '0.8rem',
-                              }}>
-                                <span style={{ fontFamily: "'JetBrains Mono', monospace", color: '#005B7F', fontWeight: 700 }}>{ci.time}</span>
-                                <span>🌡 {ci.temp}°C</span>
-                                <span>🔋 {ci.battery}%</span>
-                                <span style={{ color: '#64748B' }}>{ci.notes}</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+                          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, color: '#005B7F', fontSize: '0.95rem' }}>
+                            {exc.excursionNumber}
+                          </span>
+                          <span
+                            style={{
+                              backgroundColor: ss.bg, color: ss.color, border: `1px solid ${ss.border}`,
+                              padding: '0.12rem 0.55rem', borderRadius: '9999px', fontSize: '0.7rem', fontWeight: 700,
+                            }}
+                          >
+                            {ss.label}
+                          </span>
+                          <span
+                            style={{
+                              backgroundColor: risk.bg, color: risk.color, border: `1px solid ${risk.border}`,
+                              padding: '0.12rem 0.5rem', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 700,
+                            }}
+                          >
+                            {exc.weatherRisk} RISK
+                          </span>
+                          {exc.stationId && (
+                            <span style={{ fontSize: '0.7rem', color: '#64748B', fontWeight: 600 }}>
+                              📍 {exc.stationId.name || exc.stationId.code}
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ marginTop: '0.25rem', fontSize: '0.85rem', color: '#1e293b' }}>
+                          <strong>{leaderName}</strong> <span style={{ color: '#94a3b8' }}>→</span> <strong>{exc.destination?.name || 'Field Site'}</strong> · {memberCount} personnel · {exc.transportMode?.replace(/_/g, ' ')}
+                        </div>
                       </div>
                     </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                      {/* Operator Actions */}
+                      {isOperator && exc.status === 'PLANNED' && (
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); startExcursion(exc._id); }}
+                          style={{
+                            backgroundColor: '#005B7F', color: '#fff', border: 'none',
+                            padding: '0.4rem 0.85rem', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700,
+                            cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem',
+                          }}
+                        >
+                          <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>play_arrow</span>
+                          Start Excursion
+                        </button>
+                      )}
+
+                      {isOperator && ['ACTIVE', 'OVERDUE'].includes(exc.status) && (
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); markReturned(exc._id); }}
+                          style={{
+                            backgroundColor: '#15803D', color: '#fff', border: 'none',
+                            padding: '0.4rem 0.85rem', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700,
+                            cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem',
+                          }}
+                        >
+                          <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>home</span>
+                          Mark Returned
+                        </button>
+                      )}
+
+                      {isOperator && exc.status === 'PLANNED' && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (window.confirm(`Cancel planned excursion ${exc.excursionNumber}?`)) {
+                              cancelExcursion(exc._id);
+                            }
+                          }}
+                          style={{
+                            backgroundColor: '#fff', color: '#dc2626', border: '1px solid #fecaca',
+                            padding: '0.38rem 0.65rem', borderRadius: '6px', fontSize: '0.72rem', fontWeight: 600,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Cancel
+                        </button>
+                      )}
+
+                      <span className="material-symbols-outlined" style={{ fontSize: '20px', color: '#94a3b8' }}>
+                        {isExpanded ? 'expand_less' : 'expand_more'}
+                      </span>
+                    </div>
                   </div>
-                )}
-              </div>
-            );
-          })}
+
+                  {/* Expanded Detail & Check-in Monitor */}
+                  {isExpanded && (
+                    <div style={{ borderTop: '1px solid #E2E8F0', padding: '1.25rem', backgroundColor: '#fcfcfd' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem' }}>
+                        {/* Left: Mission Info */}
+                        <div style={{ backgroundColor: '#fff', border: '1px solid #E2E8F0', borderRadius: '6px', padding: '1rem' }}>
+                          <h4 style={{ fontSize: '0.78rem', fontWeight: 700, color: '#005B7F', textTransform: 'uppercase', letterSpacing: '0.04em', margin: '0 0 0.75rem 0' }}>
+                            Mission Parameters
+                          </h4>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.82rem' }}>
+                            <div><span style={{ color: '#64748B' }}>Purpose:</span> <strong style={{ color: '#0F172A' }}>{exc.purpose}</strong></div>
+                            <div><span style={{ color: '#64748B' }}>Destination:</span> <strong style={{ color: '#0F172A' }}>{exc.destination?.name}</strong> {exc.destination?.coordinates?.latitude ? `(${exc.destination.coordinates.latitude}, ${exc.destination.coordinates.longitude})` : ''}</div>
+                            <div><span style={{ color: '#64748B' }}>Departure:</span> <strong style={{ color: '#0F172A' }}>{new Date(exc.departureTime).toLocaleString('en-IN')}</strong></div>
+                            <div><span style={{ color: '#64748B' }}>Expected Return:</span> <strong style={{ color: '#0F172A' }}>{new Date(exc.expectedReturnTime).toLocaleString('en-IN')}</strong></div>
+                            <div><span style={{ color: '#64748B' }}>Check-in Interval:</span> <strong style={{ color: '#005B7F' }}>Every {exc.checkInIntervalMinutes} minutes</strong></div>
+                            <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid #f1f5f9' }}>
+                              <div style={{ color: '#64748B', fontWeight: 700, fontSize: '0.72rem', textTransform: 'uppercase', marginBottom: '0.3rem' }}>Assigned Team</div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+                                <span style={{ backgroundColor: '#eff6ff', color: '#1d4ed8', padding: '0.1rem 0.4rem', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 700 }}>LEADER</span>
+                                <strong>{exc.leaderId?.userId?.name || 'Leader'}</strong> <span style={{ color: '#64748B', fontSize: '0.75rem' }}>({exc.leaderId?.userId?.employeeId})</span>
+                              </div>
+                              {(exc.members || []).map((m) => (
+                                <div key={m._id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.78rem', marginLeft: '0.2rem', marginBottom: '0.15rem' }}>
+                                  <span style={{ color: '#94a3b8' }}>•</span>
+                                  <span>{m.userId?.name || 'Member'}</span>
+                                  <span style={{ color: '#94a3b8', fontSize: '0.72rem' }}>({m.userId?.employeeId || 'ID'})</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Right: Check-In Monitor */}
+                        <div style={{ backgroundColor: '#fff', border: '1px solid #E2E8F0', borderRadius: '6px', padding: '1rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+                            <h4 style={{ fontSize: '0.78rem', fontWeight: 700, color: '#005B7F', textTransform: 'uppercase', letterSpacing: '0.04em', margin: 0 }}>
+                              Team Check-In Monitor
+                            </h4>
+                            <span style={{ fontSize: '0.7rem', color: '#64748B' }}>
+                              Interval: <strong>{exc.checkInIntervalMinutes}m</strong>
+                            </span>
+                          </div>
+
+                          {/* Member Status Grid */}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                            {latestCheckIns.length === 0 ? (
+                              <div style={{ fontSize: '0.78rem', color: '#94a3b8', textAlign: 'center', padding: '1rem' }}>
+                                Loading member statuses...
+                              </div>
+                            ) : (
+                              latestCheckIns.map((mem) => {
+                                const lci = mem.latestCheckIn;
+                                const isDelayed = mem.isDelayed;
+
+                                return (
+                                  <div
+                                    key={mem.personnelId}
+                                    style={{
+                                      padding: '0.65rem 0.85rem', borderRadius: '6px',
+                                      border: `1px solid ${isDelayed ? '#fecaca' : '#E2E8F0'}`,
+                                      backgroundColor: isDelayed ? '#fff5f5' : '#f8fafc',
+                                      display: 'flex', flexDirection: 'column', gap: '0.3rem',
+                                    }}
+                                  >
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                        <strong style={{ fontSize: '0.85rem', color: '#0F172A' }}>{mem.name}</strong>
+                                        {mem.isLeader && (
+                                          <span style={{ backgroundColor: '#eff6ff', color: '#1d4ed8', fontSize: '0.65rem', fontWeight: 700, padding: '0.05rem 0.35rem', borderRadius: '3px' }}>
+                                            LEADER
+                                          </span>
+                                        )}
+                                      </div>
+                                      {isDelayed ? (
+                                        <span style={{ backgroundColor: '#fee2e2', color: '#b91c1c', fontSize: '0.68rem', fontWeight: 800, padding: '0.1rem 0.45rem', borderRadius: '9999px', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
+                                          <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>error</span>
+                                          CHECK-IN DELAYED
+                                        </span>
+                                      ) : lci ? (
+                                        <span style={{ backgroundColor: '#ecfdf5', color: '#15803D', fontSize: '0.68rem', fontWeight: 700, padding: '0.1rem 0.45rem', borderRadius: '9999px' }}>
+                                          ACTIVE
+                                        </span>
+                                      ) : (
+                                        <span style={{ backgroundColor: '#f1f5f9', color: '#64748B', fontSize: '0.68rem', fontWeight: 600, padding: '0.1rem 0.45rem', borderRadius: '9999px' }}>
+                                          AWAITING CHECK-IN
+                                        </span>
+                                      )}
+                                    </div>
+
+                                    {lci ? (
+                                      <div style={{ fontSize: '0.75rem', color: '#334155', display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}>
+                                        <span>🕒 {new Date(lci.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                        {lci.batteryLevel !== null && (
+                                          <span style={{ color: lci.batteryLevel < 25 ? '#dc2626' : 'inherit' }}>
+                                            🔋 {lci.batteryLevel}%
+                                          </span>
+                                        )}
+                                        {lci.temperature !== null && <span>🌡 {lci.temperature}°C</span>}
+                                        {lci.location?.latitude ? <span>📍 {lci.location.latitude.toFixed(2)}, {lci.location.longitude.toFixed(2)}</span> : null}
+                                        {lci.notes && <span style={{ color: '#475569', fontStyle: 'italic' }}>"{lci.notes}"</span>}
+                                      </div>
+                                    ) : (
+                                      <div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>
+                                        No check-in received yet. Expected every {exc.checkInIntervalMinutes}m.
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })
+                            )}
+                          </div>
+
+                          {/* Historical Check-ins Log */}
+                          <div style={{ marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid #E2E8F0' }}>
+                            <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: '0.5rem' }}>
+                              All Check-Ins ({checkIns.length})
+                            </div>
+                            {checkIns.length === 0 ? (
+                              <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontStyle: 'italic' }}>No check-in entries logged yet.</div>
+                            ) : (
+                              <div style={{ maxHeight: '160px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                                {checkIns.map((ci) => (
+                                  <div
+                                    key={ci._id}
+                                    style={{
+                                      padding: '0.35rem 0.6rem', backgroundColor: '#f8fafc', borderRadius: '4px',
+                                      fontSize: '0.72rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                    }}
+                                  >
+                                    <div>
+                                      <strong>{ci.personnelId?.userId?.name || 'Personnel'}</strong> · {ci.temperature !== null ? `${ci.temperature}°C` : ''} {ci.batteryLevel !== null ? `· 🔋${ci.batteryLevel}%` : ''} · <span style={{ color: '#475569' }}>{ci.notes || 'Status OK'}</span>
+                                    </div>
+                                    <div style={{ color: '#94a3b8', whiteSpace: 'nowrap' }}>
+                                      {new Date(ci.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
         </div>
       )}
 
-      {/* ── TAB: CHECK-IN FORM ─────────────────────────────────────── */}
-      {activeTab === 'checkin' && (
-        <div style={{ maxWidth: '560px' }}>
-          <div style={{ backgroundColor: '#fff', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '1.75rem' }}>
-            <h2 style={{ fontSize: '1rem', fontWeight: 700, color: '#005B7F', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>pin_drop</span>
-              Submit Field Check-In
-            </h2>
-            <div style={{ padding: '0.65rem 1rem', backgroundColor: !navigator.onLine ? '#fff7ed' : '#f0fdf4', borderRadius: '6px', marginBottom: '1rem', fontSize: '0.78rem', fontWeight: 600, color: !navigator.onLine ? '#c2410c' : '#15803D' }}>
-              {!navigator.onLine ? '⚠ OFFLINE — Check-in will be queued and synced when internet returns' : '✅ Online — Check-in will sync immediately'}
+      {/* ── TAB 2: MY ACTIVE EXCURSIONS (PERSONNEL) ──────────────────── */}
+      {activeTab === 'my_active' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {myActiveExcursions.length === 0 ? (
+            <div style={{ backgroundColor: '#fff', border: '1px dashed #cbd5e1', padding: '3rem', textAlign: 'center', borderRadius: '8px', color: '#64748B' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: '48px', color: '#cbd5e1' }}>person_pin</span>
+              <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#0F172A', marginTop: '0.5rem' }}>No Assigned Active Excursions</h3>
+              <p style={{ fontSize: '0.82rem', color: '#64748B', marginTop: '0.25rem' }}>
+                You are currently not assigned to any active field excursion. When a Station Operator assigns you to a field mission, it will appear here.
+              </p>
+            </div>
+          ) : (
+            myActiveExcursions.map((exc) => {
+              const ss = STATUS_STYLE[exc.status] || STATUS_STYLE.ACTIVE;
+              const isLeader = exc.leaderId?.userId?._id === user?.id || exc.leaderId?.userId === user?.id;
+
+              return (
+                <div
+                  key={exc._id}
+                  style={{
+                    backgroundColor: '#fff', border: '1px solid #E2E8F0', borderLeft: `5px solid ${ss.color}`,
+                    borderRadius: '8px', padding: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    flexWrap: 'wrap', gap: '1rem',
+                  }}
+                >
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.3rem' }}>
+                      <span style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, color: '#005B7F', fontSize: '1rem' }}>
+                        {exc.excursionNumber}
+                      </span>
+                      <span style={{ backgroundColor: ss.bg, color: ss.color, padding: '0.1rem 0.5rem', borderRadius: '9999px', fontSize: '0.72rem', fontWeight: 700 }}>
+                        {ss.label}
+                      </span>
+                      {isLeader && (
+                        <span style={{ backgroundColor: '#eff6ff', color: '#1d4ed8', padding: '0.1rem 0.45rem', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 700 }}>
+                          YOU ARE TEAM LEADER
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ fontSize: '0.88rem', color: '#0F172A', fontWeight: 600 }}>
+                      Destination: {exc.destination?.name} · Transport: {exc.transportMode?.replace(/_/g, ' ')}
+                    </div>
+                    <div style={{ fontSize: '0.78rem', color: '#64748B', marginTop: '0.25rem' }}>
+                      Team Leader: <strong>{exc.leaderId?.userId?.name}</strong> · Interval: Every {exc.checkInIntervalMinutes} min
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => handleOpenCheckInFor(exc)}
+                    style={{
+                      backgroundColor: '#005B7F', color: '#fff', border: 'none',
+                      borderRadius: '6px', padding: '0.55rem 1.25rem', fontSize: '0.85rem', fontWeight: 700,
+                      cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem',
+                    }}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>pin_drop</span>
+                    Submit Check-In
+                  </button>
+                </div>
+              );
+            })
+          )}
+        </div>
+      )}
+
+      {/* ── TAB 3: REGISTER EXCURSION (STATION OPERATOR) ──────────────── */}
+      {isOperator && activeTab === 'create' && (
+        <div style={{ maxWidth: '800px', backgroundColor: '#fff', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '1.75rem' }}>
+          <h2 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#005B7F', marginBottom: '0.35rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <span className="material-symbols-outlined" style={{ fontSize: '22px' }}>add_location_alt</span>
+            Register New Field Excursion
+          </h2>
+          <p style={{ fontSize: '0.8rem', color: '#64748B', marginBottom: '1.5rem' }}>
+            Plan a field research excursion, assign Team Leader and Members, and configure check-in interval.
+          </p>
+
+          <form onSubmit={handleCreateSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
+            {/* Station Selection */}
+            <div>
+              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#374151', marginBottom: '0.35rem' }}>
+                Station / Research Centre *
+              </label>
+              <select
+                value={createForm.stationId}
+                onChange={(e) => {
+                  setCreateForm((f) => ({ ...f, stationId: e.target.value }));
+                  fetchPersonnel(e.target.value);
+                }}
+                required
+                style={{ width: '100%', height: '40px', padding: '0 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem', backgroundColor: '#fff' }}
+              >
+                <option value="">Choose station...</option>
+                {stations.map((st) => (
+                  <option key={st._id} value={st._id}>{st.name} ({st.code})</option>
+                ))}
+              </select>
             </div>
 
-            <form onSubmit={handleCheckIn} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div>
-                <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '0.3rem' }}>Excursion *</label>
-                <select
-                  value={checkInForm.excursionId}
-                  onChange={e => setCheckInForm(f => ({ ...f, excursionId: e.target.value }))}
-                  required
-                  style={{ width: '100%', height: '38px', padding: '0 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem', backgroundColor: '#fff' }}
-                >
-                  <option value="">Select active excursion...</option>
-                  {DEMO_EXCURSIONS.filter(e => e.status === 'ACTIVE' || e.status === 'OVERDUE').map(e => (
-                    <option key={e._id} value={e._id}>{e.excursionNumber} — {e.destination}</option>
-                  ))}
-                </select>
-              </div>
+            {/* Team Leader Select (Real Personnel from MongoDB) */}
+            <div>
+              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#374151', marginBottom: '0.35rem' }}>
+                Team Leader (Personnel) *
+              </label>
+              <select
+                value={createForm.leaderId}
+                onChange={(e) => setCreateForm((f) => ({ ...f, leaderId: e.target.value }))}
+                required
+                style={{ width: '100%', height: '40px', padding: '0 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem', backgroundColor: '#fff' }}
+              >
+                <option value="">Select Team Leader...</option>
+                {personnelList.map((p) => (
+                  <option key={p._id} value={p._id}>
+                    {p.userId?.name || 'Unknown'} — {p.userId?.designation || 'Personnel'} ({p.userId?.employeeId})
+                  </option>
+                ))}
+              </select>
+            </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                <div>
-                  <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '0.3rem' }}>Temperature (°C)</label>
-                  <input type="number" value={checkInForm.temp}
-                    onChange={e => setCheckInForm(f => ({ ...f, temp: e.target.value }))}
-                    placeholder="-18"
-                    style={{ width: '100%', height: '38px', padding: '0 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem', boxSizing: 'border-box' }}
-                  />
-                </div>
-                <div>
-                  <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '0.3rem' }}>Battery Level (%)</label>
-                  <input type="number" min="0" max="100" value={checkInForm.battery}
-                    onChange={e => setCheckInForm(f => ({ ...f, battery: e.target.value }))}
-                    placeholder="75"
-                    style={{ width: '100%', height: '38px', padding: '0 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem', boxSizing: 'border-box' }}
-                  />
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                <div>
-                  <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '0.3rem' }}>Latitude</label>
-                  <input type="number" step="any" value={checkInForm.lat}
-                    onChange={e => setCheckInForm(f => ({ ...f, lat: e.target.value }))}
-                    placeholder="-70.77"
-                    style={{ width: '100%', height: '38px', padding: '0 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem', boxSizing: 'border-box' }}
-                  />
-                </div>
-                <div>
-                  <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '0.3rem' }}>Longitude</label>
-                  <input type="number" step="any" value={checkInForm.lng}
-                    onChange={e => setCheckInForm(f => ({ ...f, lng: e.target.value }))}
-                    placeholder="11.83"
-                    style={{ width: '100%', height: '38px', padding: '0 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem', boxSizing: 'border-box' }}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '0.3rem' }}>Notes / Weather Observed</label>
-                <textarea
-                  value={checkInForm.notes}
-                  onChange={e => setCheckInForm(f => ({ ...f, notes: e.target.value }))}
-                  rows={3} placeholder="All fine, mild wind..."
-                  style={{ width: '100%', padding: '0.5rem 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem', resize: 'vertical', boxSizing: 'border-box' }}
+            {/* Team Members Multi-Select (Real Personnel) */}
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
+                <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#374151' }}>
+                  Team Members ({createForm.members.length} selected)
+                </label>
+                <input
+                  type="text"
+                  placeholder="Filter personnel..."
+                  value={memberSearch}
+                  onChange={(e) => setMemberSearch(e.target.value)}
+                  style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem', border: '1px solid #cbd5e1', borderRadius: '4px' }}
                 />
               </div>
 
-              <button type="submit"
+              <div style={{ maxHeight: '160px', overflowY: 'auto', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.5rem', backgroundColor: '#fafafa' }}>
+                {filteredPersonnel.length === 0 ? (
+                  <div style={{ fontSize: '0.78rem', color: '#94a3b8', textAlign: 'center', padding: '1rem' }}>No personnel found</div>
+                ) : (
+                  filteredPersonnel
+                    .filter((p) => p._id !== createForm.leaderId)
+                    .map((p) => {
+                      const isChecked = createForm.members.includes(p._id);
+                      return (
+                        <label
+                          key={p._id}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: '0.5rem',
+                            padding: '0.35rem 0.5rem', borderRadius: '4px', cursor: 'pointer',
+                            backgroundColor: isChecked ? '#eff6ff' : 'transparent', fontSize: '0.82rem',
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setCreateForm((f) => ({ ...f, members: [...f.members, p._id] }));
+                              } else {
+                                setCreateForm((f) => ({ ...f, members: f.members.filter((id) => id !== p._id) }));
+                              }
+                            }}
+                          />
+                          <span style={{ fontWeight: isChecked ? 700 : 500, color: '#0F172A' }}>
+                            {p.userId?.name}
+                          </span>
+                          <span style={{ fontSize: '0.72rem', color: '#64748B' }}>
+                            ({p.userId?.employeeId} · {p.userId?.designation || 'Field'})
+                          </span>
+                        </label>
+                      );
+                    })
+                )}
+              </div>
+            </div>
+
+            {/* Destination & Purpose */}
+            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '0.75rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#374151', marginBottom: '0.35rem' }}>
+                  Destination Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Schirmacher Oasis / Larsemann Hills"
+                  value={createForm.destinationName}
+                  onChange={(e) => setCreateForm((f) => ({ ...f, destinationName: e.target.value }))}
+                  style={{ width: '100%', height: '38px', padding: '0 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem', boxSizing: 'border-box' }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#374151', marginBottom: '0.35rem' }}>
+                  Latitude
+                </label>
+                <input
+                  type="number"
+                  step="any"
+                  placeholder="-70.77"
+                  value={createForm.destinationLat}
+                  onChange={(e) => setCreateForm((f) => ({ ...f, destinationLat: e.target.value }))}
+                  style={{ width: '100%', height: '38px', padding: '0 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem', boxSizing: 'border-box' }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#374151', marginBottom: '0.35rem' }}>
+                  Longitude
+                </label>
+                <input
+                  type="number"
+                  step="any"
+                  placeholder="11.83"
+                  value={createForm.destinationLng}
+                  onChange={(e) => setCreateForm((f) => ({ ...f, destinationLng: e.target.value }))}
+                  style={{ width: '100%', height: '38px', padding: '0 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem', boxSizing: 'border-box' }}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#374151', marginBottom: '0.35rem' }}>
+                Purpose / Scientific Objective *
+              </label>
+              <textarea
+                required
+                rows={3}
+                placeholder="Describe scientific goals, equipment deployed, sampling protocol..."
+                value={createForm.purpose}
+                onChange={(e) => setCreateForm((f) => ({ ...f, purpose: e.target.value }))}
+                style={{ width: '100%', padding: '0.6rem 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem', resize: 'vertical', boxSizing: 'border-box' }}
+              />
+            </div>
+
+            {/* Transport, Interval & Risk */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#374151', marginBottom: '0.35rem' }}>
+                  Transport Mode *
+                </label>
+                <select
+                  value={createForm.transportMode}
+                  onChange={(e) => setCreateForm((f) => ({ ...f, transportMode: e.target.value }))}
+                  style={{ width: '100%', height: '38px', padding: '0 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem', backgroundColor: '#fff' }}
+                >
+                  <option value="SNOWMOBILE">Snowmobile</option>
+                  <option value="TRACK_VEHICLE">Snow Cat / Track Vehicle</option>
+                  <option value="HELICOPTER">Helicopter</option>
+                  <option value="FOOT">Foot / Ski</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#374151', marginBottom: '0.35rem' }}>
+                  Check-in Interval (mins) *
+                </label>
+                <input
+                  type="number"
+                  min="15"
+                  max="720"
+                  required
+                  value={createForm.checkInIntervalMinutes}
+                  onChange={(e) => setCreateForm((f) => ({ ...f, checkInIntervalMinutes: e.target.value }))}
+                  style={{ width: '100%', height: '38px', padding: '0 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem', boxSizing: 'border-box' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#374151', marginBottom: '0.35rem' }}>
+                  Weather Risk *
+                </label>
+                <select
+                  value={createForm.weatherRisk}
+                  onChange={(e) => setCreateForm((f) => ({ ...f, weatherRisk: e.target.value }))}
+                  style={{ width: '100%', height: '38px', padding: '0 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem', backgroundColor: '#fff' }}
+                >
+                  <option value="LOW">LOW Risk</option>
+                  <option value="MEDIUM">MEDIUM Risk</option>
+                  <option value="HIGH">HIGH Risk</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Schedule */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#374151', marginBottom: '0.35rem' }}>
+                  Departure Time *
+                </label>
+                <input
+                  type="datetime-local"
+                  required
+                  value={createForm.departureTime}
+                  onChange={(e) => setCreateForm((f) => ({ ...f, departureTime: e.target.value }))}
+                  style={{ width: '100%', height: '38px', padding: '0 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem', boxSizing: 'border-box' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#374151', marginBottom: '0.35rem' }}>
+                  Expected Return Time *
+                </label>
+                <input
+                  type="datetime-local"
+                  required
+                  value={createForm.expectedReturnTime}
+                  onChange={(e) => setCreateForm((f) => ({ ...f, expectedReturnTime: e.target.value }))}
+                  style={{ width: '100%', height: '38px', padding: '0 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem', boxSizing: 'border-box' }}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
+              <button
+                type="submit"
+                disabled={submitting}
                 style={{
                   backgroundColor: '#005B7F', color: '#fff', border: 'none',
-                  padding: '0.7rem', borderRadius: '6px', fontWeight: 700, fontSize: '0.9rem',
-                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
-                }}>
-                <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>pin_drop</span>
-                Submit Check-In
+                  borderRadius: '6px', padding: '0.75rem 1.75rem', fontSize: '0.9rem', fontWeight: 700,
+                  cursor: submitting ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem',
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>check_circle</span>
+                {submitting ? 'Creating Excursion...' : 'Register Excursion (PLANNED)'}
               </button>
-            </form>
-          </div>
+            </div>
+          </form>
         </div>
       )}
 
-      {/* ── TAB: START EXCURSION FORM ─────────────────────────────── */}
-      {activeTab === 'start' && (
-        <div style={{ maxWidth: '700px' }}>
-          <div style={{ backgroundColor: '#fff', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '1.75rem' }}>
-            <h2 style={{ fontSize: '1rem', fontWeight: 700, color: '#005B7F', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>add_location_alt</span>
-              Register New Field Excursion
-            </h2>
-            <form onSubmit={handleStartExcursion} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                <div>
-                  <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '0.3rem' }}>Team Leader *</label>
-                  <input type="text" value={startForm.leader} onChange={e => setStartForm(f => ({ ...f, leader: e.target.value }))} required placeholder="Dr. Rajan Mehta"
-                    style={{ width: '100%', height: '38px', padding: '0 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem', boxSizing: 'border-box' }} />
-                </div>
-                <div>
-                  <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '0.3rem' }}>Destination *</label>
-                  <input type="text" value={startForm.destination} onChange={e => setStartForm(f => ({ ...f, destination: e.target.value }))} required placeholder="Schirmacher Oasis"
-                    style={{ width: '100%', height: '38px', padding: '0 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem', boxSizing: 'border-box' }} />
-                </div>
-              </div>
+      {/* ── TAB 4: SUBMIT FIELD CHECK-IN (PERSONNEL) ──────────────────── */}
+      {activeTab === 'checkin' && (
+        <div style={{ maxWidth: '640px', backgroundColor: '#fff', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '1.75rem' }}>
+          <h2 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#005B7F', marginBottom: '0.35rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <span className="material-symbols-outlined" style={{ fontSize: '22px' }}>pin_drop</span>
+            Submit Field Check-In
+          </h2>
+          <p style={{ fontSize: '0.8rem', color: '#64748B', marginBottom: '1.25rem' }}>
+            Transmit your operational status, battery, temperature, and GPS coordinates back to Station Operations.
+          </p>
 
-              <div>
-                <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '0.3rem' }}>Team Members (comma separated)</label>
-                <input type="text" value={startForm.members} onChange={e => setStartForm(f => ({ ...f, members: e.target.value }))} placeholder="Dr. Priya, Anish K, Rahul V"
-                  style={{ width: '100%', height: '38px', padding: '0 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem', boxSizing: 'border-box' }} />
-              </div>
-
-              <div>
-                <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '0.3rem' }}>Purpose *</label>
-                <input type="text" value={startForm.purpose} onChange={e => setStartForm(f => ({ ...f, purpose: e.target.value }))} required placeholder="Geological survey, ice sampling..."
-                  style={{ width: '100%', height: '38px', padding: '0 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem', boxSizing: 'border-box' }} />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem' }}>
-                <div>
-                  <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '0.3rem' }}>Transport Mode</label>
-                  <select value={startForm.transportMode} onChange={e => setStartForm(f => ({ ...f, transportMode: e.target.value }))}
-                    style={{ width: '100%', height: '38px', padding: '0 0.5rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.85rem', backgroundColor: '#fff' }}>
-                    {['Snow Cat', 'Snowmobile', 'Helicopter', 'On Foot'].map(m => <option key={m}>{m}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '0.3rem' }}>Check-in (mins)</label>
-                  <input type="number" min="30" value={startForm.interval} onChange={e => setStartForm(f => ({ ...f, interval: e.target.value }))}
-                    style={{ width: '100%', height: '38px', padding: '0 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem', boxSizing: 'border-box' }} />
-                </div>
-                <div>
-                  <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '0.3rem' }}>Weather Risk</label>
-                  <select value={startForm.risk} onChange={e => setStartForm(f => ({ ...f, risk: e.target.value }))}
-                    style={{ width: '100%', height: '38px', padding: '0 0.5rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.85rem', backgroundColor: '#fff' }}>
-                    {['LOW', 'MEDIUM', 'HIGH'].map(r => <option key={r}>{r}</option>)}
-                  </select>
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                <div>
-                  <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '0.3rem' }}>Departure Time *</label>
-                  <input type="datetime-local" value={startForm.departureTime} onChange={e => setStartForm(f => ({ ...f, departureTime: e.target.value }))} required
-                    style={{ width: '100%', height: '38px', padding: '0 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem', boxSizing: 'border-box' }} />
-                </div>
-                <div>
-                  <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '0.3rem' }}>Expected Return *</label>
-                  <input type="datetime-local" value={startForm.expectedReturn} onChange={e => setStartForm(f => ({ ...f, expectedReturn: e.target.value }))} required
-                    style={{ width: '100%', height: '38px', padding: '0 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem', boxSizing: 'border-box' }} />
-                </div>
-              </div>
-
-              <button type="submit"
-                style={{
-                  backgroundColor: '#005B7F', color: '#fff', border: 'none',
-                  padding: '0.7rem', borderRadius: '6px', fontWeight: 700, fontSize: '0.9rem',
-                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
-                  marginTop: '0.5rem',
-                }}>
-                <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>add_location_alt</span>
-                Register Excursion
-              </button>
-            </form>
+          <div
+            style={{
+              padding: '0.65rem 1rem', borderRadius: '6px', marginBottom: '1.25rem', fontSize: '0.8rem', fontWeight: 600,
+              backgroundColor: !navigator.onLine ? '#fff7ed' : '#f0fdf4',
+              border: `1px solid ${!navigator.onLine ? '#fed7aa' : '#bbf7d0'}`,
+              color: !navigator.onLine ? '#c2410c' : '#15803D',
+              display: 'flex', alignItems: 'center', gap: '0.5rem',
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>
+              {!navigator.onLine ? 'wifi_off' : 'cloud_done'}
+            </span>
+            {!navigator.onLine
+              ? 'OFFLINE MODE — Check-in will be saved locally in PouchDB and synced automatically when satellite link restores.'
+              : 'ONLINE MODE — Check-in will be verified and delivered immediately to MongoDB.'}
           </div>
+
+          <form onSubmit={handleCheckInSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#374151', marginBottom: '0.35rem' }}>
+                Select Active Excursion *
+              </label>
+              <select
+                value={checkInForm.excursionId}
+                onChange={(e) => setCheckInForm((f) => ({ ...f, excursionId: e.target.value }))}
+                required
+                style={{ width: '100%', height: '40px', padding: '0 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem', backgroundColor: '#fff' }}
+              >
+                <option value="">Choose excursion...</option>
+                {availableExcursionsForCheckIn.map((exc) => (
+                  <option key={exc._id} value={exc._id}>
+                    {exc.excursionNumber} — {exc.destination?.name || 'Destination'} ({exc.status})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Read-only details from backend when excursion selected */}
+            {currentSelectedForCheckIn && (
+              <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '0.75rem 1rem', display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem' }}>
+                <div>
+                  <span style={{ color: '#64748B' }}>Team Leader:</span>{' '}
+                  <strong>{currentSelectedForCheckIn.leaderId?.userId?.name || 'Leader'}</strong>
+                </div>
+                <div>
+                  <span style={{ color: '#64748B' }}>Destination:</span>{' '}
+                  <strong>{currentSelectedForCheckIn.destination?.name}</strong>
+                </div>
+                <div>
+                  <span style={{ color: '#64748B' }}>Interval:</span>{' '}
+                  <strong>Every {currentSelectedForCheckIn.checkInIntervalMinutes}m</strong>
+                </div>
+              </div>
+            )}
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#374151', marginBottom: '0.35rem' }}>
+                  Temperature (°C)
+                </label>
+                <input
+                  type="number"
+                  step="0.1"
+                  placeholder="e.g. -18"
+                  value={checkInForm.temp}
+                  onChange={(e) => setCheckInForm((f) => ({ ...f, temp: e.target.value }))}
+                  style={{ width: '100%', height: '38px', padding: '0 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem', boxSizing: 'border-box' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#374151', marginBottom: '0.35rem' }}>
+                  Battery Level (%)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  placeholder="e.g. 85"
+                  value={checkInForm.battery}
+                  onChange={(e) => setCheckInForm((f) => ({ ...f, battery: e.target.value }))}
+                  style={{ width: '100%', height: '38px', padding: '0 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem', boxSizing: 'border-box' }}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#374151', marginBottom: '0.35rem' }}>
+                  Latitude
+                </label>
+                <input
+                  type="number"
+                  step="any"
+                  placeholder="-70.7700"
+                  value={checkInForm.lat}
+                  onChange={(e) => setCheckInForm((f) => ({ ...f, lat: e.target.value }))}
+                  style={{ width: '100%', height: '38px', padding: '0 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem', boxSizing: 'border-box' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#374151', marginBottom: '0.35rem' }}>
+                  Longitude
+                </label>
+                <input
+                  type="number"
+                  step="any"
+                  placeholder="11.8300"
+                  value={checkInForm.lng}
+                  onChange={(e) => setCheckInForm((f) => ({ ...f, lng: e.target.value }))}
+                  style={{ width: '100%', height: '38px', padding: '0 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem', boxSizing: 'border-box' }}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#374151', marginBottom: '0.35rem' }}>
+                Current Situation / Operational Notes
+              </label>
+              <textarea
+                rows={3}
+                placeholder="e.g. All members safe. Reached sampling area. Equipment functioning normally."
+                value={checkInForm.notes}
+                onChange={(e) => setCheckInForm((f) => ({ ...f, notes: e.target.value }))}
+                style={{ width: '100%', padding: '0.6rem 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem', resize: 'vertical', boxSizing: 'border-box' }}
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={submitting}
+              style={{
+                backgroundColor: '#005B7F', color: '#fff', border: 'none',
+                borderRadius: '6px', padding: '0.75rem 1.5rem', fontSize: '0.9rem', fontWeight: 700,
+                cursor: submitting ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
+              }}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>send</span>
+              {submitting ? 'Transmitting Check-In...' : 'Submit Field Check-In'}
+            </button>
+          </form>
+        </div>
+      )}
+
+      {/* ── TAB 5: EXCURSION HISTORY ─────────────────────────────────── */}
+      {activeTab === 'history' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {history.length === 0 ? (
+            <div style={{ backgroundColor: '#fff', border: '1px dashed #cbd5e1', padding: '3rem', textAlign: 'center', borderRadius: '8px', color: '#64748B' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: '48px', color: '#cbd5e1' }}>history_toggle_off</span>
+              <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#0F172A', marginTop: '0.5rem' }}>No Excursion History</h3>
+              <p style={{ fontSize: '0.82rem', color: '#64748B', marginTop: '0.25rem' }}>Completed and cancelled missions will be preserved here.</p>
+            </div>
+          ) : (
+            history.map((exc) => {
+              const ss = STATUS_STYLE[exc.status] || STATUS_STYLE.COMPLETED;
+              const isExpanded = selectedExcursion?._id === exc._id;
+
+              return (
+                <div
+                  key={exc._id}
+                  style={{
+                    backgroundColor: '#fff', border: '1px solid #E2E8F0', borderLeft: `5px solid ${ss.color}`,
+                    borderRadius: '8px', overflow: 'hidden',
+                  }}
+                >
+                  <div
+                    onClick={() => handleToggleExpand(exc)}
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      padding: '1rem 1.25rem', cursor: 'pointer', flexWrap: 'wrap', gap: '0.75rem',
+                    }}
+                  >
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                        <span style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, color: '#005B7F', fontSize: '0.95rem' }}>
+                          {exc.excursionNumber}
+                        </span>
+                        <span style={{ backgroundColor: ss.bg, color: ss.color, padding: '0.1rem 0.5rem', borderRadius: '9999px', fontSize: '0.7rem', fontWeight: 700 }}>
+                          {ss.label}
+                        </span>
+                        <span style={{ fontSize: '0.78rem', color: '#64748B' }}>
+                          {exc.transportMode?.replace(/_/g, ' ')}
+                        </span>
+                      </div>
+                      <div style={{ marginTop: '0.25rem', fontSize: '0.85rem', color: '#1e293b' }}>
+                        <strong>{exc.leaderId?.userId?.name || 'Leader'}</strong> <span style={{ color: '#94a3b8' }}>→</span> <strong>{exc.destination?.name}</strong> · {(exc.members?.length || 0) + 1} personnel
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: '#64748B', marginTop: '0.2rem' }}>
+                        {exc.actualReturnTime ? `Returned: ${new Date(exc.actualReturnTime).toLocaleString('en-IN')}` : `Departure: ${new Date(exc.departureTime).toLocaleDateString('en-IN')}`}
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span style={{ fontSize: '0.78rem', fontWeight: 600, color: '#005B7F' }}>
+                        {isExpanded ? 'Hide Details' : 'View Details & Logs'}
+                      </span>
+                      <span className="material-symbols-outlined" style={{ fontSize: '20px', color: '#94a3b8' }}>
+                        {isExpanded ? 'expand_less' : 'expand_more'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {isExpanded && (
+                    <div style={{ borderTop: '1px solid #E2E8F0', padding: '1.25rem', backgroundColor: '#fafafa' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
+                        <div>
+                          <h4 style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: '0.5rem' }}>
+                            Historical Mission Details
+                          </h4>
+                          <div style={{ fontSize: '0.82rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                            <div><span style={{ color: '#64748B' }}>Purpose:</span> {exc.purpose}</div>
+                            <div><span style={{ color: '#64748B' }}>Departure:</span> {new Date(exc.departureTime).toLocaleString('en-IN')}</div>
+                            <div><span style={{ color: '#64748B' }}>Expected Return:</span> {new Date(exc.expectedReturnTime).toLocaleString('en-IN')}</div>
+                            {exc.actualReturnTime && <div><span style={{ color: '#64748B' }}>Actual Return:</span> {new Date(exc.actualReturnTime).toLocaleString('en-IN')}</div>}
+                            <div><span style={{ color: '#64748B' }}>Leader:</span> {exc.leaderId?.userId?.name}</div>
+                            <div><span style={{ color: '#64748B' }}>Members:</span> {(exc.members || []).map((m) => m.userId?.name).join(', ') || 'None'}</div>
+                          </div>
+                        </div>
+
+                        <div>
+                          <h4 style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: '0.5rem' }}>
+                            Logged Check-Ins ({checkIns.length})
+                          </h4>
+                          {checkIns.length === 0 ? (
+                            <div style={{ fontSize: '0.78rem', color: '#94a3b8' }}>No check-in entries logged.</div>
+                          ) : (
+                            <div style={{ maxHeight: '180px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                              {checkIns.map((ci) => (
+                                <div key={ci._id} style={{ padding: '0.4rem 0.6rem', backgroundColor: '#fff', border: '1px solid #E2E8F0', borderRadius: '4px', fontSize: '0.75rem' }}>
+                                  <strong>{ci.personnelId?.userId?.name}</strong> · {new Date(ci.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · {ci.notes || 'Status OK'}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
         </div>
       )}
     </div>

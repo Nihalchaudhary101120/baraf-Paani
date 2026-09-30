@@ -60,7 +60,8 @@ const UserSchema = new mongoose.Schema({
       "CARGO_OFFICER",
       "SHIP_OFFICER",
       "FLIGHT_OFFICER",
-      "SCIENTIST"
+      "SCIENTIST",
+      
     ],
   },
 

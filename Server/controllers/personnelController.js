@@ -1,4 +1,5 @@
 import Personnel from "../models/master-models/personnel.js";
+import User from "../models/master-models/user.js";
 
 export const getMyProfile = async (req, res) => {
     try {
@@ -93,3 +94,38 @@ export const updateMyProfile = async (req, res) => {
         });
     }
 };
+
+export const getAllPersonnel = async (req, res) => {
+    try {
+        const { stationId } = req.query;
+        let query = {};
+
+        if (stationId) {
+            const usersWithStation = await User.find({ stationId }).select("_id");
+            const userIds = usersWithStation.map(u => u._id);
+            query = {
+                $or: [
+                    { "expedition.assignedStation": stationId },
+                    { userId: { $in: userIds } }
+                ]
+            };
+        }
+
+        const personnel = await Personnel.find(query)
+            .populate("userId", "name employeeId email role designation stationId")
+            .populate("expedition.assignedStation", "name code")
+            .sort({ createdAt: -1 });
+
+        return res.status(200).json({
+            success: true,
+            count: personnel.length,
+            personnel
+        });
+    } catch (error) {
+        console.error("Get all personnel error:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Failed to fetch personnel list"
+        });
+    }
+};

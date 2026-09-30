@@ -9,11 +9,11 @@ const FieldExcursionSchema = new mongoose.Schema(
       required: true
     },
 
-    expeditionId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Expedition",
-      required: true
-    },
+    // expeditionId: {
+    //   type: mongoose.Schema.Types.ObjectId,
+    //   ref: "Expedition",
+    //   required: true
+    // },
 
     stationId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -41,7 +41,8 @@ const FieldExcursionSchema = new mongoose.Schema(
 
     purpose: {
       type: String,
-      required: true
+      required: true,
+      trim:true
     },
 
     destination: {
@@ -98,7 +99,10 @@ const FieldExcursionSchema = new mongoose.Schema(
   }
 );
 
-FieldExcursionSchema.index({ status: 1 });
+
 FieldExcursionSchema.index({ stationId: 1 });
+FieldExcursionSchema.index({ leaderId: 1 });
+FieldExcursionSchema.index({ status: 1 });
+FieldExcursionSchema.index({ expectedReturnTime: 1 });
 
 export default mongoose.model("FieldExcursion", FieldExcursionSchema);

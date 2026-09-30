@@ -10,3 +10,7 @@ export const getMyPersonnelProfileApi = () =>
 
 export const updateMyPersonnelProfileApi = (profileData) =>
   axiosInstance.put(ENDPOINTS.PERSONNEL.MY_PROFILE, profileData);
+
+export const getAllPersonnelApi = (params) =>
+  axiosInstance.get('/personnel', { params });
+

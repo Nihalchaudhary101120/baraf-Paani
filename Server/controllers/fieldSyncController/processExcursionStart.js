@@ -18,8 +18,6 @@ const processExcursionStart = async (event, session) => {
 
         excursionNumber: event.excursionNumber,
 
-        expeditionId: event.expeditionId,
-
         stationId: event.stationId,
 
         leaderId: event.leaderId,

@@ -1,5 +1,5 @@
 import express from "express";
-import { getMyProfile, updateMyProfile } from "../controllers/personnelController.js";
+import { getMyProfile, updateMyProfile, getAllPersonnel } from "../controllers/personnelController.js";
 import requireAuth from "../middleware/authMiddleware.js";
 import requireRole from "../middleware/roleMiddleware.js";
 
@@ -15,6 +15,9 @@ const personnelRoles = [
     "SHIP_OFFICER",
     "FLIGHT_OFFICER"
 ];
+
+// GET  /personnel  — list personnel (supports ?stationId= filter)
+router.get("/", requireAuth, getAllPersonnel);
 
 // GET  /personnel/me  — fetch own personnel profile
 router.get("/me", requireAuth, requireRole(...personnelRoles), getMyProfile);

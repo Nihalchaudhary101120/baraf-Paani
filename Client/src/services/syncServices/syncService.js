@@ -43,6 +43,27 @@ const syncCargoReceive = async (event) => {
 };
 
 /**
+ * Handle FIELD_CHECKIN offline events.
+ * Calls POST /api/field-excursions/:excursionId/check-ins.
+ */
+const syncFieldCheckIn = async (event) => {
+  if (!event.excursionId) throw new Error('Missing excursionId in field check-in event');
+  const payload = {
+    location: event.location,
+    latitude: event.latitude || event.location?.latitude || event.location?.lat,
+    longitude: event.longitude || event.location?.longitude || event.location?.lng,
+    temperature: event.temperature,
+    batteryLevel: event.batteryLevel,
+    networkAvailable: false,
+    notes: event.notes,
+    deviceId: event.deviceId,
+    eventId: event.eventId,
+    offlineCreated: true
+  };
+  return await api.post(`/field-excursions/${event.excursionId}/check-ins`, payload);
+};
+
+/**
  * Route a queued event to the appropriate sync handler.
  * Add new event types here as the system grows.
  */
@@ -52,6 +73,8 @@ const routeEvent = async (event) => {
       return await syncInventoryConsumption(event);
     case 'CARGO_RECEIVE':
       return await syncCargoReceive(event);
+    case 'FIELD_CHECKIN':
+      return await syncFieldCheckIn(event);
     default:
       // For unknown types, attempt generic /sync endpoint
       return await api.post('/sync', { events: [event] });
@@ -77,8 +100,8 @@ export const syncOfflineQueue = async () => {
 
     console.log(`[Sync] Processing ${pendingEvents.length} offline event(s)...`);
 
-    // Group events: sequential handlers (FCFS consumption & cargo receipts) vs bulk /sync
-    const individualTypes = ['INVENTORY_CONSUMPTION', 'CARGO_RECEIVE'];
+    // Group events: sequential handlers (FCFS consumption, cargo receipts, field check-ins) vs bulk /sync
+    const individualTypes = ['INVENTORY_CONSUMPTION', 'CARGO_RECEIVE', 'FIELD_CHECKIN'];
     const individualEvents = pendingEvents.filter(e => individualTypes.includes(e.type));
     const otherEvents = pendingEvents.filter(e => !individualTypes.includes(e.type));
 
