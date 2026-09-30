@@ -8,6 +8,23 @@ const CargoItemSchema = new mongoose.Schema(
       required: true
     },
 
+    boxCode: {
+      type: String
+    },
+
+    skuId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "SKU"
+    },
+
+    skuCode: {
+      type: String
+    },
+
+    itemName: {
+      type: String
+    },
+
     description: {
       type: String,
       required: true
@@ -24,14 +41,27 @@ const CargoItemSchema = new mongoose.Schema(
         "SPARES",
         "ELECTRONICS",
         "EQUIPMENT",
+        "SAFETY",
         "GENERAL"
       ],
       default: "GENERAL"
     },
 
     make: String,
+    manufacturer: String,
     model: String,
     serialNumber: String,
+    serialNumbers: [String],
+
+    quantity: {
+      type: Number,
+      default: 1
+    },
+
+    unit: {
+      type: String,
+      default: "PCS"
+    },
 
     packageCount: {
       type: Number,
@@ -51,6 +81,11 @@ const CargoItemSchema = new mongoose.Schema(
       default: "BOX"
     },
 
+    unitWeightKg: {
+      type: Number,
+      default: 0
+    },
+
     weightKg: {
       type: Number,
       required: true
@@ -59,14 +94,43 @@ const CargoItemSchema = new mongoose.Schema(
     dimensions: {
       length: Number,
       width: Number,
-      height: Number
+      height: Number,
+      unit: { type: String, default: "cm" }
+    },
+
+    unitDeclaredValue: {
+      type: Number,
+      default: 0
     },
 
     declaredValueINR: Number,
 
+    specialHandling: {
+      type: String,
+      enum: ["NORMAL", "FRAGILE", "PRIORITY", "SECURE", "REFRIGERATED", "HAZMAT"],
+      default: "NORMAL"
+    },
+
+    temperatureRequirement: {
+      type: String,
+      enum: ["AMBIENT", "COLD_STORAGE", "FREEZER", "CRYOGENIC"],
+      default: "AMBIENT"
+    },
+
     hazardous: {
       type: Boolean,
       default: false
+    },
+
+    notes: {
+      type: String,
+      default: ""
+    },
+
+    status: {
+      type: String,
+      enum: ["CREATED", "PACKED", "LOADED", "IN_TRANSIT", "RECEIVED"],
+      default: "PACKED"
     },
 
     qrCode: String

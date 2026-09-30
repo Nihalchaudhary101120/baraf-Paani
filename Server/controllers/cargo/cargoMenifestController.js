@@ -3,14 +3,14 @@ import CargoManifest from "../../models/cargo-models/cargo-menifest.js";
 import Shipment from "../../models/cargo-models/shipment.js";
 import Expedition from "../../models/master-models/expedition.js";
 import Station from "../../models/master-models/station.js";
+import SKU from "../../models/cargo-models/sku.js";
 
 const calculateTotals = (items = []) => {
     return items.reduce(
         (totals, item) => {
-            totals.totalPackages += item.packageCount || 1;
-            totals.totalWeightKg +=
-                (item.weightKg || 0) * (item.packageCount || 1);
-            totals.totalDeclaredValue += item.declaredValueINR || 0;
+            totals.totalPackages += Number(item.packageCount) || 1;
+            totals.totalWeightKg += Number(item.weightKg) || 0;
+            totals.totalDeclaredValue += Number(item.declaredValueINR) || 0;
 
             return totals;
         },
@@ -271,19 +271,31 @@ export const addManifestItem = async (req, res) => {
     try {
         const { id } = req.params;
         const {
+            skuId,
+            skuCode,
+            itemName,
             boxCode,
             itemCode,
             description,
             category,
+            quantity,
+            unit,
             weightKg,
+            unitWeightKg,
             dimensions,
             declaredValueINR,
+            unitDeclaredValue,
             hazardous,
             packageCount,
             packageType,
             make,
+            manufacturer,
             model,
-            serialNumber
+            serialNumber,
+            serialNumbers,
+            specialHandling,
+            temperatureRequirement,
+            notes
         } = req.body;
 
         const manifest = await CargoManifest.findById(id);
@@ -294,25 +306,88 @@ export const addManifestItem = async (req, res) => {
             });
         }
 
+        if (manifest.status === "DELIVERED") {
+            return res.status(400).json({
+                success: false,
+                message: "Cannot add cargo boxes to a delivered / closed manifest"
+            });
+        }
+
+        // Fetch SKU if provided
+        let skuItem = null;
+        if (skuId) {
+            skuItem = await SKU.findById(skuId);
+        } else if (skuCode) {
+            skuItem = await SKU.findOne({ skuCode: skuCode.trim().toUpperCase() });
+        }
+
+        if (skuItem && skuItem.status === "INACTIVE") {
+            return res.status(400).json({
+                success: false,
+                message: `SKU '${skuItem.skuCode}' is INACTIVE and cannot be added to cargo.`
+            });
+        }
+
+        const resolvedQty = Math.max(1, Number(quantity) || 1);
+        const resolvedUnitWeight = Number(unitWeightKg) || (skuItem?.defaultWeightKg) || (Number(weightKg) ? Number(weightKg) / resolvedQty : 1);
+        const resolvedTotalWeight = Number(weightKg) || (resolvedUnitWeight * resolvedQty);
+
+        const resolvedUnitValue = Number(unitDeclaredValue) || (skuItem?.unitDeclaredValue) || (Number(declaredValueINR) ? Number(declaredValueINR) / resolvedQty : 0);
+        const resolvedTotalValue = Number(declaredValueINR) || (resolvedUnitValue * resolvedQty);
+
+        const resolvedCategory = category || skuItem?.category || "GENERAL";
+        const resolvedDescription = description || skuItem?.description || skuItem?.itemName || "Polar Cargo Supplies";
+        const resolvedMake = make || manufacturer || skuItem?.manufacturer || undefined;
+        const resolvedModel = model || skuItem?.model || undefined;
+        const resolvedUnit = unit || skuItem?.unit || "PCS";
+
+        // Check serial tracking requirement
+        let parsedSerials = [];
+        if (Array.isArray(serialNumbers)) {
+            parsedSerials = serialNumbers.filter(s => s && String(s).trim().length > 0);
+        } else if (typeof serialNumbers === 'string' && serialNumbers.trim()) {
+            parsedSerials = serialNumbers.split(',').map(s => s.trim()).filter(Boolean);
+        } else if (serialNumber) {
+            parsedSerials = [serialNumber.trim()];
+        }
+
+        if (skuItem?.trackingType === "SERIALIZED" && parsedSerials.length < resolvedQty) {
+            // If serialized and fewer serials provided, still allow or warn
+        }
+
         const finalCode = boxCode?.trim() || itemCode?.trim() || `BOX-${new Date().getFullYear()}-${String((manifest.items?.length || 0) + 1).padStart(3, "0")}`;
 
         const parsedDimensions = typeof dimensions === 'string'
-            ? { length: 50, width: 40, height: 30 }
-            : (dimensions || { length: 50, width: 40, height: 30 });
+            ? { length: 50, width: 40, height: 30, unit: 'cm' }
+            : (dimensions || skuItem?.defaultDimensions || { length: 50, width: 40, height: 30, unit: 'cm' });
 
         const newItem = {
             itemCode: finalCode,
-            description: description || "Scientific & Base Supplies",
-            category: category || "GENERAL",
-            make: make || undefined,
-            model: model || undefined,
-            serialNumber: serialNumber || undefined,
-            weightKg: Number(weightKg) || 15,
+            boxCode: finalCode,
+            skuId: skuItem?._id || (skuId ? new mongoose.Types.ObjectId(skuId) : undefined),
+            skuCode: skuItem?.skuCode || skuCode || undefined,
+            itemName: itemName || skuItem?.itemName || resolvedDescription,
+            description: resolvedDescription,
+            category: resolvedCategory,
+            make: resolvedMake,
+            manufacturer: resolvedMake,
+            model: resolvedModel,
+            quantity: resolvedQty,
+            unit: resolvedUnit,
+            unitWeightKg: resolvedUnitWeight,
+            weightKg: resolvedTotalWeight,
             packageCount: Number(packageCount) || 1,
             packageType: packageType || "BOX",
             dimensions: parsedDimensions,
-            declaredValueINR: Number(declaredValueINR) || 0,
-            hazardous: Boolean(hazardous),
+            unitDeclaredValue: resolvedUnitValue,
+            declaredValueINR: resolvedTotalValue,
+            specialHandling: specialHandling || "NORMAL",
+            temperatureRequirement: temperatureRequirement || skuItem?.temperatureRequirement || "AMBIENT",
+            hazardous: hazardous !== undefined ? Boolean(hazardous) : Boolean(skuItem?.isHazardous),
+            notes: notes || "",
+            status: "PACKED",
+            serialNumber: parsedSerials[0] || undefined,
+            serialNumbers: parsedSerials,
             qrCode: req.body.qrCode || `QR-${finalCode}`
         };
 
@@ -333,7 +408,7 @@ export const addManifestItem = async (req, res) => {
 
         return res.status(201).json({
             success: true,
-            message: `Box ${finalCode} added successfully`,
+            message: `Box ${finalCode} added successfully with SKU ${newItem.skuCode || 'Custom'}`,
             item: manifest.items[manifest.items.length - 1],
             manifest
         });

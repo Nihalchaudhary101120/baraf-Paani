@@ -11,8 +11,13 @@ import {
   updateManifestItemQR,
   getAllCheckpoints,
 } from '@/api/cargo.api';
+import { useToast } from '@/context/ToastContext';
 import { getStationsApi } from '@/api/station.api';
 import { getExpeditionsApi } from '@/api/admin.api';
+import SKUMasterView from './SKUMasterView';
+import AddCargoBoxModal from './AddCargoBoxModal';
+import CreateSKUModal from './CreateSKUModal';
+import ManifestDetailModal from './ManifestDetailModal';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -86,6 +91,7 @@ const generateQRSVG = (text) => {
 
 export default function CargoOfficerDashboard() {
   const { user } = useAuth();
+  const { showToast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const activeTab = searchParams.get('tab') || 'overview';
@@ -98,6 +104,13 @@ export default function CargoOfficerDashboard() {
   const [checkpoints, setCheckpoints] = useState([]);
   const [expeditions, setExpeditions] = useState([]);
   const [stations, setStations] = useState([]);
+
+  // ── SKU Master & Manifest Detail Modals State
+  const [selectedManifestDetail, setSelectedManifestDetail] = useState(null);
+  const [targetManifestForAddBox, setTargetManifestForAddBox] = useState('');
+  const [isCreateSKUOpen, setIsCreateSKUOpen] = useState(false);
+  const [initialSKUCategory, setInitialSKUCategory] = useState('SCIENTIFIC');
+  const [newlyCreatedSKU, setNewlyCreatedSKU] = useState(null);
 
   // ── Shipment Create Modal State
   const [isCreateShipmentOpen, setIsCreateShipmentOpen] = useState(false);
@@ -117,11 +130,6 @@ export default function CargoOfficerDashboard() {
 
   // ── Box / QR State
   const [isAddBoxOpen, setIsAddBoxOpen] = useState(false);
-  const [boxForm, setBoxForm] = useState({
-    boxCode: '', description: '', category: 'SCIENTIFIC', weightKg: '', dimensions: '50×40×30cm',
-    make: '', model: '', serialNumber: '', packageCount: '1', packageType: 'BOX',
-    declaredValueINR: '', hazardous: false, manifestId: '',
-  });
   const [qrPreviewBox, setQrPreviewBox] = useState(null);
   const [generatingQR, setGeneratingQR] = useState(null);
 
@@ -140,14 +148,6 @@ export default function CargoOfficerDashboard() {
   // ── Search / Filters
   const [shipmentSearch, setShipmentSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
-
-  // ── Toast
-  const [toast, setToast] = useState(null);
-
-  const showToast = useCallback((msg, type = 'success') => {
-    setToast({ msg, type });
-    setTimeout(() => setToast(null), 3500);
-  }, []);
 
   // ── Backend Data Fetching
   const fetchData = useCallback(async () => {
@@ -286,21 +286,7 @@ export default function CargoOfficerDashboard() {
   };
 
   const openAddBoxModal = (defaultManifestId) => {
-    setBoxForm({
-      boxCode: `BOX-${new Date().getFullYear()}-${String(boxes.length + 1).padStart(3, '0')}`,
-      description: '',
-      category: 'SCIENTIFIC',
-      weightKg: '',
-      dimensions: '50×40×30cm',
-      make: '',
-      model: '',
-      serialNumber: '',
-      packageCount: '1',
-      packageType: 'BOX',
-      declaredValueINR: '',
-      hazardous: false,
-      manifestId: defaultManifestId || manifests[0]?._id || '',
-    });
+    setTargetManifestForAddBox(defaultManifestId || manifests[0]?._id || '');
     setIsAddBoxOpen(true);
   };
 
@@ -494,22 +480,6 @@ export default function CargoOfficerDashboard() {
   return (
     <div style={{ maxWidth: '1400px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
 
-      {/* ── TOAST ── */}
-      {toast && (
-        <div style={{
-          position: 'fixed', top: '80px', right: '1.5rem', zIndex: 9999,
-          padding: '0.75rem 1.25rem',
-          backgroundColor: toast.type === 'error' ? '#fef2f2' : '#f0fdf4',
-          border: `1px solid ${toast.type === 'error' ? '#fecaca' : '#bbf7d0'}`,
-          color: toast.type === 'error' ? '#B91C1C' : '#15803D',
-          borderRadius: '8px', fontWeight: 600, fontSize: '0.85rem',
-          boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
-          animation: 'slideIn 0.2s ease',
-        }}>
-          {toast.msg}
-        </div>
-      )}
-
       {/* ── HEADER ── */}
       <div style={{
         backgroundColor: '#ffffff', border: '1px solid #E2E8F0', borderRadius: '10px',
@@ -551,6 +521,22 @@ export default function CargoOfficerDashboard() {
           </div>
 
           <button
+            onClick={() => {
+              setInitialSKUCategory('SCIENTIFIC');
+              setIsCreateSKUOpen(true);
+            }}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '0.4rem',
+              padding: '0.5rem 0.95rem', backgroundColor: '#005B7F', color: '#fff',
+              border: 'none', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer',
+              boxShadow: '0 2px 4px rgba(0,91,127,0.25)',
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>add_circle</span>
+            + Create SKU
+          </button>
+
+          <button
             onClick={openCreateShipmentModal}
             style={{
               display: 'flex', alignItems: 'center', gap: '0.4rem',
@@ -559,7 +545,7 @@ export default function CargoOfficerDashboard() {
               boxShadow: '0 2px 4px rgba(124,58,237,0.25)',
             }}
           >
-            <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>add_circle</span>
+            <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>local_shipping</span>
             New Shipment
           </button>
         </div>
@@ -594,6 +580,7 @@ export default function CargoOfficerDashboard() {
       <div style={{ display: 'flex', gap: '0.5rem', borderBottom: '1px solid #CBD5E1', paddingBottom: '0.25rem', overflowX: 'auto' }}>
         {[
           { key: 'overview', label: 'Dashboard', icon: 'dashboard' },
+          { key: 'skus', label: 'SKU Master Catalog', icon: 'inventory' },
           { key: 'shipments', label: 'Shipments', icon: 'local_shipping' },
           { key: 'manifests', label: 'Cargo Manifests', icon: 'assignment' },
           { key: 'qr', label: 'QR Generation', icon: 'qr_code_2', badge: stats.pendingQR },
@@ -607,7 +594,7 @@ export default function CargoOfficerDashboard() {
             style={{
               display: 'flex', alignItems: 'center', gap: '0.45rem',
               padding: '0.6rem 1rem', borderRadius: '6px', border: 'none',
-              backgroundColor: activeTab === tab.key ? '#7c3aed' : 'transparent',
+              backgroundColor: activeTab === tab.key ? '#005B7F' : 'transparent',
               color: activeTab === tab.key ? '#ffffff' : '#475569',
               fontWeight: activeTab === tab.key ? 700 : 600,
               fontSize: '0.82rem', cursor: 'pointer', whiteSpace: 'nowrap',
@@ -619,7 +606,7 @@ export default function CargoOfficerDashboard() {
             {tab.badge !== undefined && tab.badge > 0 && (
               <span style={{
                 backgroundColor: activeTab === tab.key ? '#fff' : '#f59e0b',
-                color: activeTab === tab.key ? '#7c3aed' : '#fff',
+                color: activeTab === tab.key ? '#005B7F' : '#fff',
                 fontSize: '0.65rem', fontWeight: 800,
                 padding: '0.1rem 0.4rem', borderRadius: '9999px',
               }}>
@@ -629,6 +616,17 @@ export default function CargoOfficerDashboard() {
           </button>
         ))}
       </div>
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          TAB: SKU MASTER CATALOG
+      ══════════════════════════════════════════════════════════════════════ */}
+      {activeTab === 'skus' && (
+        <SKUMasterView
+          onSelectSKUForBox={() => {
+            openAddBoxModal();
+          }}
+        />
+      )}
 
       {/* ══════════════════════════════════════════════════════════════════════
           TAB 1: OVERVIEW / DASHBOARD
@@ -921,14 +919,14 @@ export default function CargoOfficerDashboard() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h2 style={{ fontSize: '1rem', fontWeight: 700, color: '#0F172A', margin: 0 }}>Cargo Manifests ({manifests.length})</h2>
             <div style={{ display: 'flex', gap: '0.75rem' }}>
-              <button onClick={() => setIsAssignBoxOpen(true)} style={{
+              {/* <button onClick={() => setIsAssignBoxOpen(true)} style={{
                 display: 'flex', alignItems: 'center', gap: '0.4rem',
                 padding: '0.5rem 0.9rem', backgroundColor: '#0891b2', color: '#fff',
                 border: 'none', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer',
               }}>
                 <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>link</span>
                 Assign Box to Manifest
-              </button>
+              </button> */}
               <button onClick={() => openAddBoxModal()} style={{
                 display: 'flex', alignItems: 'center', gap: '0.4rem',
                 padding: '0.5rem 0.9rem', backgroundColor: '#059669', color: '#fff',
@@ -968,6 +966,25 @@ export default function CargoOfficerDashboard() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                       <span style={{ fontSize: '0.78rem', color: '#64748B' }}>{manifestBoxes.length} boxes · {manifest.totalWeight} kg</span>
                       <StatusBadge status={manifest.status} />
+                      <button
+                        onClick={() => setSelectedManifestDetail(manifest)}
+                        style={{
+                          backgroundColor: '#005B7F',
+                          color: '#FFFFFF',
+                          border: 'none',
+                          padding: '0.35rem 0.75rem',
+                          borderRadius: '4px',
+                          fontSize: '0.74rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.3rem'
+                        }}
+                      >
+                        <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>visibility</span>
+                        Inspect Manifest
+                      </button>
                     </div>
                   </div>
 
@@ -1577,123 +1594,51 @@ export default function CargoOfficerDashboard() {
         </div>
       )}
 
-      {/* Add Box Modal */}
-      {isAddBoxOpen && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.4)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-          <div style={{ backgroundColor: '#fff', borderRadius: '12px', width: '100%', maxWidth: '520px', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
-            <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid #E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                <span className="material-symbols-outlined" style={{ color: '#059669', fontSize: '22px' }}>add_box</span>
-                <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 700 }}>Add Cargo Box</h2>
-              </div>
-              <button onClick={() => setIsAddBoxOpen(false)} style={{ background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer', color: '#64748B' }}>✕</button>
-            </div>
-            <form onSubmit={handleAddBox} style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#374151', marginBottom: '0.3rem' }}>Target Manifest *</label>
-                <select
-                  value={boxForm.manifestId}
-                  onChange={e => setBoxForm(f => ({ ...f, manifestId: e.target.value }))}
-                  required
-                  style={{ width: '100%', height: '38px', padding: '0 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem' }}
-                >
-                  <option value="">Select Cargo Manifest...</option>
-                  {manifests.map(m => (
-                    <option key={m._id} value={m._id}>
-                      {m.manifestNumber} — {m.description || m.status} ({m.totalBoxes || 0} items)
-                    </option>
-                  ))}
-                </select>
-                {manifests.length === 0 && (
-                  <span style={{ fontSize: '0.72rem', color: '#dc2626', marginTop: '4px', display: 'block' }}>
-                    ⚠️ No manifests found. Please create a Cargo Manifest first.
-                  </span>
-                )}
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#374151', marginBottom: '0.3rem' }}>Box Code *</label>
-                  <input type="text" value={boxForm.boxCode} onChange={e => setBoxForm(f => ({ ...f, boxCode: e.target.value }))} placeholder="e.g. BOX-2026-007" required style={{ width: '100%', height: '38px', padding: '0 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem', boxSizing: 'border-box' }} />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#374151', marginBottom: '0.3rem' }}>Category *</label>
-                  <select value={boxForm.category} onChange={e => setBoxForm(f => ({ ...f, category: e.target.value }))} style={{ width: '100%', height: '38px', padding: '0 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem' }}>
-                    {Object.keys(CATEGORY_COLOR).map(c => <option key={c}>{c}</option>)}
-                  </select>
-                </div>
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#374151', marginBottom: '0.3rem' }}>Description *</label>
-                <input type="text" value={boxForm.description} onChange={e => setBoxForm(f => ({ ...f, description: e.target.value }))} placeholder="e.g. Seismic monitoring sensors" required style={{ width: '100%', height: '38px', padding: '0 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem', boxSizing: 'border-box' }} />
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#374151', marginBottom: '0.3rem' }}>Weight (kg) *</label>
-                  <input type="number" min="0.1" step="0.1" value={boxForm.weightKg} onChange={e => setBoxForm(f => ({ ...f, weightKg: e.target.value }))} placeholder="e.g. 25" required style={{ width: '100%', height: '38px', padding: '0 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem', boxSizing: 'border-box' }} />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#374151', marginBottom: '0.3rem' }}>Dimensions</label>
-                  <input type="text" value={boxForm.dimensions} onChange={e => setBoxForm(f => ({ ...f, dimensions: e.target.value }))} placeholder="e.g. 60×40×30cm" style={{ width: '100%', height: '38px', padding: '0 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem', boxSizing: 'border-box' }} />
-                </div>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#374151', marginBottom: '0.3rem' }}>Make / Manufacturer</label>
-                  <input type="text" value={boxForm.make} onChange={e => setBoxForm(f => ({ ...f, make: e.target.value }))} placeholder="e.g. Vaisala" style={{ width: '100%', height: '38px', padding: '0 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem', boxSizing: 'border-box' }} />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#374151', marginBottom: '0.3rem' }}>Model</label>
-                  <input type="text" value={boxForm.model} onChange={e => setBoxForm(f => ({ ...f, model: e.target.value }))} placeholder="e.g. WXT530" style={{ width: '100%', height: '38px', padding: '0 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem', boxSizing: 'border-box' }} />
-                </div>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#374151', marginBottom: '0.3rem' }}>Serial Number</label>
-                  <input type="text" value={boxForm.serialNumber} onChange={e => setBoxForm(f => ({ ...f, serialNumber: e.target.value }))} placeholder="e.g. SN-20261234" style={{ width: '100%', height: '38px', padding: '0 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem', boxSizing: 'border-box' }} />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#374151', marginBottom: '0.3rem' }}>Package Type *</label>
-                  <select value={boxForm.packageType} onChange={e => setBoxForm(f => ({ ...f, packageType: e.target.value }))} style={{ width: '100%', height: '38px', padding: '0 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem' }}>
-                    {['BOX', 'CRATE', 'PALLET', 'CYLINDER', 'CONTAINER', 'BAG'].map(pt => (
-                      <option key={pt} value={pt}>{pt}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#374151', marginBottom: '0.3rem' }}>Package Count</label>
-                  <input type="number" min="1" step="1" value={boxForm.packageCount} onChange={e => setBoxForm(f => ({ ...f, packageCount: e.target.value }))} placeholder="1" style={{ width: '100%', height: '38px', padding: '0 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem', boxSizing: 'border-box' }} />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#374151', marginBottom: '0.3rem' }}>Declared Value (₹)</label>
-                  <input type="number" min="0" step="0.01" value={boxForm.declaredValueINR} onChange={e => setBoxForm(f => ({ ...f, declaredValueINR: e.target.value }))} placeholder="e.g. 50000" style={{ width: '100%', height: '38px', padding: '0 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem', boxSizing: 'border-box' }} />
-                </div>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.5rem 0.75rem', backgroundColor: '#fff7ed', border: '1px solid #fed7aa', borderRadius: '6px' }}>
-                <input
-                  type="checkbox"
-                  id="hazardous-check"
-                  checked={boxForm.hazardous}
-                  onChange={e => setBoxForm(f => ({ ...f, hazardous: e.target.checked }))}
-                  style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: '#dc2626' }}
-                />
-                <label htmlFor="hazardous-check" style={{ fontSize: '0.82rem', fontWeight: 600, color: '#c2410c', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                  <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>warning</span>
-                  Mark as Hazardous Material
-                </label>
-              </div>
-              <div style={{ display: 'flex', gap: '0.75rem' }}>
-                <button type="button" onClick={() => setIsAddBoxOpen(false)} style={{ flex: 1, backgroundColor: '#f1f5f9', color: '#374151', border: 'none', padding: '0.65rem', borderRadius: '6px', fontWeight: 600, cursor: 'pointer' }}>Cancel</button>
-                <button type="submit" style={{ flex: 2, backgroundColor: '#059669', color: '#fff', border: 'none', padding: '0.65rem', borderRadius: '6px', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
-                  <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>add_box</span>
-                  Add Box to Manifest
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* Redesigned Add Cargo Box Modal */}
+      <AddCargoBoxModal
+        isOpen={isAddBoxOpen}
+        onClose={() => setIsAddBoxOpen(false)}
+        manifests={manifests}
+        initialManifestId={targetManifestForAddBox}
+        onSuccess={() => {
+          fetchData();
+        }}
+        onRequestCreateSKU={(category) => {
+          setInitialSKUCategory(category || 'SCIENTIFIC');
+          setIsCreateSKUOpen(true);
+        }}
+      />
+
+      {/* Create SKU Modal */}
+      <CreateSKUModal
+        isOpen={isCreateSKUOpen}
+        initialCategory={initialSKUCategory}
+        onClose={() => setIsCreateSKUOpen(false)}
+        onSuccess={() => {
+          fetchData();
+        }}
+      />
+
+      {/* Manifest Detail Modal */}
+      <ManifestDetailModal
+        isOpen={Boolean(selectedManifestDetail)}
+        manifest={selectedManifestDetail}
+        onClose={() => setSelectedManifestDetail(null)}
+        onAddBox={(manifestId) => {
+          setSelectedManifestDetail(null);
+          openAddBoxModal(manifestId);
+        }}
+        onViewQR={(item) => {
+          setQrPreviewBox({
+            boxCode: item.boxCode || item.itemCode,
+            description: item.itemName || item.description,
+            category: item.category,
+            weightKg: item.weightKg,
+            dimensions: typeof item.dimensions === 'object' ? `${item.dimensions.length}×${item.dimensions.width}×${item.dimensions.height}cm` : (item.dimensions || '50×40×30cm'),
+            qrGenerated: true
+          });
+        }}
+      />
 
       {/* Assign Box to Manifest Modal */}
       {isAssignBoxOpen && (

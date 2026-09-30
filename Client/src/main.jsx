@@ -8,6 +8,7 @@ import { AuthProvider } from '@/context/AuthContext';
 import { AdminProvider } from '@/context/AdminContext';
 import { MedicalProvider } from '@/context/MedicalContext';
 import { ToastProvider } from '@/context/ToastContext';
+import { SKUProvider } from '@/context/SKUContext';
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
@@ -16,7 +17,9 @@ createRoot(document.getElementById('root')).render(
         <AdminProvider>
           <MedicalProvider>
             <ToastProvider>
-              <App />
+              <SKUProvider>
+                <App />
+              </SKUProvider>
             </ToastProvider>
           </MedicalProvider>
         </AdminProvider>

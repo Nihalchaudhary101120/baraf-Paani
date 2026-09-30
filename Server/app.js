@@ -14,6 +14,7 @@ import cargoManifestRoutes from "./routes/cargoRoutes/cargoMenifestRoutes.js";
 import shipmentRoutes from "./routes/cargoRoutes/shipmentRoutes.js";
 import syncRoutes from "./routes/syncRoutes.js";
 import cargoReceiveRoutes from "./routes/cargoRoutes/cargoReceiveRoutes.js";
+import skuRoutes from "./routes/cargoRoutes/skuRoutes.js";
 import stationRoutes from "./routes/stationRoutes.js";
 
 
@@ -69,6 +70,8 @@ app.use("/api/cargo/shipments", shipmentRoutes);
 app.use("/api/cargo/checkpoints", cargoCheckpointRoutes);
 app.use("/api/sync",syncRoutes);
 app.use("/api/cargo/receiving", cargoReceiveRoutes);
+app.use("/api/cargo/skus", skuRoutes);
+app.use("/api/skus", skuRoutes);
 
 const PORT = process.env.PORT || 5000;
 

@@ -54,7 +54,24 @@ const InventoryItemSchema = new mongoose.Schema(
       required: true
     },
 
+    skuId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "SKU"
+    },
+
     currentStock: {
+      type: Number,
+      default: 0,
+      min: 0
+    },
+
+    inTransitStock: {
+      type: Number,
+      default: 0,
+      min: 0
+    },
+
+    reservedStock: {
       type: Number,
       default: 0,
       min: 0

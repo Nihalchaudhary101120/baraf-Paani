@@ -37,5 +37,13 @@ export const getManifestCheckpoints = (manifestId) => api.get(`/cargo/checkpoint
 export const createCheckpoint = (data) => api.post('/cargo/checkpoints', data);
 export const syncOfflineCheckpointsApi = (checkpoints) => api.post('/cargo/checkpoints/sync', { checkpoints });
 
+// ── SKU Master ─────────────────────────────────────────────────────
+export const getSKUs = (params) => api.get('/cargo/skus', { params });
+export const getSKUById = (id) => api.get(`/cargo/skus/${id}`);
+export const createSKU = (data) => api.post('/cargo/skus', data);
+export const updateSKU = (id, data) => api.patch(`/cargo/skus/${id}`, data);
+export const getSKUInventorySummary = () => api.get('/cargo/skus/summary/inventory');
+
 // ── Receive Cargo (online mode) ────────────────────────────────────
 export const receiveCargo = (data) => api.post('/cargo/receiving', data);
+

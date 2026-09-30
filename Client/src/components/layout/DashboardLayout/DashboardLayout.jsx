@@ -205,6 +205,12 @@ const CARGO_OFFICER_NAV = [
     section: 'MAIN',
   },
   {
+    path: '/dashboard?tab=skus',
+    icon: 'inventory',
+    label: 'SKU Master Catalog',
+    section: 'CARGO OPS',
+  },
+  {
     path: '/dashboard?tab=shipments',
     icon: 'local_shipping',
     label: 'Shipments',
