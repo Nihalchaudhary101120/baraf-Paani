@@ -77,7 +77,15 @@ export const login = async (req, res) => {
             profileStatus = personnel ? personnel.profileStatus : "INCOMPLETE";
         }
 
-        await user.populate("stationId", "code name stationType");
+        if (!user.stationId) {
+            const p = await Personnel.findOne({ userId: user._id }).populate("expedition.assignedStation", "code name stationType");
+            if (p?.expedition?.assignedStation) {
+                user.stationId = p.expedition.assignedStation;
+                await User.updateOne({ _id: user._id }, { stationId: p.expedition.assignedStation._id });
+            }
+        } else {
+            await user.populate("stationId", "code name stationType");
+        }
 
         return res.status(200).json({
             success: true,
@@ -145,6 +153,14 @@ export const getMe = async (req, res) => {
         if (personnelRoles.includes(user.role)) {
             const personnel = await Personnel.findOne({ userId: user._id }).select("profileStatus");
             profileStatus = personnel ? personnel.profileStatus : "INCOMPLETE";
+        }
+
+        if (!user.stationId) {
+            const p = await Personnel.findOne({ userId: user._id }).populate("expedition.assignedStation", "code name stationType");
+            if (p?.expedition?.assignedStation) {
+                user.stationId = p.expedition.assignedStation;
+                await User.updateOne({ _id: user._id }, { stationId: p.expedition.assignedStation._id });
+            }
         }
 
         return res.status(200).json({

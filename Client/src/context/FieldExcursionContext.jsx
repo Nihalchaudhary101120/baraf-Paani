@@ -277,23 +277,51 @@ export const FieldExcursionProvider = ({ children }) => {
         notify('Check-in submitted successfully.', 'success');
         return { success: true, checkIn };
       } else {
-        // Queue locally via PouchDB offline architecture
-        await queueEvent({
-          type: 'FIELD_CHECKIN',
+        // Queue locally via PouchDB offline architecture (backed by IndexedDB)
+        const queuedDoc = await queueEvent({
+          type: 'FIELD_CHECK_IN',
           excursionId,
-          location: payload.location || { latitude: payload.latitude, longitude: payload.longitude },
-          latitude: payload.latitude,
-          longitude: payload.longitude,
-          temperature: payload.temperature,
-          batteryLevel: payload.batteryLevel,
-          notes: payload.notes,
-          deviceId: 'web-browser',
-          offlineCreated: true
+          payload: {
+            excursionId,
+            location: payload.location || { latitude: payload.latitude, longitude: payload.longitude },
+            latitude: payload.latitude,
+            longitude: payload.longitude,
+            temperature: payload.temperature,
+            batteryLevel: payload.batteryLevel,
+            notes: payload.notes,
+            networkAvailable: false,
+          },
+          createdAt: new Date().toISOString(),
+          status: 'PENDING',
+          retryCount: 0,
         });
-        notify('Check-in queued locally (offline) — will sync when connected.', 'info');
-        return { success: true, offlineQueued: true };
+        notify('Check-in saved offline. It will sync when connectivity returns.', 'info');
+        return { success: true, offlineQueued: true, queuedDoc };
       }
     } catch (err) {
+      // If network dropped mid-request, queue locally
+      if (!err.response || err.code === 'ERR_NETWORK') {
+        const queuedDoc = await queueEvent({
+          type: 'FIELD_CHECK_IN',
+          excursionId,
+          payload: {
+            excursionId,
+            location: payload.location || { latitude: payload.latitude, longitude: payload.longitude },
+            latitude: payload.latitude,
+            longitude: payload.longitude,
+            temperature: payload.temperature,
+            batteryLevel: payload.batteryLevel,
+            notes: payload.notes,
+            networkAvailable: false,
+          },
+          createdAt: new Date().toISOString(),
+          status: 'PENDING',
+          retryCount: 0,
+        });
+        notify('Check-in saved offline. It will sync when connectivity returns.', 'info');
+        return { success: true, offlineQueued: true, queuedDoc };
+      }
+
       const errMsg = err?.response?.data?.message || err?.message || 'Failed to submit check-in';
       notify(`Check-in failed: ${errMsg}`, 'error');
       return { success: false, message: errMsg };
@@ -313,6 +341,33 @@ export const FieldExcursionProvider = ({ children }) => {
     refreshAll();
     fetchPersonnel();
   }, [refreshAll, fetchPersonnel]);
+
+  // Listen for sync completion/error events dispatched by syncService
+  useEffect(() => {
+    const handleSyncComplete = (e) => {
+      if (e.detail?.checkInsSynced > 0) {
+        notify('Offline check-in synced successfully.', 'success');
+        refreshAll();
+        if (selectedExcursion) {
+          fetchCheckIns(selectedExcursion._id);
+          fetchLatestCheckIns(selectedExcursion._id);
+        }
+      }
+    };
+
+    const handleSyncError = (e) => {
+      if (e.detail?.isPermanent && ['FIELD_CHECK_IN', 'FIELD_CHECKIN'].includes(e.detail?.event?.type)) {
+        notify('Check-in could not be synchronized.', 'error');
+      }
+    };
+
+    window.addEventListener('nirantra:sync-complete', handleSyncComplete);
+    window.addEventListener('nirantra:sync-error', handleSyncError);
+    return () => {
+      window.removeEventListener('nirantra:sync-complete', handleSyncComplete);
+      window.removeEventListener('nirantra:sync-error', handleSyncError);
+    };
+  }, [notify, refreshAll, selectedExcursion, fetchCheckIns, fetchLatestCheckIns]);
 
   const value = {
     activeExcursions,

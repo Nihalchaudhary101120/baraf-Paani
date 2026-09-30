@@ -35,42 +35,56 @@ export const updateMyProfile = async (req, res) => {
             emergencyContact
         } = req.body;
 
-        const personnel = await Personnel.findOne({ userId });
+        let personnel = await Personnel.findOne({ userId });
 
         if (!personnel) {
-            return res.status(404).json({
-                success: false,
-                message: "Personnel profile not found"
-            });
+            personnel = new Personnel({ userId });
         }
 
-        personnel.dateOfBirth = dateOfBirth;
-        personnel.gender = gender;
-        personnel.nationality = nationality;
-        personnel.maritalStatus = maritalStatus;
-        personnel.profilePhoto = profilePhoto;
+        if (dateOfBirth) {
+            personnel.dateOfBirth = new Date(dateOfBirth);
+        } else if (dateOfBirth === "") {
+            personnel.dateOfBirth = undefined;
+        }
+
+        if (gender) personnel.gender = gender;
+        if (nationality) personnel.nationality = nationality;
+        if (maritalStatus) personnel.maritalStatus = maritalStatus;
+        if (profilePhoto) personnel.profilePhoto = profilePhoto;
 
         if (contact) {
             personnel.contact = {
-                ...personnel.contact?.toObject?.(),
+                ...(personnel.contact?.toObject?.() || {}),
                 ...contact,
                 residentialAddress: {
-                    ...personnel.contact?.residentialAddress?.toObject?.(),
-                    ...contact.residentialAddress
+                    ...(personnel.contact?.residentialAddress?.toObject?.() || {}),
+                    ...(contact.residentialAddress || {})
                 }
             };
         }
 
         if (passport) {
+            const cleanPassport = { ...passport };
+            if (!cleanPassport.passportNumber || !cleanPassport.passportNumber.trim()) {
+                cleanPassport.passportNumber = undefined;
+            } else {
+                cleanPassport.passportNumber = cleanPassport.passportNumber.trim().toUpperCase();
+            }
+            if (!cleanPassport.issueDate) cleanPassport.issueDate = undefined;
+            if (!cleanPassport.expiryDate) cleanPassport.expiryDate = undefined;
+
             personnel.passport = {
-                ...personnel.passport?.toObject?.(),
-                ...passport
+                ...(personnel.passport?.toObject?.() || {}),
+                ...cleanPassport
             };
+            if (!cleanPassport.passportNumber) {
+                personnel.passport.passportNumber = undefined;
+            }
         }
 
         if (emergencyContact) {
             personnel.emergencyContact = {
-                ...personnel.emergencyContact?.toObject?.(),
+                ...(personnel.emergencyContact?.toObject?.() || {}),
                 ...emergencyContact
             };
         }
@@ -88,9 +102,16 @@ export const updateMyProfile = async (req, res) => {
     } catch (error) {
         console.error("Update personnel profile error:", error);
 
+        if (error.code === 11000) {
+            return res.status(400).json({
+                success: false,
+                message: "A personnel record with this passport number already exists. Please verify your passport details."
+            });
+        }
+
         return res.status(500).json({
             success: false,
-            message: "Failed to update personnel profile"
+            message: error.message || "Failed to update personnel profile"
         });
     }
 };
@@ -98,14 +119,32 @@ export const updateMyProfile = async (req, res) => {
 export const getAllPersonnel = async (req, res) => {
     try {
         const { stationId } = req.query;
+        let targetStationId = stationId;
+
+        // If caller is Station Operator / Commander, scope to their assigned station
+        if (!["HQ_ADMIN", "HQ_COMMAND"].includes(req.user?.role)) {
+            let userStationId = req.user?.stationId;
+            if (!userStationId) {
+                const u = await User.findById(req.user?.userId).select("stationId");
+                userStationId = u?.stationId;
+                if (!userStationId) {
+                    const p = await Personnel.findOne({ userId: req.user?.userId }).select("expedition.assignedStation");
+                    userStationId = p?.expedition?.assignedStation;
+                }
+            }
+            if (userStationId) {
+                targetStationId = userStationId;
+            }
+        }
+
         let query = {};
 
-        if (stationId) {
-            const usersWithStation = await User.find({ stationId }).select("_id");
+        if (targetStationId) {
+            const usersWithStation = await User.find({ stationId: targetStationId }).select("_id");
             const userIds = usersWithStation.map(u => u._id);
             query = {
                 $or: [
-                    { "expedition.assignedStation": stationId },
+                    { "expedition.assignedStation": targetStationId },
                     { userId: { $in: userIds } }
                 ]
             };

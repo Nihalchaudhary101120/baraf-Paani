@@ -14,6 +14,7 @@ import processSOS from "../fieldSyncController/processSos.js";
 import processExcursionStart from "../fieldSyncController/processExcursionStart.js";
 import processExcursionEnd from "../fieldSyncController/processExcursionEnd.js";
 import processEquipmentReturn from "../fieldSyncController/processEquipmentReturn.js";
+import consumeInventoryFCFS from "../../services/inventoryConsumptionService.js";
 
 const processCheckpointScan = async (event, session) => {
     await CargoCheckpoint.create(
@@ -38,50 +39,36 @@ const processCheckpointScan = async (event, session) => {
 };
 
 const processConsumption = async (event, session) => {
-    const item = await InventoryItem.findById(event.inventoryItemId).session(session);
-
-    if (!item) {
-        throw new Error("Inventory item not found.");
+    const payload = event.payload || event;
+    let stationId = payload.stationId || event.stationId;
+    if (stationId && !mongoose.Types.ObjectId.isValid(stationId)) {
+        const found = await Station.findOne({
+            $or: [
+                { code: String(stationId).toUpperCase() },
+                { name: new RegExp(`^${stationId}`, "i") }
+            ]
+        }).session(session) || await Station.findOne({ code: "BHARATI" }).session(session) || await Station.findOne().session(session);
+        stationId = found?._id;
     }
 
-    if (item.currentStock < event.quantity) {
-        throw new Error("Insufficient stock.");
+    let performedBy = payload.performedBy || event.performedBy;
+    if (!performedBy || !mongoose.Types.ObjectId.isValid(performedBy)) {
+        const defaultUser = await User.findOne().session(session);
+        performedBy = defaultUser?._id;
     }
 
-    item.currentStock -= event.quantity;
-
-    if (item.currentStock <= 0) {
-        item.status = "OUT_OF_STOCK";
-    } else if (item.currentStock <= item.criticalStock) {
-        item.status = "CRITICAL";
-    } else if (item.currentStock <= item.minimumStock) {
-        item.status = "LOW_STOCK";
-    } else {
-        item.status = "AVAILABLE";
-    }
-
-    await item.save({ session });
-
-    await InventoryTransaction.create(
-        [
-            {
-                eventId: event.eventId,
-                transactionNumber: `INV-${Date.now()}`,
-                inventoryItemId: item._id,
-                stationId: event.stationId,
-                expeditionId: event.expeditionId,
-                transactionType: "CONSUMPTION",
-                quantity: event.quantity,
-                balanceAfterTransaction: item.currentStock,
-                performedBy: event.performedBy,
-                deviceId: event.deviceId,
-                offlineCreated: true,
-                syncStatus: "SYNCED",
-                remarks: event.remarks
-            }
-        ],
-        { session }
-    );
+    await consumeInventoryFCFS({
+        stationId,
+        skuId: payload.skuId || event.skuId,
+        skuCode: payload.skuCode || event.skuCode || payload.itemCode || event.itemCode,
+        quantity: Number(payload.quantity || event.quantity),
+        reason: payload.reason || event.reason || "Offline sync consumption",
+        notes: payload.notes || event.notes || payload.remarks || "",
+        eventId: event.eventId,
+        performedBy,
+        offlineCreated: true,
+        externalSession: session
+    });
 };
 
 const processCargoReceive = async (event, session) => {
@@ -416,6 +403,7 @@ export const syncOfflineEvents = async (req, res) => {
                             await processExcursionStart(event, session);
                             break;
 
+                        case "FIELD_CHECK_IN":
                         case "FIELD_CHECKIN":
                             await processFieldCheckIn(event, session);
                             break;

@@ -4,7 +4,10 @@ import InventoryBatch from "../models/inventory-models/inventory-batch.js";
 import InventoryItem from "../models/inventory-models/inventory-item.js";
 import InventoryTransaction from "../models/inventory-models/inventory-transaction.js";
 import Station from "../models/master-models/station.js";
+import User from "../models/master-models/user.js";
+import Personnel from "../models/master-models/personnel.js";
 import processManifestDelivery from "../services/inventoryReceiptService.js";
+import consumeInventoryFCFS from "../services/inventoryConsumptionService.js";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -13,14 +16,56 @@ const generateTransactionNumber = () =>
 
 const resolveStationId = async (input) => {
   if (!input) return null;
-  if (mongoose.Types.ObjectId.isValid(input)) return new mongoose.Types.ObjectId(input);
+  if (mongoose.Types.ObjectId.isValid(input)) {
+    const st = await Station.findById(input);
+    if (st) return st._id;
+  }
   const found = await Station.findOne({
     $or: [
       { code: String(input).toUpperCase() },
       { name: new RegExp(`^${input}`, "i") }
     ]
-  }) || await Station.findOne({ code: "BHARATI" }) || await Station.findOne();
+  });
   return found ? found._id : null;
+};
+
+/**
+ * Validate that non-HQ users (such as Station Operator and Inventory Manager)
+ * can ONLY access their assigned station.
+ * Rejects unauthorized station access with 403 Forbidden.
+ */
+const validateStationAccess = async (req, targetStationId) => {
+  if (["HQ_ADMIN", "HQ_COMMAND"].includes(req.user?.role)) {
+    return { allowed: true };
+  }
+
+  let userStationId = req.user?.stationId;
+  if (!userStationId) {
+    const userDoc = await User.findById(req.user?.userId).select("stationId role");
+    userStationId = userDoc?.stationId;
+    if (!userStationId) {
+      const p = await Personnel.findOne({ userId: req.user?.userId }).select("expedition.assignedStation");
+      userStationId = p?.expedition?.assignedStation;
+    }
+  }
+
+  if (!userStationId) {
+    return {
+      allowed: false,
+      statusCode: 403,
+      message: "Forbidden: No assigned station found for authenticated user."
+    };
+  }
+
+  if (String(userStationId) !== String(targetStationId)) {
+    return {
+      allowed: false,
+      statusCode: 403,
+      message: "Forbidden: Unauthorized station access. You cannot access inventory for another station."
+    };
+  }
+
+  return { allowed: true, stationId: userStationId };
 };
 
 /**
@@ -38,6 +83,15 @@ export const getStationInventory = async (req, res) => {
     const stId = await resolveStationId(stationId);
     if (!stId) {
       return res.status(400).json({ success: false, message: "Invalid station ID" });
+    }
+
+    // Station authorization validation
+    const access = await validateStationAccess(req, stId);
+    if (!access.allowed) {
+      return res.status(access.statusCode || 403).json({
+        success: false,
+        message: access.message
+      });
     }
 
     // Aggregate InventoryBatch by skuCode + stationId
@@ -60,13 +114,58 @@ export const getStationInventory = async (req, res) => {
         }
       },
       {
+        $lookup: {
+          from: "inventoryitems",
+          let: { stId: "$_id.stationId", scode: "$_id.skuCode" },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ["$stationId", "$$stId"] },
+                    { $eq: ["$itemCode", "$$scode"] }
+                  ]
+                }
+              }
+            }
+          ],
+          as: "itemDoc"
+        }
+      },
+      {
+        $lookup: {
+          from: "skus",
+          localField: "skuId",
+          foreignField: "_id",
+          as: "skuDoc"
+        }
+      },
+      {
+        $addFields: {
+          minimumStock: {
+            $ifNull: [
+              { $arrayElemAt: ["$itemDoc.minimumStock", 0] },
+              { $arrayElemAt: ["$skuDoc.reorderLevel", 0] },
+              10
+            ]
+          },
+          criticalStock: {
+            $ifNull: [
+              { $arrayElemAt: ["$itemDoc.criticalStock", 0] },
+              { $arrayElemAt: ["$skuDoc.minStockLevel", 0] },
+              5
+            ]
+          }
+        }
+      },
+      {
         $addFields: {
           stockStatus: {
             $switch: {
               branches: [
                 { case: { $lte: ["$totalRemaining", 0] }, then: "OUT_OF_STOCK" },
-                { case: { $lte: ["$totalRemaining", 5] }, then: "CRITICAL" },
-                { case: { $lte: ["$totalRemaining", 10] }, then: "LOW_STOCK" }
+                { case: { $lte: ["$totalRemaining", "$criticalStock"] }, then: "CRITICAL" },
+                { case: { $lte: ["$totalRemaining", "$minimumStock"] }, then: "LOW_STOCK" }
               ],
               default: "AVAILABLE"
             }
@@ -125,7 +224,16 @@ export const getStationInventorySummary = async (req, res) => {
       return res.status(400).json({ success: false, message: "Invalid station ID" });
     }
 
-    const [summaryAgg, recentReceipts, lowStockAgg] = await Promise.all([
+    // Station authorization validation
+    const access = await validateStationAccess(req, stId);
+    if (!access.allowed) {
+      return res.status(access.statusCode || 403).json({
+        success: false,
+        message: access.message
+      });
+    }
+
+    const [summaryAgg, recentReceipts, lowStockAgg, criticalAgg] = await Promise.all([
       // Total SKUs and stock
       InventoryBatch.aggregate([
         { $match: { stationId: stId, status: "AVAILABLE" } },
@@ -149,35 +257,46 @@ export const getStationInventorySummary = async (req, res) => {
         transactionType: "RECEIPT",
         createdAt: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }
       }),
-      // Low stock SKUs — using InventoryItem thresholds
+      // Low stock SKUs: currentStock > criticalStock && currentStock <= minimumStock
       InventoryItem.aggregate([
         { $match: { stationId: stId } },
         {
           $match: {
             $expr: {
               $and: [
-                { $gt: ["$currentStock", 0] },
+                { $gt: ["$currentStock", "$criticalStock"] },
                 { $lte: ["$currentStock", "$minimumStock"] }
               ]
             }
           }
         },
-        { $count: "lowCount" }
+        { $count: "count" }
+      ]),
+      // Critical stock SKUs: currentStock <= criticalStock
+      InventoryItem.aggregate([
+        { $match: { stationId: stId } },
+        {
+          $match: {
+            $expr: {
+              $lte: ["$currentStock", "$criticalStock"]
+            }
+          }
+        },
+        { $count: "count" }
       ])
     ]);
 
     const summary = summaryAgg[0] || { totalSKUs: 0, totalStock: 0 };
-
-    // Out of stock count
-    const outOfStock = await InventoryItem.countDocuments({ stationId: stId, currentStock: 0 });
+    const lowStockCount = lowStockAgg[0]?.count || 0;
+    const criticalCount = criticalAgg[0]?.count || 0;
 
     return res.status(200).json({
       success: true,
       summary: {
         totalSKUs: summary.totalSKUs || 0,
         totalStock: summary.totalStock || 0,
-        lowStockCount: lowStockAgg[0]?.lowCount || 0,
-        outOfStockCount: outOfStock,
+        lowStockCount,
+        criticalCount,
         recentReceipts
       }
     });
@@ -200,6 +319,15 @@ export const getItemBatches = async (req, res) => {
     const stId = await resolveStationId(stationId);
     if (!stId) {
       return res.status(400).json({ success: false, message: "Invalid station ID" });
+    }
+
+    // Station authorization validation
+    const access = await validateStationAccess(req, stId);
+    if (!access.allowed) {
+      return res.status(access.statusCode || 403).json({
+        success: false,
+        message: access.message
+      });
     }
 
     // skuId can be a MongoDB ObjectId or a skuCode string
@@ -239,270 +367,59 @@ export const getItemBatches = async (req, res) => {
  * POST /api/inventory/:stationId/consume
  *
  * FCFS stock consumption. Atomically:
- *   1. Validate sufficient stock
- *   2. Deduct from oldest available batches first
- *   3. Mark depleted batches as DEPLETED
- *   4. Update InventoryItem aggregate
- *   5. Create CONSUMPTION transaction with batch allocations
+ *   1. Validate user and station authorization
+ *   2. Check eventId for idempotency
+ *   3. Pre-flight check: total available stock
+ *   4. Deduct from oldest available batches first (FCFS)
+ *   5. Mark depleted batches as DEPLETED
+ *   6. Update InventoryItem aggregate & recalculate status
+ *   7. Create CONSUMPTION transaction with batch allocations
  *
- * Body: { skuId, skuCode, quantity, reason, notes }
+ * Body: { skuId, skuCode, quantity, reason, notes, eventId, offlineCreated }
  */
 export const consumeStock = async (req, res) => {
-  const session = await mongoose.startSession();
-
   try {
     const { stationId } = req.params;
-    const { skuId, skuCode, quantity, reason, notes } = req.body;
+    const { skuId, skuCode, quantity, reason, notes, eventId } = req.body;
 
     const stId = await resolveStationId(stationId);
     if (!stId) {
       return res.status(400).json({ success: false, message: "Invalid station ID" });
     }
 
-    const requestedQty = Number(quantity);
-    if (!requestedQty || requestedQty <= 0) {
-      return res.status(400).json({ success: false, message: "Quantity must be greater than 0" });
-    }
-
-    if (!skuId && !skuCode) {
-      return res.status(400).json({ success: false, message: "skuId or skuCode is required" });
-    }
-
-    // Build query for batches
-    let batchQuery = { stationId: stId, status: "AVAILABLE" };
-    if (skuId && mongoose.Types.ObjectId.isValid(skuId)) {
-      batchQuery.skuId = new mongoose.Types.ObjectId(skuId);
-    } else if (skuCode) {
-      batchQuery.skuCode = skuCode.toUpperCase();
-    }
-
-    // ── Pre-flight: check total available stock ────────────────────────
-    // Do this BEFORE opening the session to avoid long-held locks
-    const availableBatches = await InventoryBatch.find(batchQuery)
-      .sort({ receivedAt: 1 }) // FCFS: oldest first
-      .lean();
-
-    const totalAvailable = availableBatches.reduce((sum, b) => sum + b.remainingQuantity, 0);
-
-    if (totalAvailable < requestedQty) {
-      return res.status(400).json({
+    // Role / Station authorization check:
+    const access = await validateStationAccess(req, stId);
+    if (!access.allowed) {
+      return res.status(access.statusCode || 403).json({
         success: false,
-        message: `Insufficient inventory. Available: ${totalAvailable} ${availableBatches[0]?.unit || ""}, requested: ${requestedQty}.`,
-        available: totalAvailable,
-        requested: requestedQty
+        message: access.message
       });
     }
 
-    // ── Start MongoDB session for atomic consumption ───────────────────
-    let consumptionAllocations = [];
-    let updatedBatches = [];
-    let inventoryItem = null;
     const performedBy = req.user?.userId || req.user?.id || req.user?._id;
 
-    try {
-      session.startTransaction();
+    const result = await consumeInventoryFCFS({
+      stationId: stId,
+      skuId,
+      skuCode,
+      quantity,
+      reason,
+      notes,
+      eventId,
+      performedBy,
+      offlineCreated: Boolean(req.body.offlineCreated)
+    });
 
-      let remaining = requestedQty;
-
-      for (const batchLean of availableBatches) {
-        if (remaining <= 0) break;
-
-        const batch = await InventoryBatch.findById(batchLean._id).session(session);
-        if (!batch || batch.status !== "AVAILABLE") continue;
-
-        const toConsume = Math.min(remaining, batch.remainingQuantity);
-        batch.remainingQuantity -= toConsume;
-        remaining -= toConsume;
-
-        if (batch.remainingQuantity <= 0) {
-          batch.remainingQuantity = 0;
-          batch.status = "DEPLETED";
-        }
-
-        await batch.save({ session });
-
-        consumptionAllocations.push({
-          batchId: batch._id,
-          quantity: toConsume
-        });
-        updatedBatches.push(batch);
-      }
-
-      // ── Update InventoryItem aggregate ─────────────────────────────
-      let itemQuery = { stationId: stId };
-      if (skuId && mongoose.Types.ObjectId.isValid(skuId)) {
-        itemQuery.skuId = new mongoose.Types.ObjectId(skuId);
-      } else {
-        itemQuery.itemCode = (skuCode || availableBatches[0]?.skuCode || "").toUpperCase();
-      }
-
-      inventoryItem = await InventoryItem.findOne(itemQuery).session(session);
-      if (inventoryItem) {
-        inventoryItem.currentStock = Math.max(0, inventoryItem.currentStock - requestedQty);
-
-        // Recalculate status
-        if (inventoryItem.currentStock <= 0) {
-          inventoryItem.status = "OUT_OF_STOCK";
-        } else if (inventoryItem.currentStock <= inventoryItem.criticalStock) {
-          inventoryItem.status = "CRITICAL";
-        } else if (inventoryItem.currentStock <= inventoryItem.minimumStock) {
-          inventoryItem.status = "LOW_STOCK";
-        } else {
-          inventoryItem.status = "AVAILABLE";
-        }
-        await inventoryItem.save({ session });
-      }
-
-      // ── Create CONSUMPTION transaction ─────────────────────────────
-      const firstBatch = availableBatches[0];
-      const transaction = await InventoryTransaction.create(
-        [
-          {
-            transactionNumber: generateTransactionNumber(),
-            eventId: crypto.randomUUID(),
-            inventoryItemId: inventoryItem?._id || firstBatch?.sourceManifestId,
-            stationId: stId,
-            skuId: firstBatch?.skuId || undefined,
-            skuCode: firstBatch?.skuCode,
-            transactionType: "CONSUMPTION",
-            quantity: requestedQty,
-            balanceAfterTransaction: inventoryItem?.currentStock ?? (totalAvailable - requestedQty),
-            consumptionAllocations,
-            performedBy,
-            reason: reason || "Station consumption",
-            remarks: notes || "",
-            syncStatus: "SYNCED"
-          }
-        ],
-        { session }
-      );
-
-      await session.commitTransaction();
-
-      return res.status(200).json({
-        success: true,
-        message: `${requestedQty} ${firstBatch?.unit || "units"} of ${firstBatch?.itemName || skuCode} consumed successfully.`,
-        consumed: requestedQty,
-        remainingTotal: totalAvailable - requestedQty,
-        consumptionAllocations,
-        transaction: transaction[0],
-        inventoryItem
-      });
-    } catch (txErr) {
-      await session.abortTransaction();
-      throw txErr;
-    }
+    return res.status(200).json(result);
   } catch (err) {
     console.error("[consumeStock]", err);
-
-    // Handle case where sessions aren't supported (standalone MongoDB)
-    if (err.message?.includes("Transaction") || err.message?.includes("session")) {
-      return await consumeStockFallback(req, res);
-    }
-
-    return res.status(500).json({ success: false, message: err.message || "Failed to consume stock" });
-  } finally {
-    await session.endSession();
-  }
-};
-
-/**
- * Fallback for standalone MongoDB instances that don't support sessions.
- * Same logic but without transaction guarantees.
- */
-const consumeStockFallback = async (req, res) => {
-  try {
-    const { stationId } = req.params;
-    const { skuId, skuCode, quantity, reason, notes } = req.body;
-    const requestedQty = Number(quantity);
-    const stId = await resolveStationId(stationId);
-    if (!stId) {
-      return res.status(400).json({ success: false, message: "Invalid station ID" });
-    }
-    const performedBy = req.user?.userId || req.user?.id || req.user?._id;
-
-    let batchQuery = { stationId: stId, status: "AVAILABLE" };
-    if (skuId && mongoose.Types.ObjectId.isValid(skuId)) {
-      batchQuery.skuId = new mongoose.Types.ObjectId(skuId);
-    } else if (skuCode) {
-      batchQuery.skuCode = skuCode.toUpperCase();
-    }
-
-    const batches = await InventoryBatch.find(batchQuery).sort({ receivedAt: 1 });
-    const totalAvailable = batches.reduce((sum, b) => sum + b.remainingQuantity, 0);
-
-    if (totalAvailable < requestedQty) {
-      return res.status(400).json({
-        success: false,
-        message: `Insufficient inventory. Available: ${totalAvailable}, requested: ${requestedQty}.`,
-        available: totalAvailable,
-        requested: requestedQty
-      });
-    }
-
-    let remaining = requestedQty;
-    const consumptionAllocations = [];
-
-    for (const batch of batches) {
-      if (remaining <= 0) break;
-      const toConsume = Math.min(remaining, batch.remainingQuantity);
-      batch.remainingQuantity -= toConsume;
-      remaining -= toConsume;
-      if (batch.remainingQuantity <= 0) {
-        batch.remainingQuantity = 0;
-        batch.status = "DEPLETED";
-      }
-      await batch.save();
-      consumptionAllocations.push({ batchId: batch._id, quantity: toConsume });
-    }
-
-    let itemQuery = { stationId: stId };
-    if (skuId && mongoose.Types.ObjectId.isValid(skuId)) {
-      itemQuery.skuId = new mongoose.Types.ObjectId(skuId);
-    } else {
-      itemQuery.itemCode = (skuCode || batches[0]?.skuCode || "").toUpperCase();
-    }
-
-    const inventoryItem = await InventoryItem.findOne(itemQuery);
-    if (inventoryItem) {
-      inventoryItem.currentStock = Math.max(0, inventoryItem.currentStock - requestedQty);
-      if (inventoryItem.currentStock <= 0) inventoryItem.status = "OUT_OF_STOCK";
-      else if (inventoryItem.currentStock <= inventoryItem.criticalStock) inventoryItem.status = "CRITICAL";
-      else if (inventoryItem.currentStock <= inventoryItem.minimumStock) inventoryItem.status = "LOW_STOCK";
-      else inventoryItem.status = "AVAILABLE";
-      await inventoryItem.save();
-    }
-
-    const firstBatch = batches[0];
-    const transaction = await InventoryTransaction.create({
-      transactionNumber: generateTransactionNumber(),
-      eventId: crypto.randomUUID(),
-      inventoryItemId: inventoryItem?._id,
-      stationId: stId,
-      skuId: firstBatch?.skuId || undefined,
-      skuCode: firstBatch?.skuCode,
-      transactionType: "CONSUMPTION",
-      quantity: requestedQty,
-      balanceAfterTransaction: inventoryItem?.currentStock ?? (totalAvailable - requestedQty),
-      consumptionAllocations,
-      performedBy,
-      reason: reason || "Station consumption",
-      remarks: notes || "",
-      syncStatus: "SYNCED"
+    const statusCode = err.statusCode || 500;
+    return res.status(statusCode).json({
+      success: false,
+      message: err.message || "Failed to consume stock",
+      available: err.available,
+      requested: err.requested
     });
-
-    return res.status(200).json({
-      success: true,
-      message: `${requestedQty} ${firstBatch?.unit || "units"} of ${firstBatch?.itemName || skuCode} consumed successfully.`,
-      consumed: requestedQty,
-      remainingTotal: totalAvailable - requestedQty,
-      consumptionAllocations,
-      transaction,
-      inventoryItem
-    });
-  } catch (err) {
-    console.error("[consumeStockFallback]", err);
-    return res.status(500).json({ success: false, message: err.message || "Failed to consume stock" });
   }
 };
 
@@ -585,6 +502,15 @@ export const getTransactionHistory = async (req, res) => {
       return res.status(400).json({ success: false, message: "Invalid station ID" });
     }
 
+    // Station authorization validation
+    const access = await validateStationAccess(req, stId);
+    if (!access.allowed) {
+      return res.status(access.statusCode || 403).json({
+        success: false,
+        message: access.message
+      });
+    }
+
     const filter = { stationId: stId };
     if (type && type !== "ALL") filter.transactionType = type.toUpperCase();
     if (skuCode) filter.skuCode = skuCode.toUpperCase();
@@ -626,6 +552,20 @@ export const manualReceiveCargo = async (req, res) => {
   try {
     const { stationId } = req.params;
     const { manifestId } = req.body;
+
+    const stId = await resolveStationId(stationId);
+    if (!stId) {
+      return res.status(400).json({ success: false, message: "Invalid station ID" });
+    }
+
+    // Station authorization validation
+    const access = await validateStationAccess(req, stId);
+    if (!access.allowed) {
+      return res.status(access.statusCode || 403).json({
+        success: false,
+        message: access.message
+      });
+    }
 
     if (!manifestId || !mongoose.Types.ObjectId.isValid(manifestId)) {
       return res.status(400).json({ success: false, message: "Valid manifestId is required" });

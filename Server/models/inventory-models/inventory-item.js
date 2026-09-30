@@ -8,7 +8,6 @@ const InventoryItemSchema = new mongoose.Schema(
     itemCode: {
       type: String,
       required: true,
-      unique: true,
       uppercase: true,
       trim: true
     },
@@ -128,7 +127,7 @@ const InventoryItemSchema = new mongoose.Schema(
 
 InventoryItemSchema.index({ stationId: 1, category: 1 });
 InventoryItemSchema.index({ stationId: 1, skuId: 1 }, { unique: true, sparse: true });
-InventoryItemSchema.index({ stationId: 1, itemCode: 1 });
+InventoryItemSchema.index({ stationId: 1, itemCode: 1 }, { unique: true });
 InventoryItemSchema.index({ status: 1 });
 
 export default mongoose.model("InventoryItem", InventoryItemSchema);

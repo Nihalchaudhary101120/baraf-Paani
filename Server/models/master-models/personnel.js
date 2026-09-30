@@ -42,7 +42,8 @@ const PersonnelSchema = new mongoose.Schema(
       passportNumber: {
         type: String,
         uppercase: true,
-        trim: true
+        trim: true,
+        set: (v) => (v && typeof v === "string" && v.trim() ? v.trim() : undefined)
       },
       passportType: String,
       issueDate: Date,

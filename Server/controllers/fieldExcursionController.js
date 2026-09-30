@@ -46,6 +46,30 @@ const autoUpdateOverdueExcursions = async (filter = {}) => {
 };
 
 /**
+ * Helper to resolve authenticated user's assigned station from existing schemas:
+ * 1. User.stationId
+ * 2. Fallback: User -> Personnel -> expedition.assignedStation
+ */
+const resolveUserStationId = async (req) => {
+    let stationId = req.user?.stationId;
+    if (stationId) {
+        return stationId;
+    }
+
+    const user = await User.findById(req.user?.userId).select("stationId role");
+    if (user?.stationId) {
+        return user.stationId;
+    }
+
+    const personnel = await Personnel.findOne({ userId: req.user?.userId }).select("expedition.assignedStation");
+    if (personnel?.expedition?.assignedStation) {
+        return personnel.expedition.assignedStation;
+    }
+
+    return null;
+};
+
+/**
  * 1. CREATE FIELD EXCURSION (Station Operator)
  * Initial status: PLANNED
  */
@@ -66,17 +90,21 @@ export const createFieldExcursion = async (req, res) => {
         } = req.body;
 
         // 1. Resolve & Validate Station
-        let targetStationId = stationId || req.user.stationId;
-        if (!targetStationId) {
-            // Fallback to Bharati or first active station
-            const defaultStation = await Station.findOne({ code: "BHARATI" }) || await Station.findOne();
-            if (defaultStation) targetStationId = defaultStation._id;
+        // The station must automatically come from the logged-in Station Operator's existing database/schema relationship.
+        // Backend must use the authenticated user's assigned station and NOT trust a stationId supplied by the frontend.
+        let targetStationId = null;
+
+        if (["HQ_ADMIN", "HQ_COMMAND"].includes(req.user?.role)) {
+            targetStationId = stationId || await resolveUserStationId(req);
+        } else {
+            // For STATION_OPERATOR and field personnel, strictly resolve from their assigned station
+            targetStationId = await resolveUserStationId(req);
         }
 
         if (!targetStationId || !mongoose.Types.ObjectId.isValid(targetStationId)) {
             return res.status(400).json({
                 success: false,
-                message: "Valid Station is required to create a field excursion"
+                message: "No assigned station found for authenticated user. Valid station assignment is required."
             });
         }
 
@@ -84,7 +112,7 @@ export const createFieldExcursion = async (req, res) => {
         if (!station) {
             return res.status(404).json({
                 success: false,
-                message: "Station not found"
+                message: "Assigned station not found"
             });
         }
 
@@ -267,10 +295,23 @@ export const getActiveExcursions = async (req, res) => {
             status: { $in: ["PLANNED", "ACTIVE", "OVERDUE"] }
         };
 
-        if (stationId) {
+        if (!["HQ_ADMIN", "HQ_COMMAND"].includes(req.user?.role)) {
+            const userStationId = await resolveUserStationId(req);
+            if (!userStationId) {
+                return res.status(403).json({
+                    success: false,
+                    message: "Forbidden: No assigned station found for authenticated user."
+                });
+            }
+            if (stationId && String(stationId) !== String(userStationId)) {
+                return res.status(403).json({
+                    success: false,
+                    message: "Forbidden: Unauthorized station access. You cannot view excursions for another station."
+                });
+            }
+            filter.stationId = userStationId;
+        } else if (stationId) {
             filter.stationId = stationId;
-        } else if (req.user?.stationId && !["HQ_ADMIN", "HQ_COMMAND"].includes(req.user?.role)) {
-            filter.stationId = req.user.stationId;
         }
 
         const excursions = await FieldExcursion.find(filter)
@@ -325,10 +366,23 @@ export const getExcursionHistory = async (req, res) => {
             status: { $in: ["COMPLETED", "CANCELLED"] }
         };
 
-        if (stationId) {
+        if (!["HQ_ADMIN", "HQ_COMMAND"].includes(req.user?.role)) {
+            const userStationId = await resolveUserStationId(req);
+            if (!userStationId) {
+                return res.status(403).json({
+                    success: false,
+                    message: "Forbidden: No assigned station found for authenticated user."
+                });
+            }
+            if (stationId && String(stationId) !== String(userStationId)) {
+                return res.status(403).json({
+                    success: false,
+                    message: "Forbidden: Unauthorized station access. You cannot view excursions for another station."
+                });
+            }
+            filter.stationId = userStationId;
+        } else if (stationId) {
             filter.stationId = stationId;
-        } else if (req.user?.stationId && !["HQ_ADMIN", "HQ_COMMAND"].includes(req.user?.role)) {
-            filter.stationId = req.user.stationId;
         }
 
         const excursions = await FieldExcursion.find(filter)

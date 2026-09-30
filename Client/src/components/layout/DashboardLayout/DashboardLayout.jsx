@@ -117,9 +117,9 @@ const ALL_NAV_ITEMS = [
   {
     path: '/dashboard/inventory',
     icon: 'inventory_2',
-    label: 'Inventory Stock',
-    roles: ['HQ_COMMAND', 'LOGISTICS_OFFICER', 'STATION_COMMANDER', 'INVENTORY_MANAGER'],
-    section: 'Operations',
+    label: 'Inventory Pool',
+    roles: ['HQ_COMMAND', 'LOGISTICS_OFFICER', 'STATION_COMMANDER', 'INVENTORY_MANAGER', 'STATION_OPERATOR'],
+    section: 'Inventory',
   },
   {
     path: '/dashboard/field',

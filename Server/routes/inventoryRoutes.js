@@ -57,6 +57,7 @@ router.get(
   requireRole(
     "INVENTORY_MANAGER",
     "STATION_COMMANDER",
+    "STATION_OPERATOR",
     "HQ_COMMAND",
     "HQ_ADMIN",
     "LOGISTICS_OFFICER"

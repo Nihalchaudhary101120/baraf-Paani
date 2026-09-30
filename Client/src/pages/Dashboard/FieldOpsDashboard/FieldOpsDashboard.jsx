@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useFieldExcursion } from '@/context/FieldExcursionContext';
 import { getStationsApi } from '@/api/station.api';
+import { getCheckInQueue } from '@/services/syncServices/queueService';
 
 const STATUS_STYLE = {
   ACTIVE:    { bg: '#ecfdf5', color: '#15803D', border: '#a7f3d0', label: 'ACTIVE', pulse: false },
@@ -54,9 +55,25 @@ const FieldOpsDashboard = () => {
   const [activeTab, setActiveTab] = useState(isOperator ? 'active' : 'my_active');
   const [stations, setStations] = useState([]);
 
+  // Resolve Station Operator's assigned station from AuthContext or stations list
+  const userStationDoc = typeof user?.stationId === 'object' && user?.stationId !== null ? user?.stationId : null;
+  const userStationId = userStationDoc?._id || user?.stationId || user?.station;
+
+  const assignedStation = React.useMemo(() => {
+    if (userStationDoc?.name || userStationDoc?.code) return userStationDoc;
+    if (userStationId && stations.length > 0) {
+      return stations.find(s => String(s._id) === String(userStationId) || s.code === String(userStationId)) || null;
+    }
+    return null;
+  }, [userStationDoc, userStationId, stations]);
+
+  const assignedStationId = assignedStation?._id || (typeof userStationId === 'string' ? userStationId : '');
+  const assignedStationName = assignedStation?.name || (assignedStation?.code ? `${assignedStation.code} Station` : 'Assigned Station');
+  const assignedStationCode = assignedStation?.code || '';
+
   // Form states
   const [createForm, setCreateForm] = useState({
-    stationId: user?.stationId?._id || user?.stationId || '',
+    stationId: assignedStationId || '',
     leaderId: '',
     members: [],
     purpose: '',
@@ -81,8 +98,24 @@ const FieldOpsDashboard = () => {
 
   const [submitting, setSubmitting] = useState(false);
   const [memberSearch, setMemberSearch] = useState('');
+  const [pendingSyncCount, setPendingSyncCount] = useState(0);
 
-  // Fetch stations for create dropdown
+  const refreshPendingCount = async () => {
+    try {
+      const q = await getCheckInQueue();
+      const pending = q.filter(e => e.status === 'PENDING' || e.syncStatus === 'PENDING');
+      setPendingSyncCount(pending.length);
+    } catch (e) {}
+  };
+
+  useEffect(() => {
+    refreshPendingCount();
+    const handleSyncComplete = () => refreshPendingCount();
+    window.addEventListener('nirantra:sync-complete', handleSyncComplete);
+    return () => window.removeEventListener('nirantra:sync-complete', handleSyncComplete);
+  }, []);
+
+  // Fetch stations for reference
   useEffect(() => {
     const loadStations = async () => {
       try {
@@ -95,6 +128,24 @@ const FieldOpsDashboard = () => {
     };
     loadStations();
   }, []);
+
+  // Automatically sync createForm.stationId and fetch scoped personnel
+  useEffect(() => {
+    if (assignedStationId) {
+      setCreateForm((prev) => ({
+        ...prev,
+        stationId: assignedStationId,
+      }));
+      fetchPersonnel(assignedStationId);
+    }
+  }, [assignedStationId, fetchPersonnel]);
+
+  // When switching to 'create' tab, refresh personnel for assigned station
+  useEffect(() => {
+    if (activeTab === 'create' && assignedStationId) {
+      fetchPersonnel(assignedStationId);
+    }
+  }, [activeTab, assignedStationId, fetchPersonnel]);
 
   // When expanding an excursion, load its check-ins and latest member statuses
   const handleToggleExpand = async (exc) => {
@@ -119,9 +170,9 @@ const FieldOpsDashboard = () => {
       ...prev,
       departureTime: prev.departureTime || toLocalISO(now),
       expectedReturnTime: prev.expectedReturnTime || toLocalISO(plus8h),
-      stationId: prev.stationId || user?.stationId?._id || user?.stationId || '',
+      stationId: assignedStationId || prev.stationId || '',
     }));
-  }, [user]);
+  }, [user, assignedStationId]);
 
   // Handle Create Excursion submit
   const handleCreateSubmit = async (e) => {
@@ -137,7 +188,7 @@ const FieldOpsDashboard = () => {
 
     setSubmitting(true);
     const payload = {
-      stationId: createForm.stationId || undefined,
+      stationId: assignedStationId || createForm.stationId || undefined,
       leaderId: createForm.leaderId,
       members: createForm.members,
       purpose: createForm.purpose,
@@ -250,6 +301,20 @@ const FieldOpsDashboard = () => {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          {pendingSyncCount > 0 && (
+            <span
+              title="Check-ins saved locally in PouchDB/IndexedDB awaiting network synchronization"
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
+                backgroundColor: '#fff7ed', color: '#c2410c', border: '1px solid #fed7aa',
+                padding: '0.25rem 0.65rem', borderRadius: '9999px', fontSize: '0.72rem', fontWeight: 700,
+              }}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>sync_problem</span>
+              {pendingSyncCount} offline check-in{pendingSyncCount > 1 ? 's' : ''} queued
+            </span>
+          )}
+
           <button
             type="button"
             onClick={() => refreshAll()}
@@ -713,25 +778,38 @@ const FieldOpsDashboard = () => {
           </p>
 
           <form onSubmit={handleCreateSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
-            {/* Station Selection */}
+            {/* Station / Research Centre (Read-only for Station Operator) */}
             <div>
               <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#374151', marginBottom: '0.35rem' }}>
                 Station / Research Centre *
               </label>
-              <select
-                value={createForm.stationId}
-                onChange={(e) => {
-                  setCreateForm((f) => ({ ...f, stationId: e.target.value }));
-                  fetchPersonnel(e.target.value);
+              <div
+                id="station-operator-assigned-station"
+                style={{
+                  width: '100%',
+                  height: '42px',
+                  padding: '0 0.85rem',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '6px',
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  backgroundColor: '#f8fafc',
+                  color: '#1e293b',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  boxSizing: 'border-box',
+                  userSelect: 'none',
                 }}
-                required
-                style={{ width: '100%', height: '40px', padding: '0 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem', backgroundColor: '#fff' }}
               >
-                <option value="">Choose station...</option>
-                {stations.map((st) => (
-                  <option key={st._id} value={st._id}>{st.name} ({st.code})</option>
-                ))}
-              </select>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#005B7F' }}>location_on</span>
+                  <span>{assignedStationName} {assignedStationCode ? `(${assignedStationCode})` : ''}</span>
+                </span>
+                <span title="Assigned station (read-only)" style={{ fontSize: '0.9rem', color: '#64748B', display: 'flex', alignItems: 'center' }}>
+                  🔒
+                </span>
+              </div>
             </div>
 
             {/* Team Leader Select (Real Personnel from MongoDB) */}

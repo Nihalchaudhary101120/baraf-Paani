@@ -109,8 +109,7 @@ export const InventoryProvider = ({ children }) => {
   const consumeStock = useCallback(async (sid, payload) => {
     const targetStation = resolveTargetStation(sid) || resolveTargetStation(stationId);
 
-    if (!navigator.onLine) {
-      // ── Offline path: queue to PouchDB ──────────────────────────────
+    const queueOfflineConsumption = async () => {
       try {
         const offlineEvent = await queueEvent({
           type: 'INVENTORY_CONSUMPTION',
@@ -140,12 +139,16 @@ export const InventoryProvider = ({ children }) => {
         return {
           success: true,
           offline: true,
-          message: `Queued offline — ${payload.quantity} units of ${payload.skuCode || 'item'} will sync when connected.`,
+          message: 'Inventory consumption saved offline. It will sync when connectivity returns.',
           eventId: offlineEvent.eventId,
         };
       } catch (offlineErr) {
         return { success: false, error: offlineErr.message };
       }
+    };
+
+    if (!navigator.onLine) {
+      return await queueOfflineConsumption();
     }
 
     // ── Online path: call backend ────────────────────────────────────
@@ -170,7 +173,6 @@ export const InventoryProvider = ({ children }) => {
         // Update cached batches for this SKU if they were loaded
         const skuKey = payload.skuId || payload.skuCode;
         if (skuKey && batches[skuKey]) {
-          // Re-fetch batches to reflect new DEPLETED states
           fetchItemBatches(targetStation, skuKey);
         }
 
@@ -187,6 +189,10 @@ export const InventoryProvider = ({ children }) => {
 
       return res;
     } catch (err) {
+      const isNetErr = !navigator.onLine || err.message === 'Network Error' || err.code === 'ERR_NETWORK' || !err.response;
+      if (isNetErr) {
+        return await queueOfflineConsumption();
+      }
       const msg = err?.response?.data?.message || err.message || 'Failed to consume stock';
       return { success: false, error: msg };
     }

@@ -2,6 +2,8 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useInventory } from '@/context/InventoryContext';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
+import { getPendingEvents } from '@/services/syncServices/queueService';
+import { getStationsApi } from '@/api/station.api';
 
 // ── Style constants ────────────────────────────────────────────────────────
 const COLORS = {
@@ -339,20 +341,97 @@ export default function InventoryDashboard() {
   const [consumeTarget, setConsumeTarget] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [pendingCount, setPendingCount] = useState(0);
+  const [stations, setStations] = useState([]);
 
-  const userStationDoc = typeof user?.stationId === 'object' ? user?.stationId : null;
-  const stationId = userStationDoc?._id || user?.stationId || user?.station;
-  const stationName = userStationDoc?.name || (userStationDoc?.code ? `${userStationDoc.code} Station` : null);
-  const stationCode = userStationDoc?.code || null;
-
-  // Online/offline indicator
   useEffect(() => {
-    const onOnline = () => setIsOnline(true);
-    const onOffline = () => setIsOnline(false);
+    const loadStations = async () => {
+      try {
+        const res = await getStationsApi();
+        const list = res?.stations || res?.data?.stations || res?.data || [];
+        setStations(Array.isArray(list) ? list : []);
+      } catch (err) {
+        console.error('Error fetching stations:', err);
+      }
+    };
+    loadStations();
+  }, []);
+
+  const userStationDoc = typeof user?.stationId === 'object' && user?.stationId !== null ? user?.stationId : null;
+  const userStationId = userStationDoc?._id || user?.stationId || user?.station;
+
+  const assignedStation = useMemo(() => {
+    if (userStationDoc?.name || userStationDoc?.code) return userStationDoc;
+    if (userStationId && stations.length > 0) {
+      return stations.find(s => String(s._id) === String(userStationId) || s.code === String(userStationId)) || null;
+    }
+    return null;
+  }, [userStationDoc, userStationId, stations]);
+
+  const stationId = assignedStation?._id || (typeof userStationId === 'string' ? userStationId : '');
+  const stationName = assignedStation?.name || (assignedStation?.code ? `${assignedStation.code} Station` : null);
+  const stationCode = assignedStation?.code || null;
+
+  const checkPendingQueue = useCallback(async () => {
+    try {
+      const pending = await getPendingEvents();
+      const count = pending.filter(e => e.type === 'INVENTORY_CONSUMPTION').length;
+      setPendingCount(count);
+    } catch {
+      setPendingCount(0);
+    }
+  }, []);
+
+  // Online/offline indicator and pending queue tracking
+  useEffect(() => {
+    checkPendingQueue();
+
+    const onOnline = () => {
+      setIsOnline(true);
+      checkPendingQueue();
+    };
+    const onOffline = () => {
+      setIsOnline(false);
+      checkPendingQueue();
+    };
+
     window.addEventListener('online', onOnline);
     window.addEventListener('offline', onOffline);
-    return () => { window.removeEventListener('online', onOnline); window.removeEventListener('offline', onOffline); };
-  }, []);
+    return () => {
+      window.removeEventListener('online', onOnline);
+      window.removeEventListener('offline', onOffline);
+    };
+  }, [checkPendingQueue]);
+
+  // Listen for sync completion and error events
+  useEffect(() => {
+    const onSyncComplete = (e) => {
+      checkPendingQueue();
+      if (e?.detail?.inventorySynced > 0) {
+        toast.success("Offline inventory operation synced.");
+      }
+      if (stationId) {
+        fetchInventory(stationId);
+        if (activeTab === 'transactions') {
+          fetchTransactions(stationId);
+        }
+      }
+    };
+
+    const onSyncError = (e) => {
+      checkPendingQueue();
+      if (e?.detail?.event?.type === 'INVENTORY_CONSUMPTION') {
+        toast.error(`Unable to consume inventory: ${e.detail.error || 'insufficient stock'}`);
+      }
+    };
+
+    window.addEventListener('nirantra:sync-complete', onSyncComplete);
+    window.addEventListener('nirantra:sync-error', onSyncError);
+    return () => {
+      window.removeEventListener('nirantra:sync-complete', onSyncComplete);
+      window.removeEventListener('nirantra:sync-error', onSyncError);
+    };
+  }, [stationId, activeTab, fetchInventory, fetchTransactions, toast, checkPendingQueue]);
 
   // Initial and reactive load for the inventory manager's assigned station
   useEffect(() => {
@@ -415,21 +494,23 @@ export default function InventoryDashboard() {
       const res = await consumeStock(stationId, payload);
 
       if (res?.success) {
-        const msg = res.offline
-          ? `Queued offline — ${formData.quantity} ${consumeTarget.unit} of ${consumeTarget.itemName} will sync when connected.`
-          : `${formData.quantity} ${consumeTarget.unit} of ${consumeTarget.itemName} consumed successfully.`;
-        toast.success(msg);
+        if (res.offline) {
+          toast.info("Inventory consumption saved offline. It will sync when connectivity returns.");
+          checkPendingQueue();
+        } else {
+          toast.success("Inventory consumed successfully.");
+        }
         setShowConsumeModal(false);
         setConsumeTarget(null);
       } else {
-        toast.error(res?.error || res?.message || 'Failed to consume stock');
+        toast.error(res?.error || res?.message || "Unable to consume inventory: insufficient stock.");
       }
     } catch (err) {
-      toast.error(err.message || 'Failed to consume stock');
+      toast.error(err.message || "Unable to consume inventory: insufficient stock.");
     } finally {
       setSubmitting(false);
     }
-  }, [consumeTarget, stationId, consumeStock, toast]);
+  }, [consumeTarget, stationId, consumeStock, toast, checkPendingQueue]);
 
   // ── Client-side filter (for instant search feedback) ──────────────────────
   const filteredInventory = useMemo(() => {
@@ -459,16 +540,18 @@ export default function InventoryDashboard() {
       <div style={{ backgroundColor: '#FFF', borderRadius: '12px', padding: '1.1rem 1.5rem', border: `1px solid ${COLORS.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', boxShadow: '0 2px 6px rgba(0,0,0,0.03)' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
-            <span className="material-symbols-outlined" style={{ color: COLORS.primary, fontSize: '24px' }}>warehouse</span>
-            <h1 style={{ fontSize: '1.15rem', fontWeight: 800, color: COLORS.text, margin: 0 }}>Station Inventory Management</h1>
+            <span className="material-symbols-outlined" style={{ color: COLORS.primary, fontSize: '24px' }}>inventory_2</span>
+            <h1 style={{ fontSize: '1.2rem', fontWeight: 900, color: COLORS.text, margin: 0, letterSpacing: '0.04em' }}>INVENTORY POOL</h1>
             <span style={{ backgroundColor: '#EFF6FF', color: COLORS.primary, border: '1px solid #BFDBFE', padding: '0.15rem 0.5rem', borderRadius: '9999px', fontSize: '0.68rem', fontWeight: 800 }}>NIRANTRA</span>
-            {/* Online indicator */}
-            <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.7rem', fontWeight: 700, color: isOnline ? '#15803D' : '#DC2626' }}>
-              <span style={{ width: 7, height: 7, borderRadius: '50%', backgroundColor: isOnline ? '#22C55E' : '#EF4444', display: 'inline-block' }} />
-              {isOnline ? 'Online' : 'Offline (changes queued)'}
+            {/* Sync / Online Status Indicator */}
+            <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.72rem', fontWeight: 700, color: !isOnline ? '#DC2626' : pendingCount > 0 ? '#D97706' : '#15803D' }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: !isOnline ? '#EF4444' : pendingCount > 0 ? '#F59E0B' : '#22C55E', display: 'inline-block' }} />
+              {!isOnline ? `Offline (${pendingCount} queued)` : pendingCount > 0 ? `Syncing (${pendingCount} pending)...` : 'Synced'}
             </span>
           </div>
-          <p style={{ margin: '0.15rem 0 0', fontSize: '0.75rem', color: COLORS.muted }}>Batch-based FCFS inventory · Automatic cargo receipt · Real-time stock tracking</p>
+          <p style={{ margin: '0.2rem 0 0', fontSize: '0.78rem', color: COLORS.muted }}>
+            Physical inventory available at station · Track received, consumed and remaining stock
+          </p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
           {stationName && (
@@ -503,12 +586,11 @@ export default function InventoryDashboard() {
       </div>
 
       {/* ── Summary Cards ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.85rem' }}>
-        <SummaryCard label="Total SKUs" value={summary.totalSKUs} icon="grid_view" color={COLORS.primary} bg="#EFF6FF" />
-        <SummaryCard label="Total Stock" value={summary.totalStock?.toLocaleString()} icon="inventory_2" color={COLORS.success} bg="#F0FDF4" />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.85rem' }}>
+        <SummaryCard label="Total Stock" value={summary.totalStock?.toLocaleString()} icon="inventory_2" color={COLORS.primary} bg="#EFF6FF" />
         <SummaryCard label="Low Stock" value={summary.lowStockCount} icon="warning" color={COLORS.warning} bg="#FEFCE8" />
-        <SummaryCard label="Out of Stock" value={summary.outOfStockCount} icon="cancel" color={COLORS.danger} bg="#FEF2F2" />
-        <SummaryCard label="Recent Receipts (7d)" value={summary.recentReceipts} icon="move_to_inbox" color="#7E22CE" bg="#FAF5FF" />
+        <SummaryCard label="Critical" value={summary.criticalCount ?? summary.outOfStockCount ?? 0} icon="cancel" color={COLORS.danger} bg="#FEF2F2" />
+        <SummaryCard label="Recent Receipts" value={summary.recentReceipts} icon="move_to_inbox" color="#7E22CE" bg="#FAF5FF" />
       </div>
 
       {/* ── Tabs ── */}
@@ -530,7 +612,7 @@ export default function InventoryDashboard() {
           <div style={{ backgroundColor: '#FFF', borderRadius: '10px', padding: '0.85rem 1rem', border: `1px solid ${COLORS.border}`, display: 'flex', gap: '0.65rem', flexWrap: 'wrap', alignItems: 'center' }}>
             <div style={{ flex: '1 1 180px', display: 'flex', alignItems: 'center', gap: '0.4rem', border: `1px solid ${COLORS.border}`, borderRadius: '8px', padding: '0 0.6rem', backgroundColor: '#FAFAFA' }}>
               <span className="material-symbols-outlined" style={{ fontSize: '17px', color: COLORS.muted }}>search</span>
-              <input value={search} onChange={e => handleSearch(e.target.value)} placeholder="Search item, SKU..." style={{ border: 'none', background: 'none', outline: 'none', fontSize: '0.82rem', padding: '0.45rem 0', flex: 1, color: COLORS.text }} />
+              <input value={search} onChange={e => handleSearch(e.target.value)} placeholder="Search inventory..." style={{ border: 'none', background: 'none', outline: 'none', fontSize: '0.82rem', padding: '0.45rem 0', flex: 1, color: COLORS.text }} />
             </div>
             <select value={filterCategory} onChange={e => setFilterCategory(e.target.value)} style={{ padding: '0.45rem 0.7rem', borderRadius: '8px', border: `1px solid ${COLORS.border}`, fontSize: '0.8rem', backgroundColor: '#FAFAFA' }}>
               <option value="ALL">All Categories</option>
@@ -541,7 +623,7 @@ export default function InventoryDashboard() {
               <option value="AVAILABLE">Available</option>
               <option value="LOW_STOCK">Low Stock</option>
               <option value="CRITICAL">Critical</option>
-              <option value="OUT_OF_STOCK">Out of Stock</option>
+              <option value="OUT_OF_STOCK">Depleted / Out of Stock</option>
             </select>
             <select value={`${sortBy}:${sortOrder}`} onChange={e => { const [f, o] = e.target.value.split(':'); setSortBy(f); setSortOrder(o); }} style={{ padding: '0.45rem 0.7rem', borderRadius: '8px', border: `1px solid ${COLORS.border}`, fontSize: '0.8rem', backgroundColor: '#FAFAFA' }}>
               <option value="itemName:asc">Name A→Z</option>
@@ -577,7 +659,7 @@ export default function InventoryDashboard() {
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
                   <thead>
                     <tr style={{ backgroundColor: '#F8FAFC', borderBottom: `1px solid ${COLORS.border}` }}>
-                      {['SKU', 'Item Name', 'Category', 'Available', 'Unit', 'Batches', 'Status', 'Actions'].map(h => (
+                      {['SKU', 'Item Name', 'Category', 'Stock', 'Minimum', 'Status', 'Actions'].map(h => (
                         <th key={h} style={{ padding: '0.7rem 1rem', textAlign: 'left', fontWeight: 800, color: COLORS.muted, fontSize: '0.7rem', letterSpacing: '0.04em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>{h}</th>
                       ))}
                     </tr>
@@ -592,18 +674,17 @@ export default function InventoryDashboard() {
                         </td>
                         <td style={{ padding: '0.75rem 1rem', fontWeight: 700, color: COLORS.text }}>{item.itemName}</td>
                         <td style={{ padding: '0.75rem 1rem' }}><CategoryBadge category={item.category} /></td>
-                        <td style={{ padding: '0.75rem 1rem', fontWeight: 800, color: item.totalRemaining <= 0 ? COLORS.danger : item.totalRemaining <= 10 ? COLORS.warning : COLORS.success, fontSize: '0.95rem' }}>
-                          {item.totalRemaining?.toLocaleString() ?? 0}
+                        <td style={{ padding: '0.75rem 1rem', fontWeight: 800, color: item.totalRemaining <= 0 ? COLORS.danger : (item.totalRemaining <= (item.minimumStock ?? 10) ? COLORS.warning : COLORS.success), fontSize: '0.95rem' }}>
+                          {item.totalRemaining?.toLocaleString() ?? 0} <span style={{ fontSize: '0.72rem', fontWeight: 600, color: COLORS.muted }}>{item.unit}</span>
                         </td>
-                        <td style={{ padding: '0.75rem 1rem', color: COLORS.muted, fontWeight: 600 }}>{item.unit}</td>
-                        <td style={{ padding: '0.75rem 1rem' }}>
-                          <span style={{ backgroundColor: '#F1F5F9', color: COLORS.muted, padding: '0.15rem 0.45rem', borderRadius: '5px', fontSize: '0.72rem', fontWeight: 700 }}>{item.batchCount || 0}</span>
+                        <td style={{ padding: '0.75rem 1rem', color: COLORS.muted, fontWeight: 700 }}>
+                          {item.minimumStock ?? 10} <span style={{ fontSize: '0.72rem', fontWeight: 500 }}>{item.unit}</span>
                         </td>
                         <td style={{ padding: '0.75rem 1rem' }}><StatusBadge status={item.stockStatus} /></td>
                         <td style={{ padding: '0.75rem 1rem' }}>
                           <div style={{ display: 'flex', gap: '0.4rem' }}>
                             <button onClick={() => handleViewBatches(item)} style={{ padding: '0.3rem 0.65rem', borderRadius: '6px', border: `1px solid ${COLORS.border}`, background: '#FFF', color: COLORS.primary, fontWeight: 700, fontSize: '0.72rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
-                              <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>layers</span> Batches
+                              <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>visibility</span> View
                             </button>
                             {canConsume && item.totalRemaining > 0 && (
                               <button onClick={() => handleOpenConsume(item)} style={{ padding: '0.3rem 0.65rem', borderRadius: '6px', border: 'none', backgroundColor: COLORS.primary, color: '#FFF', fontWeight: 700, fontSize: '0.72rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>

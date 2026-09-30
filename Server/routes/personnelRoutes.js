@@ -12,6 +12,7 @@ const personnelRoles = [
     "MEDICAL_OFFICER",
     "STATION_COMMANDER",
     "LOGISTICS_OFFICER",
+    "CARGO_OFFICER",
     "SHIP_OFFICER",
     "FLIGHT_OFFICER"
 ];

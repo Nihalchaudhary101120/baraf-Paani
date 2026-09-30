@@ -1,8 +1,9 @@
 import api from '@/api/axiosInstance';
-
 import {
   getPendingEvents,
-  markEventSynced
+  markEventSyncing,
+  markEventSynced,
+  markEventFailed,
 } from "./queueService";
 
 let syncing = false;
@@ -12,18 +13,19 @@ let syncing = false;
  * Calls POST /api/inventory/:stationId/consume for each queued event.
  */
 const syncInventoryConsumption = async (event) => {
-  if (!event.stationId) throw new Error('Missing stationId in inventory event');
+  const payloadData = event.payload || event;
+  const stationId = payloadData.stationId || event.stationId;
+  if (!stationId) throw new Error('Missing stationId in inventory event');
   const payload = {
-    skuId: event.skuId,
-    skuCode: event.skuCode,
-    quantity: event.quantity,
-    reason: event.reason,
-    notes: event.notes,
+    skuId: payloadData.skuId,
+    skuCode: payloadData.skuCode,
+    quantity: payloadData.quantity,
+    reason: payloadData.reason,
+    notes: payloadData.notes,
+    eventId: event.eventId, // Stable eventId for backend idempotency
     offlineCreated: true,
   };
-  // Backend enforces FCFS and validates stock server-side
-  const res = await api.post(`/inventory/${event.stationId}/consume`, payload);
-  return res;
+  return await api.post(`/inventory/${stationId}/consume`, payload);
 };
 
 /**
@@ -31,41 +33,54 @@ const syncInventoryConsumption = async (event) => {
  * Calls POST /api/cargo/receiving for each queued receipt.
  */
 const syncCargoReceive = async (event) => {
+  const payloadData = event.payload || event;
   const payload = {
-    manifestId: event.manifestId,
-    itemCode: event.itemCode,
-    boxCode: event.boxCode || event.itemCode,
-    acceptedQuantity: event.acceptedQuantity,
-    remarks: event.remarks,
+    manifestId: payloadData.manifestId,
+    itemCode: payloadData.itemCode,
+    boxCode: payloadData.boxCode || payloadData.itemCode,
+    acceptedQuantity: payloadData.acceptedQuantity,
+    remarks: payloadData.remarks,
     skipCheckpointCheck: true,
   };
   return await api.post('/cargo/receiving', payload);
 };
 
 /**
- * Handle FIELD_CHECKIN offline events.
+ * Handle FIELD_CHECK_IN / FIELD_CHECKIN offline events.
  * Calls POST /api/field-excursions/:excursionId/check-ins.
+ * Preserves the original stable eventId, creation timestamp, and location.
  */
 const syncFieldCheckIn = async (event) => {
-  if (!event.excursionId) throw new Error('Missing excursionId in field check-in event');
-  const payload = {
-    location: event.location,
-    latitude: event.latitude || event.location?.latitude || event.location?.lat,
-    longitude: event.longitude || event.location?.longitude || event.location?.lng,
-    temperature: event.temperature,
-    batteryLevel: event.batteryLevel,
-    networkAvailable: false,
-    notes: event.notes,
-    deviceId: event.deviceId,
-    eventId: event.eventId,
-    offlineCreated: true
+  const payloadData = event.payload || event;
+  const excursionId = payloadData.excursionId || event.excursionId;
+  if (!excursionId) throw new Error('Missing excursionId in field check-in event');
+
+  const loc = payloadData.location || {
+    latitude: payloadData.latitude ?? 0,
+    longitude: payloadData.longitude ?? 0,
   };
-  return await api.post(`/field-excursions/${event.excursionId}/check-ins`, payload);
+
+  const payload = {
+    location: {
+      latitude: Number(loc.latitude ?? loc.lat ?? 0),
+      longitude: Number(loc.longitude ?? loc.lng ?? 0),
+    },
+    latitude: Number(loc.latitude ?? loc.lat ?? 0),
+    longitude: Number(loc.longitude ?? loc.lng ?? 0),
+    temperature: payloadData.temperature !== undefined && payloadData.temperature !== '' ? Number(payloadData.temperature) : null,
+    batteryLevel: payloadData.batteryLevel !== undefined && payloadData.batteryLevel !== '' ? Number(payloadData.batteryLevel) : null,
+    networkAvailable: false,
+    notes: payloadData.notes || '',
+    deviceId: payloadData.deviceId || 'offline-device',
+    eventId: event.eventId, // MUST remain identical across retries
+    offlineCreated: true,
+  };
+
+  return await api.post(`/field-excursions/${excursionId}/check-ins`, payload);
 };
 
 /**
  * Route a queued event to the appropriate sync handler.
- * Add new event types here as the system grows.
  */
 const routeEvent = async (event) => {
   switch (event.type) {
@@ -73,84 +88,93 @@ const routeEvent = async (event) => {
       return await syncInventoryConsumption(event);
     case 'CARGO_RECEIVE':
       return await syncCargoReceive(event);
+    case 'FIELD_CHECK_IN':
     case 'FIELD_CHECKIN':
       return await syncFieldCheckIn(event);
     default:
-      // For unknown types, attempt generic /sync endpoint
       return await api.post('/sync', { events: [event] });
   }
 };
 
-// Sync all LOCAL events to MongoDB
+/**
+ * Sync all PENDING events to MongoDB in creation order (FIFO).
+ */
 export const syncOfflineQueue = async () => {
-
   if (syncing) return;
-
   if (!navigator.onLine) return;
 
   syncing = true;
 
   try {
-
     const pendingEvents = await getPendingEvents();
-
     if (pendingEvents.length === 0) {
       return;
     }
 
-    console.log(`[Sync] Processing ${pendingEvents.length} offline event(s)...`);
+    console.log(`[Sync] Processing ${pendingEvents.length} offline event(s) in FIFO order...`);
 
-    // Group events: sequential handlers (FCFS consumption, cargo receipts, field check-ins) vs bulk /sync
-    const individualTypes = ['INVENTORY_CONSUMPTION', 'CARGO_RECEIVE', 'FIELD_CHECKIN'];
+    const individualTypes = ['INVENTORY_CONSUMPTION', 'CARGO_RECEIVE', 'FIELD_CHECK_IN', 'FIELD_CHECKIN'];
     const individualEvents = pendingEvents.filter(e => individualTypes.includes(e.type));
     const otherEvents = pendingEvents.filter(e => !individualTypes.includes(e.type));
 
-    // Process individual events one-by-one in order
+    let checkInsSynced = 0;
+    let inventorySynced = 0;
+
+    // Process individual events sequentially in chronological order
     for (const event of individualEvents) {
       try {
+        await markEventSyncing(event);
         await routeEvent(event);
         await markEventSynced(event);
-        console.log(`[Sync] ${event.type} synced successfully`);
+        if (['FIELD_CHECK_IN', 'FIELD_CHECKIN'].includes(event.type)) {
+          checkInsSynced++;
+        }
+        if (event.type === 'INVENTORY_CONSUMPTION') {
+          inventorySynced++;
+        }
+        console.log(`[Sync] ${event.type} (${event.eventId}) synced successfully`);
       } catch (err) {
-        console.warn(`[Sync] Failed to sync ${event.type} event ${event._id}:`, err.message);
-        // Don't stop — attempt remaining events
+        const status = err.response?.status;
+        const errMsg = err.response?.data?.message || err.message || 'Sync failed';
+        console.warn(`[Sync] Error syncing ${event.type} (${event.eventId}):`, errMsg);
+
+        // Check if permanent validation error (400, 401, 403, 404, 422)
+        const isPermanent = status >= 400 && status < 500 && status !== 408 && status !== 429;
+        await markEventFailed(event, errMsg, isPermanent);
+
+        // Broadcast event for UI notifications
+        window.dispatchEvent(new CustomEvent('nirantra:sync-error', {
+          detail: { event, error: errMsg, isPermanent }
+        }));
       }
     }
 
-    // Process remaining events via generic /sync endpoint
+    // Process remaining generic events via /sync
     if (otherEvents.length > 0) {
       try {
-        const response = await api.post("/sync", {
-          events: otherEvents
-        });
-
+        const response = await api.post("/sync", { events: otherEvents });
         const syncedEvents = response.data?.synced || response.synced || [];
-
         for (const syncedEvent of syncedEvents) {
-          const localDoc = otherEvents.find(
-            event => event.eventId === syncedEvent.eventId
-          );
+          const localDoc = otherEvents.find(e => e.eventId === syncedEvent.eventId);
           if (localDoc) {
             await markEventSynced(localDoc);
           }
         }
-
-        console.log(`[Sync] ${syncedEvents.length} general events synced.`);
       } catch (err) {
-        console.error('[Sync] General sync failed:', err.message);
+        console.error('[Sync] Generic sync failed:', err.message);
       }
     }
 
+    // Dispatch sync completion event for UI refresh
+    window.dispatchEvent(new CustomEvent('nirantra:sync-complete', {
+      detail: { count: pendingEvents.length, checkInsSynced, inventorySynced }
+    }));
+
   } catch (error) {
-
-    console.error("[Sync] Sync process failed:", error);
-
+    console.error("[Sync] Sync queue error:", error);
   } finally {
-
     syncing = false;
-
   }
-
 };
 
 let syncInterval = null;
@@ -167,7 +191,7 @@ export const startSyncListener = () => {
       if (navigator.onLine) {
         syncOfflineQueue();
       }
-    }, 30000);
+    }, 20000); // 20s heartbeat
   }
 };
 
