@@ -7,10 +7,21 @@ let _db = null;
 
 const getDB = async () => {
   if (_db) return _db;
-  // Dynamic import avoids Vite's static ESM analysis of pouchdb-browser
-  const PouchDB = (await import('pouchdb-browser')).default;
-  _db = new PouchDB('nirantra-offline-events');
-  return _db;
+  try {
+    const PouchDBModule = await import('pouchdb-browser');
+    const PouchDB = PouchDBModule.default || PouchDBModule;
+    _db = new PouchDB('nirantra-offline-events');
+    return _db;
+  } catch (err) {
+    console.warn('[pouchService] Failed to initialize PouchDB for events, using fallback:', err.message);
+    // Provide a memory/dummy fallback object so queue operations never crash
+    return {
+      put: async () => ({ ok: true }),
+      allDocs: async () => ({ rows: [] }),
+      get: async () => { throw { status: 404 }; },
+      remove: async () => ({ ok: true }),
+    };
+  }
 };
 
 /**

@@ -11,6 +11,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+      events: path.resolve(__dirname, 'node_modules/events/events.js'),
     },
   },
   define: {
@@ -18,7 +19,7 @@ export default defineConfig({
     global: 'globalThis',
   },
   optimizeDeps: {
-    // Force Vite to pre-bundle PouchDB (CJS → ESM transformation)
-    include: ['pouchdb-browser'],
+    // Force Vite to pre-bundle PouchDB and events
+    include: ['pouchdb-browser', 'events'],
   },
 })

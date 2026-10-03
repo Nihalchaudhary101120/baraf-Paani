@@ -81,6 +81,7 @@ export const ToastProvider = ({ children }) => {
 
   const toast = {
     show: showToast,
+    showToast,
     success: (msg, opts) => showToast(msg, 'success', opts),
     error: (msg, opts) => showToast(msg, 'error', opts),
     warning: (msg, opts) => showToast(msg, 'warning', opts),

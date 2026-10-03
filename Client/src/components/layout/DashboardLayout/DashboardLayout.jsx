@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import OfflineWidget from '@/components/common/OfflineWidget/OfflineWidget';
+import ActiveSOSAlertBanner from '@/components/emergency/ActiveSOSAlertBanner';
 
 // ── Master Navigation Definitions with Role Scoping ─────────────────
 const ALL_NAV_ITEMS = [
@@ -139,7 +140,7 @@ const ALL_NAV_ITEMS = [
     path: '/dashboard/sos',
     icon: 'emergency',
     label: 'SOS / Emergency',
-    roles: ['HQ_COMMAND', 'STATION_COMMANDER', 'SCIENTIST', 'STATION_OPERATOR'],
+    roles: ['HQ_COMMAND', 'HQ_ADMIN', 'STATION_COMMANDER', 'SCIENTIST', 'STATION_OPERATOR', 'LOGISTICS_OFFICER', 'INVENTORY_MANAGER', 'MEDICAL_OFFICER', 'CARGO_OFFICER', 'SHIP_OFFICER', 'FLIGHT_OFFICER'],
     danger: true,
     section: 'Emergency',
   },
@@ -407,23 +408,24 @@ const DashboardLayout = () => {
           {/* Offline Sync Widget */}
           <OfflineWidget />
 
-          {/* SOS button for operational roles */}
-          {userRole !== 'HQ_ADMIN' && (
-            <button
-              type="button"
-              onClick={() => navigate('/dashboard/sos')}
-              style={{
-                display: 'flex', alignItems: 'center', gap: '0.3rem',
-                padding: '0.3rem 0.7rem',
-                backgroundColor: '#B91C1C', color: '#fff',
-                borderRadius: '4px', border: '1px solid rgba(248,113,113,0.3)',
-                fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer',
-              }}
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>emergency</span>
-              SOS
-            </button>
-          )}
+          {/* Global Emergency SOS Quick Button */}
+          <button
+            type="button"
+            id="global-header-sos-btn"
+            onClick={() => navigate('/dashboard/sos')}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '0.3rem',
+              padding: '0.35rem 0.8rem',
+              backgroundColor: '#DC2626', color: '#fff',
+              borderRadius: '6px', border: '1px solid rgba(248,113,113,0.4)',
+              fontSize: '0.78rem', fontWeight: 800, cursor: 'pointer',
+              boxShadow: '0 2px 6px rgba(220, 38, 38, 0.4)',
+              letterSpacing: '0.03em'
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>emergency</span>
+            EMERGENCY SOS
+          </button>
 
           {/* Notifications */}
           <div style={{ position: 'relative' }}>
@@ -607,7 +609,11 @@ const DashboardLayout = () => {
           padding: '1.5rem 2rem',
           overflowY: 'auto',
           backgroundColor: '#F4F7F9',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '1rem',
         }}>
+          <ActiveSOSAlertBanner />
           <Outlet />
         </main>
       </div>

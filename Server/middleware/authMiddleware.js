@@ -19,13 +19,15 @@ const requireAuth = async (req, res, next) => {
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET || "default_jwt_secret");
 
+    const resolvedUserId = decoded.userId || decoded.id || decoded._id;
+    decoded.userId = resolvedUserId;
     req.user = decoded;
 
     // Resolve assigned station from existing schema relationship:
     // 1. User.stationId
     // 2. Fallback: User -> Personnel -> expedition.assignedStation
     try {
-      const userDoc = await User.findById(decoded.userId).select("stationId role isActive").lean();
+      const userDoc = await User.findById(resolvedUserId).select("stationId role isActive").lean();
       if (userDoc) {
         if (userDoc.isActive === false) {
           return res.status(403).json({
@@ -35,7 +37,7 @@ const requireAuth = async (req, res, next) => {
         }
         let stId = userDoc.stationId;
         if (!stId) {
-          const personnelDoc = await Personnel.findOne({ userId: decoded.userId }).select("expedition.assignedStation").lean();
+          const personnelDoc = await Personnel.findOne({ userId: resolvedUserId }).select("expedition.assignedStation").lean();
           stId = personnelDoc?.expedition?.assignedStation || null;
         }
         req.user.stationId = stId;

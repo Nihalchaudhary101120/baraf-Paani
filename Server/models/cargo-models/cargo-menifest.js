@@ -136,8 +136,7 @@ const CargoItemSchema = new mongoose.Schema(
     qrCode: String,
     trackingCode: {
       type: String,
-      trim: true,
-      index: true
+      trim: true
     }
   }
 );

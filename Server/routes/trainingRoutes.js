@@ -21,14 +21,14 @@ const router = express.Router();
 router.get(
     "/",
     requireAuth,
-    requireRole("STATION_COMMANDER", "HQ_COMMAND", "HQ_ADMIN"),
+    requireRole("STATION_COMMANDER", "HQ_COMMAND", "HQ_ADMIN", "MEDICAL_OFFICER"),
     getAllTrainingClearances
 );
 
 router.get(
     "/candidate/:expeditionId/:personnelId",
     requireAuth,
-    requireRole("STATION_COMMANDER", "HQ_COMMAND", "HQ_ADMIN"),
+    requireRole("STATION_COMMANDER", "HQ_COMMAND", "HQ_ADMIN", "MEDICAL_OFFICER"),
     getCandidateTrainingClearance
 );
 
