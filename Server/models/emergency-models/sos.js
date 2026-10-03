@@ -199,7 +199,7 @@ const SOSSchema = new mongoose.Schema(
     expeditionId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Expedition",
-      required: true,
+      required: false,
       index: true
     },
 
@@ -217,7 +217,7 @@ const SOSSchema = new mongoose.Schema(
     personnelId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Personnel",
-      required: true,
+      required: false,
       index: true
     },
 

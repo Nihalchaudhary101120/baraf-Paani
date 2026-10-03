@@ -254,10 +254,11 @@ export const createSOS = async (req, res) => {
       resolvedStationId = defaultStation?._id || null;
     }
 
-    // Determine expedition
+    // Determine expedition — try body, then personnel, then active expedition, then any expedition
     let resolvedExpeditionId = bodyExpeditionId || personnelDoc?.expedition?.expeditionId;
     if (!resolvedExpeditionId) {
-      const activeExpedition = await Expedition.findOne({ status: "ACTIVE" }).lean();
+      const activeExpedition = await Expedition.findOne({ status: "ACTIVE" }).lean()
+        || await Expedition.findOne().sort({ createdAt: -1 }).lean();
       resolvedExpeditionId = activeExpedition?._id || null;
     }
 

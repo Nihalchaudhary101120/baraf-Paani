@@ -8,6 +8,8 @@
 const LS_QUEUE_KEY = 'nirantra_offline_sos_queue';
 const LS_DRAFT_KEY = 'nirantra_offline_sos_draft';
 
+let _db = null;
+
 const getLocalStorageQueue = () => {
   try {
     const raw = localStorage.getItem(LS_QUEUE_KEY);

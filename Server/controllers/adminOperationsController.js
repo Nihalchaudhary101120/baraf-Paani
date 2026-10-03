@@ -779,7 +779,7 @@ export const getAdminCargoData = async (req, res) => {
     try {
         const [manifests, checkpoints, shipments] = await Promise.all([
             CargoManifest.find()
-                .populate("expedition", "expeditionCode name")
+                .populate("expeditionId", "expeditionCode name")
                 .sort({ createdAt: -1 })
                 .limit(50),
             CargoCheckpoint.find()
@@ -808,12 +808,13 @@ export const getAdminCargoData = async (req, res) => {
 // 8. HQ_ADMIN READ-ONLY: FIELD OPS & EXCURSIONS
 // ==========================================
 
+
 export const getAdminFieldOpsData = async (req, res) => {
     try {
         const excursions = await FieldExcursion.find()
-            .populate("leadPersonnel", "userId")
-            .populate("station", "name code")
-            .sort({ plannedDepartureTime: -1 })
+            .populate("leaderId", "name rank designation")
+            .populate("stationId", "name code")
+            .sort({ createdAt: -1 })
             .limit(50);
 
         const summary = {

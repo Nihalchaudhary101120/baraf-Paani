@@ -48,18 +48,6 @@ export const SOSProvider = ({ children }) => {
   });
   const [offlineSOSList, setOfflineSOSList] = useState([]);
 
-  // Subscribe to offlineSyncService
-  useEffect(() => {
-    const unsubscribe = offlineSyncService.subscribe((snapshot) => {
-      setSyncSnapshot(snapshot);
-      getAllOfflineSOS().then(setOfflineSOSList);
-      if (snapshot.status === NETWORK_STATUS.SYNCED && snapshot.syncedCount > 0) {
-        fetchActiveSOS(true);
-      }
-    });
-    return unsubscribe;
-  }, []);
-
   // Ref to track known SOS IDs to alert on new critical incidents
   const knownSosIdsRef = useRef(new Set());
   const initialFetchDoneRef = useRef(false);
@@ -150,6 +138,23 @@ export const SOSProvider = ({ children }) => {
     }
   }, [user, location, showToast, playAlertSound]);
 
+  // Subscribe to offlineSyncService: only show pouch-to-db message when succeeded
+  useEffect(() => {
+    const unsubscribe = offlineSyncService.subscribe((snapshot) => {
+      setSyncSnapshot(snapshot);
+      getAllOfflineSOS().then(setOfflineSOSList);
+      if (snapshot.syncedCount > 0) {
+        showToast(
+          `✓ Successfully synchronized ${snapshot.syncedCount} SOS record(s) from local queue to Command database.`,
+          'success',
+          { duration: 6000 }
+        );
+        fetchActiveSOS(true);
+      }
+    });
+    return unsubscribe;
+  }, [showToast, fetchActiveSOS]);
+
   /**
    * Fetch responders for a specific SOS
    */
@@ -171,6 +176,9 @@ export const SOSProvider = ({ children }) => {
    */
   const fetchSOSById = useCallback(async (id) => {
     if (!id) return null;
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      return null;
+    }
     setActionLoading(true);
     try {
       const res = await sosApi.getSOSById(id);
@@ -183,13 +191,13 @@ export const SOSProvider = ({ children }) => {
       }
       return sosData;
     } catch (err) {
-      const msg = err.response?.data?.message || err.message;
-      showToast(msg, 'error');
+      // Do not pop up network error toasts for background detail queries
+      console.warn('[fetchSOSById] Telemetry fetch notice:', err.message);
       return null;
     } finally {
       setActionLoading(false);
     }
-  }, [showToast]);
+  }, []);
 
   /**
    * Sync responders whenever currentSos changes
@@ -234,6 +242,7 @@ export const SOSProvider = ({ children }) => {
         role: user?.role || 'PERSONNEL'
       },
       stationId: payload.stationId || user?.stationId || null,
+      expeditionId: payload.expeditionId || user?.expeditionId || null,
       location: {
         latitude: payload.latitude ?? null,
         longitude: payload.longitude ?? null,

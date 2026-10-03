@@ -240,9 +240,9 @@ export const AdminProvider = ({ children }) => {
     fetchMedicalData,
   ]);
 
-  // Trigger pre-fetch when HQ user is authenticated
+  // Trigger pre-fetch only for full HQ admin roles that have permission to all admin endpoints
   useEffect(() => {
-    if (isAuthenticated && user?.role && ['HQ_ADMIN', 'HQ_COMMAND', 'LOGISTICS_OFFICER', 'STATION_COMMANDER'].includes(user.role)) {
+    if (isAuthenticated && user?.role && ['HQ_ADMIN', 'HQ_COMMAND'].includes(user.role)) {
       fetchAllAdminData();
     }
   }, [isAuthenticated, user?.role, fetchAllAdminData]);

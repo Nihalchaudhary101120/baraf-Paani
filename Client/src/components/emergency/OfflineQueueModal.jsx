@@ -48,12 +48,8 @@ const OfflineQueueModal = ({ isOpen, onClose }) => {
     await loadRecords();
     setIsSyncing(false);
 
-    if (result.success && result.syncedCount > 0) {
-      toast?.showToast?.(`✓ Successfully synchronized ${result.syncedCount} SOS record(s) to Command.`, 'success');
-    } else if (result.failedCount > 0) {
-      toast?.showToast?.('⚠ SOS synchronization failed. Records remain safely stored locally.', 'warning');
-    } else {
-      toast?.showToast?.('All local SOS records are up to date.', 'info');
+    if (result.syncedCount > 0) {
+      toast?.showToast?.(`✓ Successfully synchronized ${result.syncedCount} SOS record(s) to Command database.`, 'success');
     }
   };
 

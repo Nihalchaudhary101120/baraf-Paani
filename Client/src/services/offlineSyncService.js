@@ -37,6 +37,7 @@ class OfflineSyncService {
 
       // Periodic health check & sync poll every 30 seconds
       setInterval(() => {
+        if (typeof navigator !== 'undefined' && !navigator.onLine) return;
         if (this.status !== NETWORK_STATUS.OFFLINE && !this.isSyncing) {
           this.syncPendingSOS();
         }
@@ -157,6 +158,9 @@ class OfflineSyncService {
           accuracy: doc.location?.accuracy,
           addressOrDesc: doc.location?.addressOrDesc,
           stationId: doc.stationId,
+          expeditionId: doc.expeditionId || null,
+          personnelId: doc.reporter?.personnelId || null,
+          userId: doc.reporter?.userId || null,
           offlineCreated: true,
           syncStatus: 'PENDING_SYNC'
         };
@@ -222,10 +226,14 @@ class OfflineSyncService {
 
   scheduleRetry(attempts) {
     if (this.retryTimeoutId) clearTimeout(this.retryTimeoutId);
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      return;
+    }
 
     // Backoff: 8s, 20s, 45s, max 60s
     const delayMs = Math.min(60000, Math.pow(attempts, 1.5) * 8000);
     this.retryTimeoutId = setTimeout(() => {
+      if (typeof navigator !== 'undefined' && !navigator.onLine) return;
       this.syncPendingSOS();
     }, delayMs);
   }

@@ -213,12 +213,15 @@ export const MedicalProvider = ({ children }) => {
     }
   }, [fetchOverview, fetchRoster, fetchAssessments, fetchTrainings, fetchNominatedCandidates, selectedExpedition]);
 
-  // Auto pre-fetch on mount / auth change
+  // Roles permitted to access medical API endpoints
+  const MEDICAL_ROLES = ['MEDICAL_OFFICER', 'HQ_ADMIN', 'STATION_COMMANDER', 'HQ_COMMAND'];
+
+  // Auto pre-fetch on mount / auth change — only for authorized medical roles
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthenticated && user?.role && MEDICAL_ROLES.includes(user.role)) {
       fetchAllMedicalData(selectedExpedition);
     }
-  }, [isAuthenticated, selectedExpedition, fetchAllMedicalData]);
+  }, [isAuthenticated, user?.role, selectedExpedition, fetchAllMedicalData]);
 
   // ── 7. Optimistic Mutations: Save/Update Medical Assessment ───────────────
   const saveAssessment = useCallback(async (assessmentData) => {
