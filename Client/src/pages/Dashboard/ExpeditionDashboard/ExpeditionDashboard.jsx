@@ -922,12 +922,12 @@ const ExpeditionDetailPanel = ({ expedition, allPersonnel, stations, onClose, on
                       <div style={{ fontSize: '0.75rem', marginTop: '0.2rem' }}>Click "+ Nominate Personnel" to add candidate scientists and engineers for clearance.</div>
                     </div>
                   ) : (
-                    <div style={{ border: '1px solid #E2E8F0', borderRadius: '8px', overflow: 'hidden' }}>
-                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem' }}>
+                    <div style={{ border: '1px solid #E2E8F0', borderRadius: '8px', overflowX: 'auto', maxWidth: '100%', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+                      <table style={{ width: '100%', minWidth: '750px', borderCollapse: 'collapse', fontSize: '0.78rem' }}>
                         <thead style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #E2E8F0' }}>
                           <tr>
                             {['Candidate', 'Role / Station', 'Medical Clearance', 'Polar Training', 'Readiness', 'HQ Action'].map(h => (
-                              <th key={h} style={{ padding: '0.55rem 0.75rem', textAlign: 'left', fontWeight: 700, color: '#475569', fontSize: '0.68rem', textTransform: 'uppercase' }}>{h}</th>
+                              <th key={h} style={{ padding: '0.65rem 0.85rem', textAlign: 'left', fontWeight: 700, color: '#475569', fontSize: '0.68rem', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>{h}</th>
                             ))}
                           </tr>
                         </thead>
@@ -1134,12 +1134,12 @@ const ExpeditionDetailPanel = ({ expedition, allPersonnel, stations, onClose, on
                       <div style={{ fontSize: '0.75rem', marginTop: '0.2rem' }}>Candidates who pass both medical & polar training clearance can be confirmed above.</div>
                     </div>
                   ) : (
-                    <div style={{ border: '1px solid #86efac', borderRadius: '8px', overflow: 'hidden' }}>
-                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem' }}>
+                    <div style={{ border: '1px solid #86efac', borderRadius: '8px', overflowX: 'auto', maxWidth: '100%', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+                      <table style={{ width: '100%', minWidth: '880px', borderCollapse: 'collapse', fontSize: '0.78rem' }}>
                         <thead style={{ backgroundColor: '#f0fdf4', borderBottom: '1px solid #86efac' }}>
                           <tr>
-                            {['Member Name', 'Role', 'Assigned Station', 'Medical Clearance', 'Training', 'Confirmed Date', 'Expedition Designation', 'Leader Appoint'].map(h => (
-                              <th key={h} style={{ padding: '0.55rem 0.75rem', textAlign: 'left', fontWeight: 700, color: '#15803d', fontSize: '0.68rem', textTransform: 'uppercase' }}>{h}</th>
+                            {['Member Name', 'Role', 'Assigned Station', 'Medical Clearance', 'Training', 'Confirmed Date', 'Expedition Designation', 'Leader Selection'].map(h => (
+                              <th key={h} style={{ padding: '0.65rem 0.85rem', textAlign: 'left', fontWeight: 700, color: '#15803d', fontSize: '0.68rem', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>{h}</th>
                             ))}
                           </tr>
                         </thead>
@@ -1157,7 +1157,7 @@ const ExpeditionDetailPanel = ({ expedition, allPersonnel, stations, onClose, on
                             return (
                               <tr key={c._id ? `conf-${c._id}-${i}` : `conf-${i}`} style={{ borderBottom: '1px solid #F1F5F9', backgroundColor: isLeader ? '#fefce8' : i % 2 === 0 ? '#fff' : '#fcfdfc' }}>
                                 {/* Member Name */}
-                                <td style={{ padding: '0.55rem 0.75rem' }}>
+                                <td style={{ padding: '0.65rem 0.85rem', whiteSpace: 'nowrap' }}>
                                   <div style={{ fontWeight: 700, color: '#0F172A', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
                                     {isLeader && <span className="material-symbols-outlined" style={{ fontSize: '16px', color: '#d97706' }}>star</span>}
                                     {name}
@@ -1166,15 +1166,15 @@ const ExpeditionDetailPanel = ({ expedition, allPersonnel, stations, onClose, on
                                 </td>
 
                                 {/* Role */}
-                                <td style={{ padding: '0.55rem 0.75rem', color: '#334155', fontWeight: 600 }}>{role}</td>
+                                <td style={{ padding: '0.65rem 0.85rem', color: '#334155', fontWeight: 600, whiteSpace: 'nowrap' }}>{role}</td>
 
                                 {/* Station */}
-                                <td style={{ padding: '0.55rem 0.75rem', color: '#64748B' }}>{stationName} ({c.participationType || 'WINTER'})</td>
+                                <td style={{ padding: '0.65rem 0.85rem', color: '#64748B', whiteSpace: 'nowrap' }}>{stationName} ({c.participationType || 'WINTER'})</td>
 
                                 {/* Medical Status */}
-                                <td style={{ padding: '0.55rem 0.75rem' }}>
+                                <td style={{ padding: '0.65rem 0.85rem', whiteSpace: 'nowrap' }}>
                                   <span style={{
-                                    display: 'inline-block', padding: '0.12rem 0.45rem', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 700,
+                                    display: 'inline-block', padding: '0.15rem 0.55rem', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 700,
                                     backgroundColor: c.medicalStatus === 'FIT' ? '#dcfce7' : '#fef3c7',
                                     color: c.medicalStatus === 'FIT' ? '#15803d' : '#b45309'
                                   }}>
@@ -1183,9 +1183,9 @@ const ExpeditionDetailPanel = ({ expedition, allPersonnel, stations, onClose, on
                                 </td>
 
                                 {/* Training Status */}
-                                <td style={{ padding: '0.55rem 0.75rem' }}>
+                                <td style={{ padding: '0.65rem 0.85rem', whiteSpace: 'nowrap' }}>
                                   <span style={{
-                                    display: 'inline-block', padding: '0.12rem 0.45rem', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 700,
+                                    display: 'inline-block', padding: '0.15rem 0.55rem', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 700,
                                     backgroundColor: '#dcfce7', color: '#15803d'
                                   }}>
                                     ✔ COMPLETED
@@ -1193,10 +1193,10 @@ const ExpeditionDetailPanel = ({ expedition, allPersonnel, stations, onClose, on
                                 </td>
 
                                 {/* Confirmed Date */}
-                                <td style={{ padding: '0.55rem 0.75rem', color: '#64748B', fontSize: '0.72rem' }}>{confirmedDate}</td>
+                                <td style={{ padding: '0.65rem 0.85rem', color: '#64748B', fontSize: '0.72rem', whiteSpace: 'nowrap' }}>{confirmedDate}</td>
 
                                 {/* Expedition Role / Leader Badge */}
-                                <td style={{ padding: '0.55rem 0.75rem' }}>
+                                <td style={{ padding: '0.65rem 0.85rem', whiteSpace: 'nowrap' }}>
                                   {isLeader ? (
                                     <span style={{
                                       display: 'inline-flex', alignItems: 'center', gap: '0.25rem',
@@ -1213,10 +1213,10 @@ const ExpeditionDetailPanel = ({ expedition, allPersonnel, stations, onClose, on
                                 </td>
 
                                 {/* Leader Selection Action */}
-                                <td style={{ padding: '0.55rem 0.75rem' }}>
+                                <td style={{ padding: '0.65rem 0.85rem', whiteSpace: 'nowrap' }}>
                                   {isLeader ? (
-                                    <span style={{ fontSize: '0.72rem', color: '#059669', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>
-                                      <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>verified</span> Appointed
+                                    <span style={{ fontSize: '0.72rem', color: '#059669', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                                      <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>verified</span> Appointed Leader
                                     </span>
                                   ) : (
                                     <button
@@ -1224,14 +1224,15 @@ const ExpeditionDetailPanel = ({ expedition, allPersonnel, stations, onClose, on
                                       disabled={settingLeaderId === pId}
                                       title="Designate this confirmed personnel as Expedition Leader"
                                       style={{
-                                        display: 'inline-flex', alignItems: 'center', gap: '0.25rem',
-                                        padding: '0.25rem 0.55rem', backgroundColor: '#005B7F', color: '#fff',
-                                        border: 'none', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 700,
+                                        display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
+                                        padding: '0.35rem 0.7rem', backgroundColor: '#005B7F', color: '#fff',
+                                        border: 'none', borderRadius: '6px', fontSize: '0.72rem', fontWeight: 700,
                                         cursor: settingLeaderId === pId ? 'not-allowed' : 'pointer',
-                                        boxShadow: '0 1px 2px rgba(0,91,127,0.2)'
+                                        boxShadow: '0 2px 4px rgba(0,91,127,0.25)',
+                                        whiteSpace: 'nowrap'
                                       }}
                                     >
-                                      <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>military_tech</span>
+                                      <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>military_tech</span>
                                       {settingLeaderId === pId ? 'Appointing...' : 'Appoint as Leader'}
                                     </button>
                                   )}
